@@ -1,0 +1,21 @@
+<Project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<PropertyGroup>
+		<!-- Enable central package management-->
+		<CentralPackageVersionManagementEnabled>true</CentralPackageVersionManagementEnabled>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+
+		<!-- Shared Project Properties-->
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+		<RootNamespace>$(MSBuildProjectDirectory.Replace('$(SolutionDir)', '').Replace('\', '.').Replace('/', '.'))</RootNamespace>
+		<Company>HydroGarden Inc.</Company>
+		<Product>HydroGarden Automation</Product>
+		<Copyright>© $([System.DateTime]::Now.Year) $(Company) All rights reserved. All trademarks are the property of $(Company) and its subsidiaries.</Copyright>
+		<AssemblyTitle>HydroGarden Inc. - $(AssemblyName)</AssemblyTitle>
+		<Trademark>$(Product) is a trademark of $(Company)</Trademark>
+
+	</PropertyGroup>
+
+</Project>

@@ -1,0 +1,3 @@
+[submodule "Keyfile"]
+	path = Keyfile
+	url = https://thermocrs.visualstudio.com/Lab%20Automation/_git/Keyfile

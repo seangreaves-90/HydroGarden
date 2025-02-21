@@ -1,0 +1,56 @@
+<Project>
+	<PropertyGroup>
+		<InfragisticsVersion11>11.2.20112.2135</InfragisticsVersion11>
+		<InfragisticsCompositeVersion>1.0.20112.2138</InfragisticsCompositeVersion>
+		<MicrosoftAspNetCoreVersion>2.3.0</MicrosoftAspNetCoreVersion>
+		<MicrosoftExtensionsVersion>8.0.1</MicrosoftExtensionsVersion>
+		<MicrosoftIdentityModelVersion>7.5.2</MicrosoftIdentityModelVersion>
+		<MicrosoftPracticesVersion>1.0.51206</MicrosoftPracticesVersion>
+		<MicrosoftPracticesObjectBuilderVersion>1.0.51205</MicrosoftPracticesObjectBuilderVersion>
+		<SystemDiagnosticsVersion>8.0.1</SystemDiagnosticsVersion>
+		<SystemIOPipelinesVersion>8.0.0</SystemIOPipelinesVersion>
+		<SystemTextJsonVersion>8.0.5</SystemTextJsonVersion>
+		<SwashbuckleAspNetCoreVersion>6.6.2</SwashbuckleAspNetCoreVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="AutoMapper" Version="8.1.1" />
+		<PackageVersion Include="Infragistics.Practices.CompositeUI.WinForms" Version="$(InfragisticsCompositeVersion)" />
+		<PackageVersion Include="Infragistics4.Shared" Version="$(InfragisticsVersion11)" />
+		<PackageVersion Include="Infragistics4.Win.UltraWinToolbars" Version="$(InfragisticsVersion11)" />
+		<PackageVersion Include="Microsoft.AspNetCore" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Authentication" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Authentication.Abstractions" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Http" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Http.Features" Version="5.0.17" />
+		<PackageVersion Include="Microsoft.AspNetCore.JsonPatch" Version="$(SystemTextJsonVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Mvc" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Formatters.Xml" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Routing" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.StaticFiles" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.0" />
+		<PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsVersion)" />
+		<PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="$(MicrosoftIdentityModelVersion)" />
+		<PackageVersion Include="Microsoft.IdentityModel.Protocols" Version="$(MicrosoftIdentityModelVersion)" />
+		<PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="$(MicrosoftIdentityModelVersion)" />
+		<PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="$(MicrosoftIdentityModelVersion)" />
+		<PackageVersion Include="Microsoft.Net.Http.Headers" Version="$(MicrosoftAspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.OpenApi" Version="1.6.22" />
+		<PackageVersion Include="Microsoft.Practices.CompositeUI" Version="$(MicrosoftPracticesVersion)" />
+		<PackageVersion Include="Microsoft.Practices.CompositeUI.WinForms" Version="$(MicrosoftPracticesVersion)" />
+		<PackageVersion Include="Microsoft.Practices.CompositeUI.WPF" Version="$(MicrosoftPracticesVersion)" />
+		<PackageVersion Include="Microsoft.Practices.ObjectBuilder" Version="$(MicrosoftPracticesObjectBuilderVersion)" />
+		<PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageVersion Include="Swashbuckle.AspNetCore" Version="$(SwashbuckleAspNetCoreVersion)" />
+		<PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="$(SystemDiagnosticsVersion)" />
+		<PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="$(MicrosoftIdentityModelVersion)" />
+		<PackageVersion Include="System.IO.Pipelines" Version="$(SystemIOPipelinesVersion)" />
+		<PackageVersion Include="System.Text.Encodings.Web" Version="$(SystemIOPipelinesVersion)" />
+		<PackageVersion Include="System.Text.Json" Version="$(SystemTextJsonVersion)" />
+	</ItemGroup>
+</Project>
