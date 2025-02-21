@@ -1,6 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 
-namespace HydroGarden.Foundation.Common.Validation
+namespace HydroGarden.Foundation.Common.Result
 {
     public class CustomValidationResult : IValidationResult
     {
