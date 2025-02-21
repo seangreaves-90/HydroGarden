@@ -4,7 +4,7 @@ using HydroGarden.Foundation.Core.Devices;
 using Moq;
 using Xunit;
 
-namespace HydroGarden.Foundation.Tests.Unit.Devices
+namespace HydroGarden.Foundation.Tests.Unit.Device
 {
     public class TestIoTDevice : IoTDeviceBase
     {
