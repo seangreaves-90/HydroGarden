@@ -4,7 +4,7 @@ using HydroGarden.Foundation.Common.Locking;
 
 namespace HydroGarden.Foundation.Common.PropertyManager
 {
-    public class PropertyManager : IPropertyManager
+    public class PropertyManager : IPropertyManager, IAsyncDisposable
     {
         private readonly IPropertyStore _store;
         private readonly IPropertyCache _cache;
@@ -45,7 +45,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 var properties = await _store.LoadAsync(_id, ct);
                 foreach (var kvp in properties)
                 {
-                    await TryAddPropertyAsync(kvp.Key, kvp.Value);
+                    await TryAddPropertyAsync(kvp.Key, kvp.Value, ct);
                 }
 
                 _isLoaded = true;
@@ -57,9 +57,10 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             }
         }
 
-        private Task<bool> TryAddPropertyAsync(
+        private async Task<bool> TryAddPropertyAsync(
             string key,
-            object value)
+            object value,
+            CancellationToken ct)
         {
             try
             {
@@ -68,13 +69,13 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 var metadata = Activator.CreateInstance(metadataType, value, false, true, null);
 
                 _metadata[key] = metadata;
-                _cache.Set(key, value);
-                return Task.FromResult(true);
+                await _cache.SetAsync(key, value, ct);
+                return true;
             }
             catch (Exception? ex)
             {
                 _logger?.LogWarning(ex, $"Failed to add property {key}");
-                return Task.FromResult(false);
+                return false;
             }
         }
 
@@ -86,8 +87,9 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             using var readLock = await _lock.ReaderLockAsync(ct);
 
             // Try cache first
-            if (_cache.TryGet<T>(name, out var cached))
-                return cached;
+            var cacheResult = await _cache.TryGetAsync<T>(name, ct);
+            if (cacheResult.exists)
+                return cacheResult.value;
 
             // Get from metadata
             if (_metadata.TryGetValue(name, out var obj))
@@ -95,7 +97,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 if (obj is PropertyMetadata<T> metadata)
                 {
                     var value = await metadata.GetValueAsync(ct);
-                    _cache.Set(name, value);
+                    await _cache.SetAsync(name, value, ct);
                     return value;
                 }
                 throw new InvalidCastException($"Property {name} is not of type {typeof(T).Name}");
@@ -124,7 +126,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
 
             if (await metadata.TrySetValueAsync(value, ct))
             {
-                _cache.Set(name, value);
+                await _cache.SetAsync(name, value, ct);
                 OnPropertyChanged(name, oldValue, value);
             }
             else
@@ -155,7 +157,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 throw new ObjectDisposedException(nameof(PropertyManager));
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
             _isDisposed = true;
@@ -163,7 +165,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             try
             {
                 // Final save attempt
-                SaveAsync(CancellationToken.None).Wait();
+                await SaveAsync(CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -172,11 +174,33 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             finally
             {
                 _lock.Dispose();
+                if (_cache is IAsyncDisposable asyncCache)
+                {
+                    await asyncCache.DisposeAsync();
+                }
+                else if (_cache is IDisposable disposableCache)
+                {
+                    disposableCache.Dispose();
+                }
+
                 foreach (var metadata in _metadata.Values)
                 {
-                    (metadata as IDisposable)?.Dispose();
+                    if (metadata is IAsyncDisposable asyncDisposable)
+                    {
+                        await asyncDisposable.DisposeAsync();
+                    }
+                    else if (metadata is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed) return;
+            DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
 
         public async Task SaveAsync(CancellationToken ct = default)
