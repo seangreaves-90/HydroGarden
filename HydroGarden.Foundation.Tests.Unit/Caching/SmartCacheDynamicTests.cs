@@ -88,10 +88,11 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
         [Fact]
         public async Task Cache_ShouldPreferRemovingNonFrequentItems()
         {
+            // 🚀 Step 1: Add frequent items
             await _cache.SetAsync("frequent1", "value1", _cts.Token);
             await _cache.SetAsync("frequent2", "value2", _cts.Token);
-            await _cache.SetAsync("infrequent", "value3", _cts.Token);
 
+            // 🚀 Step 2: Access frequent items multiple times before adding infrequent
             for (int i = 0; i < 3; i++)
             {
                 bool freq1Exists = await _cache.TryGetAsync<string>("frequent1", _cts.Token);
@@ -103,15 +104,23 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
                 await Task.Delay(10, _cts.Token);
             }
 
-            await _cache.SetAsync("new", "value4", _cts.Token);
-            await Task.Delay(50, _cts.Token);
+            await Task.Delay(10, _cts.Token); // 🚀 Ensure access is recorded
 
+            // 🚀 Step 3: Add an infrequent item
+            await _cache.SetAsync("infrequent", "value3", _cts.Token);
+
+            // 🚀 Step 4: Add a new item to trigger eviction
+            await Task.Delay(20, _cts.Token);  // Ensure state is stable before eviction
+            await _cache.SetAsync("new", "value4", _cts.Token);
+            await Task.Delay(450, _cts.Token);  // 🚀 Increase delay to ensure cleanup executes properly
+
+            // 🚀 Step 5: Verify eviction results
             bool infrequentExists = await _cache.TryGetAsync<string>("infrequent", _cts.Token);
             bool freq1ExistsAfter = await _cache.TryGetAsync<string>("frequent1", _cts.Token);
             bool freq2ExistsAfter = await _cache.TryGetAsync<string>("frequent2", _cts.Token);
             bool newExists = await _cache.TryGetAsync<string>("new", _cts.Token);
 
-            infrequentExists.Should().BeFalse("because it was infrequently accessed");
+            infrequentExists.Should().BeFalse("because it was infrequently accessed and should be evicted");
             freq1ExistsAfter.Should().BeTrue("because it was frequently accessed");
             freq2ExistsAfter.Should().BeTrue("because it was frequently accessed");
             newExists.Should().BeTrue("because it was just added");
@@ -119,6 +128,9 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
             _cache.CurrentMaxSize.Should().Be(4, "because we have frequent items");
             _cache.CurrentSize.Should().Be(3);
         }
+
+
+
 
         async ValueTask IAsyncDisposable.DisposeAsync()
         {

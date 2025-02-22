@@ -85,17 +85,27 @@ namespace HydroGarden.Foundation.Common.Caching
             var entry = new CacheEntry(value);
             _entries.AddOrUpdate(key, entry, (_, __) => entry);
 
-            if (_entries.Count > _currentMaxSize)
+            var currentSize = _entries.Count;
+
+            if (currentSize > _currentMaxSize)
             {
                 AdjustMaxSize();
+
                 if (_entries.Count > _currentMaxSize)
                 {
-                    var tcs = new TaskCompletionSource<bool>();
-                    await _cleanupChannel.Writer.WriteAsync(tcs, ct);
-                    await tcs.Task;
+                    // 🚀 **Ensure eviction happens BEFORE allowing the cache to grow**
+                    await CleanupAsync(ct);
                 }
             }
         }
+
+
+
+
+
+
+
+
 
         public async ValueTask<bool> TryGetAsync<T>(string key, CancellationToken ct = default)
         {
@@ -184,6 +194,7 @@ namespace HydroGarden.Foundation.Common.Caching
                     }
                 }
 
+                // 🚀 **Remove expired items first**
                 foreach (var entry in expiredEntries)
                 {
                     _entries.TryRemove(entry.Key, out _);
@@ -191,17 +202,26 @@ namespace HydroGarden.Foundation.Common.Caching
 
                 AdjustMaxSize();
 
+                // 🚀 **STRICT eviction order: Remove all non-frequent items before touching frequent ones**
                 while (_entries.Count > _currentMaxSize)
                 {
                     if (nonFrequentEntries.Count > 0)
                     {
-                        var toRemove = nonFrequentEntries.OrderBy(e => e.Value.LastAccessed).First();
+                        var toRemove = nonFrequentEntries
+                            .OrderBy(e => e.Value.LastAccessed)
+                            .ThenBy(e => e.Value.AccessCount) // Remove least accessed first
+                            .First();
+
                         _entries.TryRemove(toRemove.Key, out _);
                         nonFrequentEntries.Remove(toRemove);
                     }
-                    else if (frequentEntries.Count > 2)
+                    else if (frequentEntries.Count > 2) // 🚀 **Only remove frequent items if absolutely necessary**
                     {
-                        var toRemove = frequentEntries.OrderBy(e => e.Value.LastAccessed).ThenBy(e => e.Value.AccessCount).First();
+                        var toRemove = frequentEntries
+                            .OrderBy(e => e.Value.LastAccessed)
+                            .ThenBy(e => e.Value.AccessCount) // Remove least accessed among frequent ones
+                            .First();
+
                         _entries.TryRemove(toRemove.Key, out _);
                         frequentEntries.Remove(toRemove);
                     }
@@ -216,6 +236,11 @@ namespace HydroGarden.Foundation.Common.Caching
                 _cleanupLock.Release();
             }
         }
+
+
+
+
+
 
         public async ValueTask DisposeAsync()
         {

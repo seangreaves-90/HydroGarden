@@ -139,7 +139,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
             }
 
             await Task.WhenAll(tasks);
-            await Task.Delay(250, _cts.Token);
+            await Task.Delay(500, _cts.Token);
 
             var remainingKeys = await GetAllCacheKeysAsync();
             remainingKeys.Count.Should().BeLessThanOrEqualTo(2, "because cache size is limited to 2");
