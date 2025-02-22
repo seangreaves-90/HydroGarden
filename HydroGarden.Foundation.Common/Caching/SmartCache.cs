@@ -69,33 +69,13 @@ namespace HydroGarden.Foundation.Common.Caching
         public int CurrentMaxSize => _currentMaxSize;
         public int CurrentSize => _entries.Count;
 
-        private bool UpdateMaxSize()
+        private void AdjustMaxSize()
         {
-            try
-            {
-                // Safe snapshot with concurrency protection
-                var currentEntries = _entries.ToArray();
-                var frequentCount = currentEntries.Count(kvp => !kvp.Value.IsExpired(_slidingExpiration)
-                    && kvp.Value.IsFrequentlyAccessed(_frequencyWindow));
+            var currentEntries = _entries.ToArray();
+            var frequentCount = currentEntries.Count(kvp => !kvp.Value.IsExpired(_slidingExpiration)
+                && kvp.Value.IsFrequentlyAccessed(_frequencyWindow));
 
-                var targetSize = _baseMaxSize;
-                if (frequentCount > _baseMaxSize / 2)
-                {
-                    targetSize = _baseMaxSize * 2;
-                }
-
-                var oldSize = _currentMaxSize;
-                var changed = oldSize != targetSize;
-                if (changed)
-                {
-                    Interlocked.Exchange(ref _currentMaxSize, targetSize);
-                }
-                return changed;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
+            _currentMaxSize = frequentCount > _baseMaxSize / 2 ? _baseMaxSize * 2 : _baseMaxSize;
         }
 
         public async ValueTask SetAsync<T>(string key, T value, CancellationToken ct = default)
@@ -105,51 +85,53 @@ namespace HydroGarden.Foundation.Common.Caching
             var entry = new CacheEntry(value);
             _entries.AddOrUpdate(key, entry, (_, __) => entry);
 
-            // Check size and trigger cleanup if needed
-            var currentSize = _entries.Count;
-            if (currentSize > _currentMaxSize)
+            if (_entries.Count > _currentMaxSize)
             {
-                UpdateMaxSize();
-
-                // If still over size after potential expansion
+                AdjustMaxSize();
                 if (_entries.Count > _currentMaxSize)
                 {
                     var tcs = new TaskCompletionSource<bool>();
                     await _cleanupChannel.Writer.WriteAsync(tcs, ct);
-                    try
-                    {
-                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        linkedCts.CancelAfter(TimeSpan.FromSeconds(1));
-                        await tcs.Task.WaitAsync(linkedCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Cleanup request timed out, but that's okay
-                    }
+                    await tcs.Task;
                 }
             }
         }
 
-        public async ValueTask<(bool exists, T? value)> TryGetAsync<T>(string key, CancellationToken ct = default)
+        public async ValueTask<bool> TryGetAsync<T>(string key, CancellationToken ct = default)
         {
-            if (_isDisposed) return (false, default);
+            if (_isDisposed) return false;
 
             if (_entries.TryGetValue(key, out var entry))
             {
                 if (entry.IsExpired(_slidingExpiration))
                 {
                     await RemoveAsync(key, ct);
-                    return (false, default);
+                    return false;
                 }
 
-                if (entry.Value is T typedValue)
-                {
-                    entry.RecordAccess();
-                    return (true, typedValue);
-                }
+                entry.RecordAccess();
+                return true;
             }
 
-            return (false, default);
+            return false;
+        }
+
+        public async ValueTask<T?> GetValueOrDefaultAsync<T>(string key, CancellationToken ct = default)
+        {
+            if (_isDisposed) return default;
+
+            if (_entries.TryGetValue(key, out var entry))
+            {
+                if (entry.IsExpired(_slidingExpiration))
+                {
+                    await RemoveAsync(key, ct);
+                    return default;
+                }
+
+                return entry.Value is T typedValue ? typedValue : default;
+            }
+
+            return default;
         }
 
         public ValueTask RemoveAsync(string key, CancellationToken ct = default)
@@ -161,24 +143,17 @@ namespace HydroGarden.Foundation.Common.Caching
 
         private async Task ProcessCleanupRequestsAsync(CancellationToken ct)
         {
-            try
+            await foreach (var tcs in _cleanupChannel.Reader.ReadAllAsync(ct))
             {
-                await foreach (var tcs in _cleanupChannel.Reader.ReadAllAsync(ct))
+                try
                 {
-                    try
-                    {
-                        await CleanupAsync(ct);
-                        tcs.TrySetResult(true);
-                    }
-                    catch (Exception ex)
-                    {
-                        tcs.TrySetException(ex);
-                    }
+                    await CleanupAsync(ct);
+                    tcs.TrySetResult(true);
                 }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                // Normal shutdown
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
             }
         }
 
@@ -189,8 +164,6 @@ namespace HydroGarden.Foundation.Common.Caching
             try
             {
                 var currentEntries = _entries.ToArray();
-
-                // First pass: identify entries to remove
                 var expiredEntries = new List<KeyValuePair<string, CacheEntry>>();
                 var nonFrequentEntries = new List<KeyValuePair<string, CacheEntry>>();
                 var frequentEntries = new List<KeyValuePair<string, CacheEntry>>();
@@ -211,40 +184,30 @@ namespace HydroGarden.Foundation.Common.Caching
                     }
                 }
 
-                // Remove expired first
                 foreach (var entry in expiredEntries)
                 {
                     _entries.TryRemove(entry.Key, out _);
                 }
 
-                // Update size based on remaining entries
-                UpdateMaxSize();
+                AdjustMaxSize();
 
-                // If still over size, remove non-frequent first
-                if (_entries.Count > _currentMaxSize)
+                while (_entries.Count > _currentMaxSize)
                 {
-                    var toRemove = nonFrequentEntries
-                        .OrderBy(e => e.Value.AccessCount)
-                        .ThenBy(e => e.Value.LastAccessed);
-
-                    foreach (var entry in toRemove)
+                    if (nonFrequentEntries.Count > 0)
                     {
-                        if (_entries.Count <= _currentMaxSize) break;
-                        _entries.TryRemove(entry.Key, out _);
+                        var toRemove = nonFrequentEntries.OrderBy(e => e.Value.LastAccessed).First();
+                        _entries.TryRemove(toRemove.Key, out _);
+                        nonFrequentEntries.Remove(toRemove);
                     }
-
-                    // If still over size, remove least accessed frequent entries
-                    if (_entries.Count > _currentMaxSize)
+                    else if (frequentEntries.Count > 2)
                     {
-                        var frequentToRemove = frequentEntries
-                            .OrderBy(e => e.Value.AccessCount)
-                            .ThenBy(e => e.Value.LastAccessed);
-
-                        foreach (var entry in frequentToRemove)
-                        {
-                            if (_entries.Count <= _currentMaxSize) break;
-                            _entries.TryRemove(entry.Key, out _);
-                        }
+                        var toRemove = frequentEntries.OrderBy(e => e.Value.LastAccessed).ThenBy(e => e.Value.AccessCount).First();
+                        _entries.TryRemove(toRemove.Key, out _);
+                        frequentEntries.Remove(toRemove);
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
             }
@@ -266,10 +229,7 @@ namespace HydroGarden.Foundation.Common.Caching
             {
                 await _cleanupTask;
             }
-            catch (OperationCanceledException)
-            {
-                // Expected during shutdown
-            }
+            catch (OperationCanceledException) { }
 
             _cleanupCts.Dispose();
             _cleanupLock.Dispose();

@@ -87,9 +87,10 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             using var readLock = await _lock.ReaderLockAsync(ct);
 
             // Try cache first
-            var cacheResult = await _cache.TryGetAsync<T>(name, ct);
-            if (cacheResult.exists)
-                return cacheResult.value;
+            if (await _cache.TryGetAsync<T>(name, ct))
+            {
+                return await _cache.GetValueOrDefaultAsync<T>(name, ct);
+            }
 
             // Get from metadata
             if (_metadata.TryGetValue(name, out var obj))
