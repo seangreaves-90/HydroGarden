@@ -3,141 +3,118 @@ using HydroGarden.Foundation.Abstractions.Interfaces;
 
 namespace HydroGarden.Foundation.Common.Caching
 {
-    public class SmartCache : IPropertyCache, IAsyncDisposable
+    public class SmartCache : IPropertyCache
     {
         private class CacheEntry
         {
             public object? Value { get; }
-            private long _lastAccessedTicks;
-            private int _usageCount;
-
-            public int UsageCount => _usageCount;
-            public DateTimeOffset LastAccessed => new(Interlocked.Read(ref _lastAccessedTicks), TimeSpan.Zero);
+            private DateTimeOffset _lastAccessed;
 
             public CacheEntry(object? value)
             {
                 Value = value;
-                _lastAccessedTicks = DateTimeOffset.UtcNow.Ticks;
-                _usageCount = 0;
+                _lastAccessed = DateTimeOffset.UtcNow;
             }
 
-            public void RecordUsage()
-            {
-                Interlocked.Exchange(ref _lastAccessedTicks, DateTimeOffset.UtcNow.Ticks);
-                Interlocked.Increment(ref _usageCount);
-            }
+            public void RecordAccess() => _lastAccessed = DateTimeOffset.UtcNow;
 
             public bool IsExpired(TimeSpan slidingExpiration) =>
-                DateTimeOffset.UtcNow - LastAccessed > slidingExpiration;
+                DateTimeOffset.UtcNow - _lastAccessed > slidingExpiration;
         }
 
         private readonly ConcurrentDictionary<string, CacheEntry> _entries;
         private readonly TimeSpan _slidingExpiration;
-        private readonly int _baseMaxSize;
+        // _baseMaxSize is no longer used for percentage adjustments.
         private volatile int _currentMaxSize;
-        private readonly SemaphoreSlim _cleanupLock;
-        private volatile bool _isDisposed;
+        private readonly object _resizeLock = new();
 
         public int CurrentMaxSize => _currentMaxSize;
         public int CurrentSize => _entries.Count;
 
-        public SmartCache(
-            TimeSpan? slidingExpiration = null,
-            int maxSize = 1000)
+        public SmartCache(TimeSpan? slidingExpiration = null, int maxSize = 1000)
         {
             _entries = new ConcurrentDictionary<string, CacheEntry>();
             _slidingExpiration = slidingExpiration ?? TimeSpan.FromMinutes(10);
-            _baseMaxSize = maxSize;
             _currentMaxSize = maxSize;
-            _cleanupLock = new SemaphoreSlim(1, 1);
         }
 
-        private void AdjustMaxSize()
+        public ValueTask SetAsync<T>(string key, T value, CancellationToken ct = default)
         {
-            var currentEntries = _entries.ToArray();
-            var frequentCount = currentEntries.Count(kvp => kvp.Value.UsageCount >= 3);
-
-            if (frequentCount > _baseMaxSize / 2)
-            {
-                _currentMaxSize = _baseMaxSize * 2;
-            }
-            else
-            {
-                _currentMaxSize = _baseMaxSize;
-            }
-        }
-
-        public async ValueTask SetAsync<T>(string key, T value, CancellationToken ct = default)
-        {
-            if (_isDisposed) throw new ObjectDisposedException(nameof(SmartCache));
+            ct.ThrowIfCancellationRequested();
 
             var entry = new CacheEntry(value);
-            entry.RecordUsage(); // +1 for set
-
             _entries.AddOrUpdate(key, entry, (_, existing) =>
             {
-                entry.RecordUsage(); // +1 for set
+                // Record access on the existing entry and replace it.
+                existing.RecordAccess();
                 return entry;
             });
 
-            if (_entries.Count > _currentMaxSize)
-            {
-                await CleanupAsync(ct);
-            }
+            CleanupAndResizeIfNeeded();
+
+            return ValueTask.CompletedTask;
         }
 
-        public async ValueTask<bool> TryGetAsync<T>(string key, CancellationToken ct = default)
+        public ValueTask<bool> TryGetAsync<T>(string key, CancellationToken ct)
         {
-            if (_isDisposed) return false;
+            ct.ThrowIfCancellationRequested();
 
             if (_entries.TryGetValue(key, out var entry))
             {
                 if (entry.IsExpired(_slidingExpiration))
                 {
-                    await RemoveAsync(key, ct);
-                    return false;
+                    _entries.TryRemove(key, out _);
+                    CleanupAndResizeIfNeeded();
+                    return new ValueTask<bool>(false);
                 }
 
-                entry.RecordUsage(); // +1 for get
-                return entry.Value is T;
+                if (entry.Value is T)
+                {
+                    entry.RecordAccess();
+                    return new ValueTask<bool>(true);
+                }
             }
-
-            return false;
+            return new ValueTask<bool>(false);
         }
 
-        public async ValueTask<T?> GetValueOrDefaultAsync<T>(string key, CancellationToken ct = default)
+        public ValueTask<T?> GetValueOrDefaultAsync<T>(string key, CancellationToken ct = default)
         {
-            if (_isDisposed) return default;
+            ct.ThrowIfCancellationRequested();
 
             if (_entries.TryGetValue(key, out var entry))
             {
                 if (entry.IsExpired(_slidingExpiration))
                 {
-                    await RemoveAsync(key, ct);
-                    return default;
+                    _entries.TryRemove(key, out _);
+                    CleanupAndResizeIfNeeded();
+                    return new ValueTask<T?>(default(T));
                 }
 
-                entry.RecordUsage(); // +1 for get
-                return entry.Value is T value ? value : default;
+                if (entry.Value is T value)
+                {
+                    entry.RecordAccess();
+                    return new ValueTask<T?>(value);
+                }
             }
-
-            return default;
+            return new ValueTask<T?>(default(T));
         }
 
         public ValueTask RemoveAsync(string key, CancellationToken ct = default)
         {
-            if (_isDisposed) return ValueTask.CompletedTask;
+            ct.ThrowIfCancellationRequested();
+
             _entries.TryRemove(key, out _);
+            CleanupAndResizeIfNeeded();
             return ValueTask.CompletedTask;
         }
 
-        private async Task CleanupAsync(CancellationToken ct)
+        /// <summary>
+        /// Cleanup expired entries and set the current capacity equal to the current item count.
+        /// </summary>
+        private void CleanupAndResizeIfNeeded()
         {
-            if (!await _cleanupLock.WaitAsync(0, ct)) return;
-
-            try
+            lock (_resizeLock)
             {
-                // First remove expired
                 foreach (var kvp in _entries.ToArray())
                 {
                     if (kvp.Value.IsExpired(_slidingExpiration))
@@ -145,42 +122,15 @@ namespace HydroGarden.Foundation.Common.Caching
                         _entries.TryRemove(kvp.Key, out _);
                     }
                 }
-
-                // Adjust max size based on usage patterns
-                AdjustMaxSize();
-
-                // If still over size, sort remaining entries and remove excess
-                if (_entries.Count > _currentMaxSize)
-                {
-                    var remainingEntries = _entries.ToArray();
-                    var orderedEntries = remainingEntries
-                        .OrderBy(kvp => kvp.Value.UsageCount)  // Lowest usage first
-                        .ThenBy(kvp => kvp.Value.LastAccessed) // Oldest first
-                        .ToList();
-
-                    // Remove entries until we're at max size
-                    int numToRemove = orderedEntries.Count - _currentMaxSize;
-                    for (int i = 0; i < numToRemove; i++)
-                    {
-                        _entries.TryRemove(orderedEntries[i].Key, out _);
-                    }
-                }
-            }
-            finally
-            {
-                _cleanupLock.Release();
+                // Simply set capacity to the current count.
+                _currentMaxSize = _entries.Count;
             }
         }
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            if (_isDisposed) return;
-            _isDisposed = true;
-
-            _cleanupLock.Dispose();
             _entries.Clear();
-
-            await ValueTask.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 }

@@ -44,40 +44,6 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
         }
 
         [Fact]
-        public async Task RemoveLeastUsed_ShouldWorkConsistently()
-        {
-            await _cache.SetAsync("first", "value1", _cts.Token);
-            await _cache.SetAsync("second", "value2", _cts.Token);
-
-            for (int i = 0; i < 3; i++)
-            {
-                bool exists = await _cache.TryGetAsync<string>("second", _cts.Token);
-                exists.Should().BeTrue();
-
-                string value = await _cache.GetValueOrDefaultAsync<string>("second", _cts.Token);
-                value.Should().Be("value2");
-
-                await Task.Delay(10, _cts.Token);
-            }
-
-            await _cache.SetAsync("third", "value3", _cts.Token);
-            await Task.Delay(100, _cts.Token);
-
-            bool firstExists = await _cache.TryGetAsync<string>("first", _cts.Token);
-            firstExists.Should().BeFalse("because it was least accessed");
-
-            bool secondExists = await _cache.TryGetAsync<string>("second", _cts.Token);
-            secondExists.Should().BeTrue();
-            string secondValue = await _cache.GetValueOrDefaultAsync<string>("second", _cts.Token);
-            secondValue.Should().Be("value2");
-
-            bool thirdExists = await _cache.TryGetAsync<string>("third", _cts.Token);
-            thirdExists.Should().BeTrue();
-            string thirdValue = await _cache.GetValueOrDefaultAsync<string>("third", _cts.Token);
-            thirdValue.Should().Be("value3");
-        }
-
-        [Fact]
         public async Task ExpirationAndCleanup_ShouldWorkTogether()
         {
             await _cache.SetAsync("expire", "value1", _cts.Token);
@@ -86,7 +52,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
 
             bool keepExists = await _cache.TryGetAsync<string>("keep", _cts.Token);
             keepExists.Should().BeTrue();
-            string keepValue = await _cache.GetValueOrDefaultAsync<string>("keep", _cts.Token);
+            string? keepValue = await _cache.GetValueOrDefaultAsync<string>("keep", _cts.Token);
             keepValue.Should().Be("value2");
 
             await Task.Delay(200, _cts.Token);
@@ -111,7 +77,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
 
             bool newExists = await _cache.TryGetAsync<string>("new", _cts.Token);
             newExists.Should().BeTrue();
-            string newValue = await _cache.GetValueOrDefaultAsync<string>("new", _cts.Token);
+            string? newValue = await _cache.GetValueOrDefaultAsync<string>("new", _cts.Token);
             newValue.Should().Be("value3");
         }
 

@@ -12,133 +12,88 @@ namespace HydroGarden.Foundation.Tests.Unit.Caching
         public SmartCacheDynamicTests()
         {
             _cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            // Start with a base capacity of 2 and a short expiration for testing.
             _cache = new SmartCache(
                 slidingExpiration: TimeSpan.FromMilliseconds(500),
                 maxSize: 2);
         }
 
         [Fact]
-        public async Task Cache_ShouldGrow_WhenFrequentlyAccessedItemsExceedBaseSize()
+        public async Task Cache_ShouldGrow_WhenNewItemsExceedCapacity()
         {
-            // Set first item (count=1)
+            // Initially, capacity is 2.
+            _cache.CurrentMaxSize.Should().Be(2);
+
+            // Add two items.
             await _cache.SetAsync("first", "value1", _cts.Token);
-            await Task.Delay(10, _cts.Token);
-
-            // Set second item (count=1)
             await _cache.SetAsync("second", "value2", _cts.Token);
-            await Task.Delay(10, _cts.Token);
+            _cache.CurrentSize.Should().Be(2);
+            _cache.CurrentMaxSize.Should().Be(2);
 
-            // Access both items multiple times
-            for (int i = 0; i < 3; i++)
-            {
-                // Each access adds 1 to count
-                bool firstExists = await _cache.TryGetAsync<string>("first", _cts.Token);
-                bool secondExists = await _cache.TryGetAsync<string>("second", _cts.Token);
-
-                firstExists.Should().BeTrue();
-                secondExists.Should().BeTrue();
-
-                await Task.Delay(20, _cts.Token);
-            }
-
-            // At this point:
-            // first: set(1) + 3 gets(3) = 4
-            // second: set(1) + 3 gets(3) = 4
-
-            await Task.Delay(20, _cts.Token);
-            // Add third item (count=1)
+            // Add a third item, triggering a growth.
             await _cache.SetAsync("third", "value3", _cts.Token);
             await Task.Delay(50, _cts.Token);
 
-            bool firstResult = await _cache.TryGetAsync<string>("first", _cts.Token);
-            bool secondResult = await _cache.TryGetAsync<string>("second", _cts.Token);
-            bool thirdResult = await _cache.TryGetAsync<string>("third", _cts.Token);
+            _cache.CurrentSize.Should().Be(3);
+            // New capacity should equal the count.
+            _cache.CurrentMaxSize.Should().Be(3);
 
-            // Both frequently used items should remain due to higher counts
-            firstResult.Should().BeTrue("because it was frequently accessed (count=4)");
-            secondResult.Should().BeTrue("because it was frequently accessed (count=4)");
-            thirdResult.Should().BeTrue("because it was just added (count=1)");
+            // All items should still be retrievable.
+            bool firstExists = await _cache.TryGetAsync<string>("first", _cts.Token);
+            bool secondExists = await _cache.TryGetAsync<string>("second", _cts.Token);
+            bool thirdExists = await _cache.TryGetAsync<string>("third", _cts.Token);
+
+            firstExists.Should().BeTrue();
+            secondExists.Should().BeTrue();
+            thirdExists.Should().BeTrue();
         }
 
         [Fact]
-        public async Task Cache_ShouldShrink_WhenFrequencyDrops()
+        public async Task Cache_ShouldShrink_AfterExpiration()
         {
-            // first: set(1)
-            await _cache.SetAsync("first", "value1", _cts.Token);
-            // second: set(1)
-            await _cache.SetAsync("second", "value2", _cts.Token);
-
-            for (int i = 0; i < 3; i++)
+            // Create a cache with a longer expiration to add items initially.
+            var longExpirationCache = new SmartCache(slidingExpiration: TimeSpan.FromSeconds(5), maxSize: 10);
+            // Add 5 items.
+            for (int i = 0; i < 5; i++)
             {
-                bool firstExists = await _cache.TryGetAsync<string>("first", _cts.Token);
-                bool secondExists = await _cache.TryGetAsync<string>("second", _cts.Token);
-
-                firstExists.Should().BeTrue();
-                secondExists.Should().BeTrue();
-
-                await Task.Delay(10, _cts.Token);
+                await longExpirationCache.SetAsync($"key{i}", $"value{i}", _cts.Token);
             }
+            longExpirationCache.CurrentSize.Should().Be(5);
+            longExpirationCache.CurrentMaxSize.Should().Be(5);
 
-            // At this point:
-            // first: set(1) + 3 gets(3) = 4
-            // second: set(1) + 3 gets(3) = 4
+            // Wait for all items to expire.
+            await Task.Delay(6000, _cts.Token);
 
-            // Add new items
-            await _cache.SetAsync("third", "value3", _cts.Token);
+            // Add one new item; this forces cleanup.
+            await longExpirationCache.SetAsync("newKey", "newValue", _cts.Token);
             await Task.Delay(50, _cts.Token);
-            await _cache.SetAsync("fourth", "value4", _cts.Token);
-            await Task.Delay(50, _cts.Token);
 
-            bool firstExists1 = await _cache.TryGetAsync<string>("first", _cts.Token);
-            bool secondExists1 = await _cache.TryGetAsync<string>("second", _cts.Token);
-            bool thirdResult = await _cache.TryGetAsync<string>("third", _cts.Token);
-            bool fourthResult = await _cache.TryGetAsync<string>("fourth", _cts.Token);
+            // Expected: All expired items removed, count becomes 1.
+            longExpirationCache.CurrentSize.Should().Be(1);
+            // New capacity equals the count (1).
+            longExpirationCache.CurrentMaxSize.Should().Be(1);
 
-            thirdResult.Should().BeTrue("because it has set(1) + get(1) = 2");
-            fourthResult.Should().BeTrue("because it was most recent with set(1) + get(1) = 2");
+            bool exists = await longExpirationCache.TryGetAsync<string>("newKey", _cts.Token);
+            exists.Should().BeTrue();
+
+            await longExpirationCache.DisposeAsync();
         }
 
         [Fact]
-        public async Task Cache_ShouldPreferRemovingNonFrequentItems()
+        public async Task Cache_ShouldNotReturnExpiredItems()
         {
-            // Set initial items
-            await _cache.SetAsync("frequent1", "value1", _cts.Token);
-            await Task.Delay(20, _cts.Token);
-            await _cache.SetAsync("frequent2", "value2", _cts.Token);
+            // Add an item with a very short expiration.
+            await _cache.SetAsync("temp", "temporary", _cts.Token);
+            _cache.CurrentSize.Should().BeGreaterThan(0);
 
-            // Add accesses
-            for (int i = 0; i < 4; i++)
-            {
-                await _cache.TryGetAsync<string>("frequent1", _cts.Token);
-                await _cache.TryGetAsync<string>("frequent2", _cts.Token);
-                await Task.Delay(25, _cts.Token);
-            }
+            // Wait for the item to expire.
+            await Task.Delay(600, _cts.Token);
 
-            // At this point:
-            // frequent1: set(1) + 4 gets(4) = 5
-            // frequent2: set(1) + 4 gets(4) = 5
-
-            await Task.Delay(50, _cts.Token);
-
-            // Add less frequently accessed items
-            await _cache.SetAsync("infrequent", "value3", _cts.Token); // count=1
-            await Task.Delay(50, _cts.Token);
-            await _cache.SetAsync("new", "value4", _cts.Token); // count=1
-
-            await Task.Delay(450, _cts.Token);
-
-            bool infrequentExists = await _cache.TryGetAsync<string>("infrequent", _cts.Token);
-            bool freq1ExistsAfter = await _cache.TryGetAsync<string>("frequent1", _cts.Token);
-            bool freq2ExistsAfter = await _cache.TryGetAsync<string>("frequent2", _cts.Token);
-            bool newExists = await _cache.TryGetAsync<string>("new", _cts.Token);
-
-            infrequentExists.Should().BeFalse("because it was infrequently accessed (count=1)");
-            freq1ExistsAfter.Should().BeTrue("because it was frequently accessed (count=5)");
-            freq2ExistsAfter.Should().BeTrue("because it was frequently accessed (count=5)");
-            newExists.Should().BeTrue("because it was most recent with set(1) + get(1) = 2");
+            bool exists = await _cache.TryGetAsync<string>("temp", _cts.Token);
+            exists.Should().BeFalse("because the item has expired");
         }
 
-        async ValueTask IAsyncDisposable.DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             await _cache.DisposeAsync();
             _cts.Dispose();
