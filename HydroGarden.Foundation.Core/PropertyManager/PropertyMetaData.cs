@@ -1,15 +1,15 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 
-namespace HydroGarden.Foundation.Common.PropertyManager
+namespace HydroGarden.Foundation.Core.PropertyManager
 {
-    public class PropertyMetadata<T>
+    public class PropertyMetadata<T> : IPropertyMetadata
     {
         private T _value;
         private readonly IPropertyValidator<IValidationResult, T>? _validator;
         private readonly SemaphoreSlim _lock = new(1, 1);
 
         public Type PropertyType => typeof(T);
-        public bool IsReadOnly { get; }
+        public bool IsReadOnly { get; } // This flag is now only for UI/informational purposes.
         public bool IsVisible { get; }
         public DateTimeOffset LastModified { get; private set; }
         public string? LastError { get; private set; }
@@ -27,12 +27,20 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             LastModified = DateTimeOffset.UtcNow;
         }
 
-        public async Task<T> GetValueAsync(CancellationToken ct = default)
+        public async Task<TValue> GetValueAsync<TValue>(CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
             try
             {
-                return _value;
+                if (_value is TValue result)
+                {
+                    return result;
+                }
+                else
+                {
+                    // Optionally, convert _value to TValue
+                    throw new InvalidCastException($"Cannot convert value of type {typeof(T).Name} to {typeof(TValue).Name}.");
+                }
             }
             finally
             {
@@ -40,14 +48,13 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             }
         }
 
+        public async Task<object> GetValueAsync(CancellationToken ct = default)
+        {
+            return await GetValueAsync<T>(ct);
+        }
+
         public async Task<bool> TrySetValueAsync(T value, CancellationToken ct = default)
         {
-            if (IsReadOnly)
-            {
-                LastError = "Property is read-only";
-                return false;
-            }
-
             await _lock.WaitAsync(ct);
             try
             {
@@ -77,5 +84,4 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             _lock.Dispose();
         }
     }
-
 }

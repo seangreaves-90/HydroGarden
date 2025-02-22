@@ -106,7 +106,7 @@ namespace HydroGarden.Foundation.Core.Devices
 
         protected virtual void OnPropertyChanged(object? sender, IPropertyChangedEventArgs e)
         {
-            Logger.LogWarning(null,
+            Logger?.LogWarning(null,
                 $"Property changed on device {Id}: {e.Name} from {e.OldValue} to {e.NewValue}");
         }
 

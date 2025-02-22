@@ -1,8 +1,10 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using System.Collections.Concurrent;
 using HydroGarden.Foundation.Common.Locking;
+using HydroGarden.Foundation.Core.Stores;
+using HydroGarden.Foundation.Common.EventArgs;
 
-namespace HydroGarden.Foundation.Common.PropertyManager
+namespace HydroGarden.Foundation.Core.PropertyManager
 {
     public class PropertyManager : IPropertyManager, IAsyncDisposable
     {
@@ -24,7 +26,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             ILogger? logger = null)
         {
             _id = id ?? throw new ArgumentNullException(nameof(id));
-            _store = store ?? throw new ArgumentNullException(nameof(store));
+            _store = store ?? new JsonPropertyStore(Environment.CurrentDirectory);
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _logger = logger;
 
@@ -99,7 +101,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 {
                     var value = await metadata.GetValueAsync(ct);
                     await _cache.SetAsync(name, value, ct);
-                    return value;
+                    return (T?)value;
                 }
                 throw new InvalidCastException($"Property {name} is not of type {typeof(T).Name}");
             }
@@ -147,7 +149,7 @@ namespace HydroGarden.Foundation.Common.PropertyManager
             var handler = PropertyChanged;
             if (handler != null)
             {
-                var args = new EventArgs.PropertyChangedEventArgs(name, oldValue, newValue);
+                var args = new PropertyChangedEventArgs(name, oldValue, newValue);
                 handler(this, args);
             }
         }
@@ -216,14 +218,12 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 foreach (var kvp in _metadata)
                 {
                     var name = kvp.Key;
-                    var metadata = kvp.Value;
-                    var value = await ((metadata?.GetType()
-                        .GetMethod("GetValueAsync")
-                        ?.Invoke(metadata, [ct]) as Task<object>)!);
-
-                    updates[name] = value;
+                    if (kvp.Value is IPropertyMetadata metadata)
+                    {
+                        var value = await metadata.GetValueAsync<object>(ct);
+                        updates[name] = value;
+                    }
                 }
-
                 await _store.SaveAsync(_id, updates, ct);
             }
             catch (Exception ex)
@@ -232,5 +232,6 @@ namespace HydroGarden.Foundation.Common.PropertyManager
                 throw;
             }
         }
+
     }
 }
