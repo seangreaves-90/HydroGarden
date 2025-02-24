@@ -27,6 +27,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Folder Include="Caching\" />
 		<Folder Include="Device\" />
 		<Folder Include="Store\" />
 	</ItemGroup>

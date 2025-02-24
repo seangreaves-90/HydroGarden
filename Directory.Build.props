@@ -9,7 +9,7 @@
 
 		<!-- Shared Project Properties-->
 		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
-		<RootNamespace>$(MSBuildProjectDirectory.Replace('\', '.').Replace('/', '.'))</RootNamespace>
+		<RootNamespace>$(MSBuildProjectName)</RootNamespace>
 		<Company>HydroGarden Inc.</Company>
 		<Product>HydroGarden Automation</Product>
 		<Copyright>© $([System.DateTime]::Now.Year) $(Company) All rights reserved. All trademarks are the property of $(Company) and its subsidiaries.</Copyright>
