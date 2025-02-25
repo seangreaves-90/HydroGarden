@@ -4,60 +4,73 @@ using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Serialization;
-
 namespace HydroGarden.Foundation.Core.Stores
 {
-    /// <summary>
-    /// Provides a JSON file-based storage mechanism for component properties and metadata.
-    /// </summary>
     public class JsonStore : IStore
     {
         private readonly string _filePath;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly JsonSerializerOptions _serializerOptions;
         private readonly IHydroGardenLogger _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the JsonStore class.
-        /// </summary>
-        /// <param name="basePath">The base directory path for storing JSON files.</param>
         public JsonStore(string basePath, IHydroGardenLogger logger)
         {
-            _filePath = Path.Combine(Path.GetFullPath(basePath), "ComponentProperties.json");
-            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            string fullPath = Path.GetFullPath(basePath);
+            _filePath = Path.Combine(fullPath, "ComponentProperties.json");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to create directory at {Path.GetDirectoryName(_filePath)}", ex);
+            }
+
             _serializerOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
                 PropertyNameCaseInsensitive = true,
                 ReferenceHandler = ReferenceHandler.IgnoreCycles,
                 Converters =
-                            {
-                                new JsonStringEnumConverter(),
-                                new PropertyMetadataConverter(),
-                                new ComponentPropertiesConverter()
-                            }
+                {
+                    new JsonStringEnumConverter(),
+                    new PropertyMetadataConverter(),
+                    new ComponentPropertiesConverter()
+                }
             };
             _logger = logger ?? new HydroGardenLogger();
+            _logger.Log($"JsonStore initialized with file path: {_filePath}");
         }
-
-        /// <inheritdoc/>
         public async Task<IStoreTransaction> BeginTransactionAsync(CancellationToken ct = default)
         {
-            // Load current state to get a snapshot
             await _lock.WaitAsync(ct);
             try
             {
                 Dictionary<string, ComponentStore> store;
                 if (File.Exists(_filePath))
                 {
-                    string json = await File.ReadAllTextAsync(_filePath, ct);
-                    store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions) ?? new();
+                    try
+                    {
+                        string json = await File.ReadAllTextAsync(_filePath, ct);
+                        if (string.IsNullOrWhiteSpace(json))
+                        {
+                            store = new Dictionary<string, ComponentStore>();
+                        }
+                        else
+                        {
+                            store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions) ?? new();
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.Log(ex, $"Error deserializing JSON store. Creating a new store.");
+                        store = new Dictionary<string, ComponentStore>();
+                    }
                 }
                 else
                 {
                     store = new Dictionary<string, ComponentStore>();
                 }
-
                 return new JsonStoreTransaction(this, store);
             }
             finally
@@ -65,29 +78,31 @@ namespace HydroGarden.Foundation.Core.Stores
                 _lock.Release();
             }
         }
-
-        /// <inheritdoc/>
         public async Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
             try
             {
                 if (!File.Exists(_filePath)) return null;
-                string json = await File.ReadAllTextAsync(_filePath, ct);
-                var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
-                return store?.GetValueOrDefault(id.ToString())?.Properties;
-            }
-            catch (JsonException)
-            {
-                return null;
+                try
+                {
+                    string json = await File.ReadAllTextAsync(_filePath, ct);
+                    if (string.IsNullOrWhiteSpace(json)) return null;
+
+                    var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
+                    return store?.GetValueOrDefault(id.ToString())?.Properties;
+                }
+                catch (JsonException ex)
+                {
+                    _logger.Log(ex, $"Error deserializing JSON when loading properties for ID {id}");
+                    return null;
+                }
             }
             finally
             {
                 _lock.Release();
             }
         }
-
-        /// <inheritdoc/>
         public async Task<IDictionary<string, IPropertyMetadata>?> LoadMetadataAsync(Guid id, CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
@@ -99,54 +114,47 @@ namespace HydroGarden.Foundation.Core.Stores
                     return null;
                 }
 
-                string json = await File.ReadAllTextAsync(_filePath, ct);
-
-                if (string.IsNullOrWhiteSpace(json))
+                try
                 {
-                    _logger.Log($"[DEBUG] LoadMetadataAsync: JSON file is empty.");
+                    string json = await File.ReadAllTextAsync(_filePath, ct);
+                    if (string.IsNullOrWhiteSpace(json))
+                    {
+                        _logger.Log($"[DEBUG] LoadMetadataAsync: JSON file is empty.");
+                        return null;
+                    }
+
+                    var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
+                    if (store == null || !store.ContainsKey(id.ToString()))
+                    {
+                        _logger.Log($"[DEBUG] LoadMetadataAsync: No entry found for ID {id}");
+                        return null;
+                    }
+
+                    var metadata = store[id.ToString()].Metadata;
+                    if (metadata == null || metadata.Count == 0)
+                    {
+                        _logger.Log($"[DEBUG] LoadMetadataAsync: Metadata is empty for ID {id}");
+                        return null;
+                    }
+
+                    _logger.Log($"[DEBUG] LoadMetadataAsync: Successfully loaded metadata for ID {id}");
+                    return metadata.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.Log(ex, $"[ERROR] LoadMetadataAsync: JSON Parsing failed - {ex.Message}");
                     return null;
                 }
-
-                var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
-
-                if (store == null || !store.ContainsKey(id.ToString()))
-                {
-                    _logger.Log($"[DEBUG] LoadMetadataAsync: No entry found for ID {id}");
-                    return null;
-                }
-
-                var metadata = store[id.ToString()].Metadata;
-
-                if (metadata == null || metadata.Count == 0)
-                {
-                    _logger.Log($"[DEBUG] LoadMetadataAsync: Metadata is empty for ID {id}");
-                    return null;
-                }
-
-                _logger.Log($"[DEBUG] LoadMetadataAsync: Successfully loaded metadata for ID {id}");
-
-                return metadata.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value);
-            }
-            catch (JsonException ex)
-            {
-                _logger.Log(ex, $"[ERROR] LoadMetadataAsync: JSON Parsing failed - {ex.Message}");
-                return null;
             }
             finally
             {
                 _lock.Release();
             }
         }
-
-
-
-        /// <inheritdoc/>
         public async Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default)
         {
             await SaveWithMetadataAsync(id, properties, null, ct);
         }
-
-        /// <inheritdoc/>
         public async Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties,
             IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default)
         {
@@ -156,8 +164,23 @@ namespace HydroGarden.Foundation.Core.Stores
                 Dictionary<string, ComponentStore> store;
                 if (File.Exists(_filePath))
                 {
-                    string json = await File.ReadAllTextAsync(_filePath, ct);
-                    store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions) ?? new();
+                    try
+                    {
+                        string json = await File.ReadAllTextAsync(_filePath, ct);
+                        if (string.IsNullOrWhiteSpace(json))
+                        {
+                            store = new Dictionary<string, ComponentStore>();
+                        }
+                        else
+                        {
+                            store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions) ?? new();
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger.Log(ex, $"Error deserializing JSON when saving. Creating new store.");
+                        store = new Dictionary<string, ComponentStore>();
+                    }
                 }
                 else
                 {
@@ -185,27 +208,44 @@ namespace HydroGarden.Foundation.Core.Stores
                 _lock.Release();
             }
         }
-
-
         internal async Task SaveStoreAsync(Dictionary<string, ComponentStore> store, CancellationToken ct = default)
         {
             string tempFile = $"{_filePath}.tmp";
-            await File.WriteAllTextAsync(tempFile, JsonSerializer.Serialize(store.ToDictionary(kvp => kvp.Key, kvp => new ComponentStore
+            try
             {
-                Properties = kvp.Value.GetSerializableProperties(),
-                Metadata = kvp.Value.Metadata
-            }), _serializerOptions), ct);
-            File.Move(tempFile, _filePath, true);
-        }
+                var serializableStore = store.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => new ComponentStore
+                    {
+                        Properties = kvp.Value.GetSerializableProperties(),
+                        Metadata = kvp.Value.Metadata
+                    });
 
-        /// <summary>
-        /// Class that represents a component's properties and metadata.
-        /// </summary>
+                string json = JsonSerializer.Serialize(serializableStore, _serializerOptions);
+                await File.WriteAllTextAsync(tempFile, json, ct);
+                File.Move(tempFile, _filePath, true);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ex, "Error saving store to file");
+                if (File.Exists(tempFile))
+                {
+                    try
+                    {
+                        File.Delete(tempFile);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup errors
+                    }
+                }
+                throw;
+            }
+        }
         public class ComponentStore
         {
             public Dictionary<string, object> Properties { get; set; } = new();
             public Dictionary<string, PropertyMetadata> Metadata { get; set; } = new();
-
             public Dictionary<string, object> GetSerializableProperties()
             {
                 return Properties
@@ -213,10 +253,6 @@ namespace HydroGarden.Foundation.Core.Stores
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
         }
-
-        /// <summary>
-        /// Converter for PropertyMetadata objects.
-        /// </summary>
         private class PropertyMetadataConverter : JsonConverter<PropertyMetadata>
         {
             public override PropertyMetadata Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -250,7 +286,6 @@ namespace HydroGarden.Foundation.Core.Stores
                 }
                 return metadata;
             }
-
             public override void Write(Utf8JsonWriter writer, PropertyMetadata value, JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
@@ -262,10 +297,6 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
     }
-
-    /// <summary>
-    /// Provides transaction support for JsonStore.
-    /// </summary>
     public class JsonStoreTransaction : IStoreTransaction
     {
         private readonly JsonStore _store;
@@ -274,50 +305,34 @@ namespace HydroGarden.Foundation.Core.Stores
         private bool _isCommitted;
         private bool _isRolledBack;
         private bool _isDisposed;
-
-        /// <summary>
-        /// Initializes a new instance of the JsonStoreTransaction class.
-        /// </summary>
-        /// <param name="store">The JsonStore that owns this transaction.</param>
-        /// <param name="currentState">The current state of the store.</param>
         internal JsonStoreTransaction(JsonStore store, Dictionary<string, JsonStore.ComponentStore> currentState)
         {
             _store = store;
-            // Create a deep copy of the current state
             _originalState = DeepCopyState(currentState);
             _workingState = DeepCopyState(currentState);
         }
-
-        /// <inheritdoc/>
         public Task SaveAsync(Guid id, IDictionary<string, object> properties)
         {
             ThrowIfFinalized();
-
             var componentId = id.ToString();
             if (!_workingState.TryGetValue(componentId, out var componentStore))
             {
                 componentStore = new JsonStore.ComponentStore();
                 _workingState[componentId] = componentStore;
             }
-
             componentStore.Properties = new Dictionary<string, object>(properties);
             return Task.CompletedTask;
         }
-
-        /// <inheritdoc/>
         public Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata)
         {
             ThrowIfFinalized();
-
             var componentId = id.ToString();
             if (!_workingState.TryGetValue(componentId, out var componentStore))
             {
                 componentStore = new JsonStore.ComponentStore();
                 _workingState[componentId] = componentStore;
             }
-
             componentStore.Properties = new Dictionary<string, object>(properties);
-
             if (metadata != null)
             {
                 componentStore.Metadata = metadata.ToDictionary(
@@ -330,44 +345,30 @@ namespace HydroGarden.Foundation.Core.Stores
                         Description = kvp.Value.Description
                     });
             }
-
             return Task.CompletedTask;
         }
-
-        /// <inheritdoc/>
         public async Task CommitAsync(CancellationToken ct = default)
         {
             ThrowIfFinalized();
-
             await _store.SaveStoreAsync(_workingState, ct);
             _isCommitted = true;
         }
-
-        /// <inheritdoc/>
         public Task RollbackAsync(CancellationToken ct = default)
         {
             ThrowIfFinalized();
-
-            // No need to do anything since we haven't committed yet
             _isRolledBack = true;
             return Task.CompletedTask;
         }
-
-        /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed)
                 return;
-
             if (!_isCommitted && !_isRolledBack)
             {
-                // Auto-rollback if transaction was not explicitly committed or rolled back
                 await RollbackAsync();
             }
-
             _isDisposed = true;
         }
-
         private void ThrowIfFinalized()
         {
             if (_isCommitted)
@@ -377,11 +378,9 @@ namespace HydroGarden.Foundation.Core.Stores
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(JsonStoreTransaction));
         }
-
         private Dictionary<string, JsonStore.ComponentStore> DeepCopyState(Dictionary<string, JsonStore.ComponentStore> source)
         {
             var result = new Dictionary<string, JsonStore.ComponentStore>();
-
             foreach (var (key, value) in source)
             {
                 result[key] = new JsonStore.ComponentStore
@@ -390,7 +389,6 @@ namespace HydroGarden.Foundation.Core.Stores
                     Metadata = new Dictionary<string, PropertyMetadata>(value.Metadata)
                 };
             }
-
             return result;
         }
     }

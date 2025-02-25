@@ -31,6 +31,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             }
         }
 
+
         [Fact]
         public async Task SaveAsync_ShouldCreateValidJsonFile()
         {
@@ -42,6 +43,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
                 { "Value", 42.5 }
             };
             await _sut.SaveAsync(deviceId, properties);
+
+            // Verify file was created
             File.Exists(_testFilePath).Should().BeTrue();
             var fileContent = await File.ReadAllTextAsync(_testFilePath);
             fileContent.Should().NotBeNullOrEmpty();
@@ -165,26 +168,21 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
         [Fact]
         public async Task Transaction_CommitAsync_ShouldPersistChanges()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var properties = new Dictionary<string, object>
             {
                 { "Name", "Test Device" },
                 { "Value", 42.5 }
             };
-
-            // Act
             await using (var transaction = await _sut.BeginTransactionAsync())
             {
                 await transaction.SaveAsync(deviceId, properties);
                 await transaction.CommitAsync();
             }
-
-            // Assert
             var loadedProperties = await _sut.LoadAsync(deviceId);
             loadedProperties.Should().NotBeNull();
             loadedProperties.Should().ContainKey("Name");
-            loadedProperties["Name"].Should().Be("Test Device");
+            loadedProperties["Name"].Should().BeEquivalentTo("Test Device");
             loadedProperties.Should().ContainKey("Value");
             ((double)loadedProperties["Value"]).Should().BeApproximately(42.5, 0.01);
         }
