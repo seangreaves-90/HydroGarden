@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Common.Locking;
 using HydroGarden.Foundation.Common.Logging;
-using HydroGarden.Foundation.Core.Devices;
+using HydroGarden.Foundation.Core.Components;
 using System.Threading.Channels;
 
 
@@ -30,27 +30,27 @@ namespace HydroGarden.Foundation.Core.Services
             _ = ProcessEventsAsync();
         }
 
-        public async Task AddDeviceAsync(IIoTDevice device, CancellationToken ct = default)
+        public async Task AddDeviceAsync(IHydroGardenComponent component, CancellationToken ct = default)
         {
             using var writeLock = await _lock.WriterLockAsync(ct);
 
-            if (_deviceProperties.ContainsKey(device.Id))
-                throw new InvalidOperationException($"Device {device.Id} already registered");
+            if (_deviceProperties.ContainsKey(component.Id))
+                throw new InvalidOperationException($"Device {component.Id} already registered");
 
-            _deviceProperties[device.Id] = new Dictionary<string, object>();
+            _deviceProperties[component.Id] = new Dictionary<string, object>();
 
-            if (device is IoTDeviceBase deviceBase)
+            if (component is HydroGardenComponentBase deviceBase)
             {
                 deviceBase.SetEventHandler(this);
             }
 
             // Load any existing properties
-            var storedProperties = await _store.LoadAsync(device.Id, ct);
+            var storedProperties = await _store.LoadAsync(component.Id, ct);
             if (storedProperties != null)
             {
                 foreach (var (key, value) in storedProperties)
                 {
-                    _deviceProperties[device.Id][key] = value;
+                    _deviceProperties[component.Id][key] = value;
                 }
             }
         }

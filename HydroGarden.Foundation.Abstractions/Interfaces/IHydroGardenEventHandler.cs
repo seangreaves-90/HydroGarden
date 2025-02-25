@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
 {
     public interface IHydroGardenPropertyChangedEvent
     {
@@ -13,7 +7,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         Type PropertyType { get; }
         object? OldValue { get; }
         object? NewValue { get; }
-        bool IsReadOnly { get; }
+        IPropertyMetadata Metadata { get; }
     }
 
     public interface IHydroGardenEventHandler

@@ -7,5 +7,5 @@ using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.EventHandlers
 {
-    public record HydroGardenPropertyChangedEvent(Guid DeviceId,string PropertyName,Type PropertyType,object? OldValue,object? NewValue,bool IsReadOnly = false) : IHydroGardenPropertyChangedEvent;
+    public record HydroGardenPropertyChangedEvent(Guid DeviceId,string PropertyName,Type PropertyType,object? OldValue,object? NewValue,IPropertyMetadata Metadata) : IHydroGardenPropertyChangedEvent;
 }
