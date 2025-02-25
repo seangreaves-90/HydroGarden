@@ -27,12 +27,13 @@ namespace HydroGarden.Foundation.Core.Stores
             {
                 WriteIndented = true,
                 PropertyNameCaseInsensitive = true,
+                ReferenceHandler = ReferenceHandler.IgnoreCycles,
                 Converters =
-                {
-                    new JsonStringEnumConverter(),
-                    new PropertyMetadataConverter(),
-                    new ComponentPropertiesConverter()
-                }
+                            {
+                                new JsonStringEnumConverter(),
+                                new PropertyMetadataConverter(),
+                                new ComponentPropertiesConverter()
+                            }
             };
         }
 

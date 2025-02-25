@@ -37,16 +37,39 @@ namespace HydroGarden.Foundation.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
         {
+            // Handle null value
+            if (value == null)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+
             switch (value)
             {
                 case Type t:
                     writer.WriteStringValue($"Type:{t.AssemblyQualifiedName}");
                     break;
                 case string s:
-                    writer.WriteStringValue(s.Trim()); // Trim whitespace before writing
+                    writer.WriteStringValue(s.Trim());
                     break;
                 default:
-                    JsonSerializer.Serialize(writer, value, options);
+                    // Create new options without the custom converter to prevent recursive calls
+                    var newOptions = new JsonSerializerOptions(options);
+
+                    // Remove all converters of the same type to prevent recursion
+                    for (int i = newOptions.Converters.Count - 1; i >= 0; i--)
+                    {
+                        if (newOptions.Converters[i] is ComponentPropertiesConverter)
+                        {
+                            newOptions.Converters.RemoveAt(i);
+                        }
+                    }
+
+                    // Handle circular references
+                    newOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+
+                    // Use these new options when serializing
+                    JsonSerializer.Serialize(writer, value, newOptions);
                     break;
             }
         }
