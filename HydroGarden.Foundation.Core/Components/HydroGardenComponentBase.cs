@@ -19,6 +19,8 @@ namespace HydroGarden.Foundation.Core.Components
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
 
+       
+
         /// <summary>
         /// Initializes a new instance of the HydroGardenComponentBase class.
         /// </summary>
@@ -29,7 +31,7 @@ namespace HydroGarden.Foundation.Core.Components
         {
             Id = id;
             Name = name;
-            AssemblyType = GetType();
+            AssemblyType = GetType().FullName ?? "UnknownType";
             _logger = logger ?? new HydroGardenLogger();
         }
 
@@ -40,7 +42,7 @@ namespace HydroGarden.Foundation.Core.Components
         public string Name { get; }
 
         /// <inheritdoc/>
-        public Type AssemblyType { get; }
+        public string AssemblyType { get; }
 
         /// <inheritdoc/>
         public ComponentState State

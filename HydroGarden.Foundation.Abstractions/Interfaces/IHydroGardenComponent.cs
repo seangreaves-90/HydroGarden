@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
     {
         Guid Id { get; }
         string Name { get; }
-        Type AssemblyType { get; }
+        string AssemblyType { get; }
         ComponentState State { get; }
 
         Task SetPropertyAsync(string name, object value, bool isEditable = true, bool isVisible = true, string? displayName = null, string? description = null);

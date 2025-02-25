@@ -86,12 +86,13 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             // Assert
             var idProperty = await _sut.GetPropertyAsync<Guid>("Id");
             var nameProperty = await _sut.GetPropertyAsync<string>("Name");
-            var typeProperty = await _sut.GetPropertyAsync<Type>("AssemblyType");
+            var typeProperty = await _sut.GetPropertyAsync<string>("AssemblyType");
             var stateProperty = await _sut.GetPropertyAsync<ComponentState>("State");
 
             idProperty.Should().Be(_testId);
             nameProperty.Should().Be(_testName);
-            typeProperty.Should().Be(typeof(TestIoTDevice));
+            Type type = typeof(TestIoTDevice);
+            typeProperty.Should().Be(type.FullName);
             stateProperty.Should().Be(ComponentState.Ready);
         }
 

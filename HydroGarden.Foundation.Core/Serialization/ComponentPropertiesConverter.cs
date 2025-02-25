@@ -1,47 +1,54 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using HydroGarden.Foundation.Core.Components;
 
 namespace HydroGarden.Foundation.Core.Serialization
 {
     public class ComponentPropertiesConverter : JsonConverter<object>
     {
-        public override bool CanConvert(Type typeToConvert) => true;
+        private readonly HashSet<object> _seenObjects = new(); // Track seen objects to prevent recursion
+
+        public override bool CanConvert(Type typeToConvert) => typeof(HydroGardenComponentBase).IsAssignableFrom(typeToConvert);
 
         public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.String:
-                    var str = reader.GetString();
-                    if (str != null && str.StartsWith("Type:", StringComparison.OrdinalIgnoreCase))
-                        return Type.GetType(str.Substring(5), throwOnError: false);
-                    return str;
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException("Expected StartObject token");
 
-                case JsonTokenType.Number:
-                    if (reader.TryGetInt64(out long longVal))
-                        return longVal;
-                    return reader.GetDouble();
-
-                case JsonTokenType.True:
-                case JsonTokenType.False:
-                    return reader.GetBoolean();
-
-                case JsonTokenType.StartObject:
-                    return ReadJsonObject(ref reader, options); // Fix infinite recursion
-
-                case JsonTokenType.Null:
-                    return null;
-
-                default:
-                    throw new JsonException($"Unexpected token type: {reader.TokenType}");
-            }
-        }
-
-        private object ReadJsonObject(ref Utf8JsonReader reader, JsonSerializerOptions options)
-        {
             using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
             {
-                return doc.RootElement.Clone();
+                var jsonObj = doc.RootElement;
+
+                // Get the component type from JSON
+                if (!jsonObj.TryGetProperty("_Type", out var typeElement))
+                    throw new JsonException("Missing _Type property for component deserialization");
+
+                var typeName = typeElement.GetString();
+                if (string.IsNullOrWhiteSpace(typeName))
+                    throw new JsonException("Invalid component type string");
+
+                Type? componentType = Type.GetType(typeName);
+                if (componentType == null || !typeof(HydroGardenComponentBase).IsAssignableFrom(componentType))
+                    throw new JsonException($"Unknown or invalid component type: {typeName}");
+
+                // Create an instance of the component
+                var component = (HydroGardenComponentBase?)Activator.CreateInstance(componentType, Guid.NewGuid(), "Restored Component");
+
+                if (component == null)
+                    throw new JsonException($"Failed to create instance of {typeName}");
+
+                // Deserialize properties
+                if (jsonObj.TryGetProperty("Properties", out var propertiesElement))
+                {
+                    var properties = JsonSerializer.Deserialize<Dictionary<string, object>>(propertiesElement.GetRawText(), options);
+                    if (properties != null)
+                        component.LoadPropertiesAsync(properties).Wait();
+                }
+
+                return component;
             }
         }
 
@@ -53,43 +60,59 @@ namespace HydroGarden.Foundation.Core.Serialization
                 return;
             }
 
+            // Prevent infinite recursion
+            if (_seenObjects.Contains(value))
+            {
+                writer.WriteStringValue("[RecursiveReference]");
+                return;
+            }
+            _seenObjects.Add(value);
+
             switch (value)
             {
                 case Type type:
-                    writer.WriteStringValue($"Type:{type.AssemblyQualifiedName}");
+                    writer.WriteStringValue(type.AssemblyQualifiedName ?? type.FullName ?? "UnknownType");
                     break;
 
                 case string str:
                     writer.WriteStringValue(str.Trim());
                     break;
 
-                case JsonElement jsonElement:
-                    jsonElement.WriteTo(writer);
+                case int or long or double or bool:
+                    JsonSerializer.Serialize(writer, value, options);
                     break;
 
-                case IDictionary<string, object> dictionary:
+                case Dictionary<string, object> dictionary:
                     writer.WriteStartObject();
                     foreach (var kvp in dictionary)
                     {
                         writer.WritePropertyName(kvp.Key);
-                        JsonSerializer.Serialize(writer, kvp.Value, options);
+                        if (ReferenceEquals(kvp.Value, dictionary))
+                        {
+                            writer.WriteStringValue("[RecursiveReference]");
+                        }
+                        else
+                        {
+                            Write(writer, kvp.Value, options); // Recursively serialize safely
+                        }
                     }
                     writer.WriteEndObject();
                     break;
 
-                case IEnumerable<object> list:
-                    writer.WriteStartArray();
-                    foreach (var item in list)
-                    {
-                        JsonSerializer.Serialize(writer, item, options);
-                    }
-                    writer.WriteEndArray();
-                    break;
-
                 default:
-                    JsonSerializer.Serialize(writer, value, options);
+                    try
+                    {
+                        JsonSerializer.Serialize(writer, value, options);
+                    }
+                    catch (Exception ex)
+                    {
+                        writer.WriteStringValue($"[SerializationError: {ex.Message}]");
+                    }
                     break;
             }
+
+            _seenObjects.Remove(value);
         }
+
     }
 }

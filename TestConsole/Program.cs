@@ -23,13 +23,15 @@ namespace HydroGarden.TestConsole
 
             Console.WriteLine($"Creating pump with ID: {pumpId}");
             var pump = new PumpDevice(pumpId, "Main Nutrient Pump", 100, 0, logger);
-            await persistenceService.AddDeviceAsync(pump);
-            Console.WriteLine("Pump registered with persistence service");
+
 
             // Initialize the pump
             Console.WriteLine("Initializing pump...");
             await pump.InitializeAsync();
             Console.WriteLine("Pump initialized");
+
+            await persistenceService.AddDeviceAsync(pump);
+            Console.WriteLine("Pump registered with persistence service");
 
             // Set flow rate
             Console.WriteLine("Setting flow rate to 50%...");

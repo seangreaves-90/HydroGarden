@@ -2,6 +2,7 @@
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Core.Components;
 using Moq;
+using System.Xml.Linq;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Components
@@ -37,7 +38,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             _sut.Id.Should().Be(_testId);
             _sut.Name.Should().Be(_testName);
-            _sut.AssemblyType.Should().Be(typeof(TestComponent));
+            Type type = typeof(TestComponent);
+            _sut.AssemblyType.Should().Be(type.FullName);
             _sut.State.Should().Be(ComponentState.Created);
         }
 

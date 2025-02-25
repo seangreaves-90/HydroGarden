@@ -38,23 +38,60 @@ namespace HydroGarden.Foundation.Core.Services
 
         public async Task AddDeviceAsync(IHydroGardenComponent component, CancellationToken ct = default)
         {
-            if (component == null) throw new ArgumentNullException(nameof(component));
+            if (component == null)
+                throw new ArgumentNullException(nameof(component));
 
+            // Check if the device is already registered
             if (_deviceProperties.TryGetValue(component.Id, out _))
             {
-                throw new InvalidOperationException($"Device {component.Id} already registered");
+                _logger.Log($"[INFO] Device {component.Id} is already registered. Reloading properties and ensuring event handler is set.");
+
+                if (component is HydroGardenComponentBase deviceBase)
+                {
+                    _logger.Log($"[INFO] Reassigning event handler to device {component.Id}");
+                    deviceBase.SetEventHandler(this);
+                }
+
+                // Reload properties from persistent store
+                var storedProperties = await _store.LoadAsync(component.Id, ct);
+                if (storedProperties != null)
+                {
+                    await _deviceProperties.AddOrUpdateAsync(component.Id, new Dictionary<string, object>(storedProperties));
+                    _logger.Log($"[INFO] Properties reloaded for device {component.Id}");
+                }
+                else
+                {
+                    _logger.Log($"[WARNING] No stored properties found for device {component.Id}");
+                }
+
+                return;
             }
 
-            if (component is HydroGardenComponentBase deviceBase)
+            _logger.Log($"[INFO] Registering new device {component.Id}");
+
+            if (component is IHydroGardenComponent newDeviceBase)
             {
-                deviceBase.SetEventHandler(this);
+                _logger.Log($"[INFO] Assigning event handler for new device {component.Id}");
+                newDeviceBase.SetEventHandler(this);
             }
 
-            var storedProperties = await _store.LoadAsync(component.Id, ct);
-            var deviceProps = storedProperties != null ? new Dictionary<string, object>(storedProperties) : new Dictionary<string, object>();
+            // Retrieve default properties from the component
+            var deviceProps = component.GetProperties();
 
-            await _deviceProperties.AddOrUpdateAsync(component.Id, deviceProps);
+            if (deviceProps != null)
+            {
+                await _deviceProperties.AddOrUpdateAsync(component.Id, new Dictionary<string, object>(deviceProps));
+                await _store.SaveWithMetadataAsync(component.Id, deviceProps, component.GetAllPropertyMetadata(), ct);
+                _logger.Log($"[INFO] Device {component.Id} persisted to JSON storage.");
+            }
+            else
+            {
+                _logger.Log($"[WARNING] No initial properties found for device {component.Id}");
+            }
+       
         }
+
+
 
         public Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct)
         {

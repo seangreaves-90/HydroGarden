@@ -190,17 +190,28 @@ namespace HydroGarden.Foundation.Core.Stores
         internal async Task SaveStoreAsync(Dictionary<string, ComponentStore> store, CancellationToken ct = default)
         {
             string tempFile = $"{_filePath}.tmp";
-            await File.WriteAllTextAsync(tempFile, JsonSerializer.Serialize(store, _serializerOptions), ct);
+            await File.WriteAllTextAsync(tempFile, JsonSerializer.Serialize(store.ToDictionary(kvp => kvp.Key, kvp => new ComponentStore
+            {
+                Properties = kvp.Value.GetSerializableProperties(),
+                Metadata = kvp.Value.Metadata
+            }), _serializerOptions), ct);
             File.Move(tempFile, _filePath, true);
         }
 
         /// <summary>
         /// Class that represents a component's properties and metadata.
         /// </summary>
-        internal class ComponentStore
+        public class ComponentStore
         {
             public Dictionary<string, object> Properties { get; set; } = new();
             public Dictionary<string, PropertyMetadata> Metadata { get; set; } = new();
+
+            public Dictionary<string, object> GetSerializableProperties()
+            {
+                return Properties
+                    .Where(kvp => kvp.Value is not Type)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
         }
 
         /// <summary>
