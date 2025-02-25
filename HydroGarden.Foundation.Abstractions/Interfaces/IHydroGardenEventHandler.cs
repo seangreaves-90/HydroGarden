@@ -13,7 +13,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         Type PropertyType { get; }
         object? OldValue { get; }
         object? NewValue { get; }
-        bool IsReadOnly { get; }
+        IPropertyMetadata Metadata { get; }
     }
 
     public interface IHydroGardenEventHandler
