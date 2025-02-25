@@ -1,8 +1,12 @@
-﻿// HydroGarden.Foundation.Core.Stores/JsonStore.cs
-using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Common.PropertyMetadata;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 
 namespace HydroGarden.Foundation.Core.Stores
 {
@@ -23,7 +27,6 @@ namespace HydroGarden.Foundation.Core.Stores
                 Converters =
                 {
                     new JsonStringEnumConverter(),
-                    new ComponentPropertiesConverter(),
                     new PropertyMetadataConverter()
                 }
             };
@@ -34,18 +37,15 @@ namespace HydroGarden.Foundation.Core.Stores
             await _lock.WaitAsync(ct);
             try
             {
-                if (!File.Exists(_filePath))
-                    return null;
+                if (!File.Exists(_filePath)) return null;
 
-                var json = await File.ReadAllTextAsync(_filePath, ct);
+                string json = await File.ReadAllTextAsync(_filePath, ct);
                 var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
-
-                if (store?.TryGetValue(id.ToString(), out var componentData) == true)
-                {
-                    return componentData.Properties;
-                }
-
-                return null;
+                return store?.GetValueOrDefault(id.ToString())?.Properties;
+            }
+            catch (JsonException)
+            {
+                return null; // Handle corrupted JSON case
             }
             finally
             {
@@ -58,26 +58,25 @@ namespace HydroGarden.Foundation.Core.Stores
             await _lock.WaitAsync(ct);
             try
             {
-                if (!File.Exists(_filePath))
-                    return null;
+                if (!File.Exists(_filePath)) return null;
 
-                var json = await File.ReadAllTextAsync(_filePath, ct);
+                string json = await File.ReadAllTextAsync(_filePath, ct);
                 var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
 
-                if (store?.TryGetValue(id.ToString(), out var componentData) == true)
-                {
-                    return componentData.Metadata.ToDictionary(
-                        x => x.Key,
-                        x => (IPropertyMetadata)x.Value);
-                }
-
-                return null;
+                return store?.GetValueOrDefault(id.ToString())?.Metadata?
+                    .ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value)
+                    ?? new Dictionary<string, IPropertyMetadata>();
+            }
+            catch (JsonException)
+            {
+                return null; // Handle corrupted JSON case
             }
             finally
             {
                 _lock.Release();
             }
         }
+
 
         public async Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default)
         {
@@ -91,40 +90,34 @@ namespace HydroGarden.Foundation.Core.Stores
             try
             {
                 Dictionary<string, ComponentStore> store;
+
                 if (File.Exists(_filePath))
                 {
-                    var json = await File.ReadAllTextAsync(_filePath, ct);
-                    store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions)
-                        ?? new Dictionary<string, ComponentStore>();
+                    string json = await File.ReadAllTextAsync(_filePath, ct);
+                    store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions) ?? new();
                 }
                 else
                 {
                     store = new Dictionary<string, ComponentStore>();
                 }
 
-                var componentStore = new ComponentStore
+                store[id.ToString()] = new ComponentStore
                 {
-                    Properties = new Dictionary<string, object>(properties)
+                    Properties = new Dictionary<string, object>(properties),
+                    Metadata = metadata != null
+                        ? metadata.ToDictionary(kvp => kvp.Key, kvp => new PropertyMetadata
+                        {
+                            IsEditable = kvp.Value.IsEditable,
+                            IsVisible = kvp.Value.IsVisible,
+                            DisplayName = kvp.Value.DisplayName,
+                            Description = kvp.Value.Description
+                        })
+                        : new Dictionary<string, PropertyMetadata>()
                 };
 
-                if (metadata != null)
-                {
-                    foreach (var (key, value) in metadata)
-                    {
-                        componentStore.Metadata[key] = new PropertyMetadata
-                        {
-                            IsEditable = value.IsEditable,
-                            IsVisible = value.IsVisible,
-                            DisplayName = value.DisplayName,
-                            Description = value.Description
-                        };
-                    }
-                }
-
-                store[id.ToString()] = componentStore;
-
-                var updatedJson = JsonSerializer.Serialize(store, _serializerOptions);
-                await File.WriteAllTextAsync(_filePath, updatedJson, ct);
+                string tempFile = $"{_filePath}.tmp";
+                await File.WriteAllTextAsync(tempFile, JsonSerializer.Serialize(store, _serializerOptions), ct);
+                File.Move(tempFile, _filePath, true);
             }
             finally
             {
@@ -132,138 +125,58 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+
         private class ComponentStore
         {
             public Dictionary<string, object> Properties { get; set; } = new();
             public Dictionary<string, PropertyMetadata> Metadata { get; set; } = new();
         }
-    }
 
-    // Add the required converters
-    public class ComponentPropertiesConverter : JsonConverter<object>
-    {
-        public override bool CanConvert(Type typeToConvert) => true;
-
-        public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        private class PropertyMetadataConverter : JsonConverter<PropertyMetadata>
         {
-            switch (reader.TokenType)
+            public override PropertyMetadata Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
-                case JsonTokenType.True:
-                    return true;
-                case JsonTokenType.False:
-                    return false;
-                case JsonTokenType.Number:
-                    if (reader.TryGetInt64(out long l))
-                        return l;
-                    return reader.GetDouble();
-                case JsonTokenType.String:
-                    var str = reader.GetString();
-                    if (DateTime.TryParse(str, out var dt))
-                        return dt;
-                    if (Guid.TryParse(str, out var guid))
-                        return guid;
-                    if (str?.StartsWith("Type:") == true)
-                        return Type.GetType(str.Substring(5));
-                    return str;
-                case JsonTokenType.Null:
-                    return null;
-                default:
-                    throw new JsonException($"Unexpected token type: {reader.TokenType}");
-            }
-        }
+                if (reader.TokenType != JsonTokenType.StartObject)
+                    throw new JsonException("Expected StartObject token");
 
-        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
-        {
-            switch (value)
-            {
-                case bool b:
-                    writer.WriteBooleanValue(b);
-                    break;
-                case int i:
-                    writer.WriteNumberValue(i);
-                    break;
-                case long l:
-                    writer.WriteNumberValue(l);
-                    break;
-                case double d:
-                    writer.WriteNumberValue(d);
-                    break;
-                case DateTime dt:
-                    writer.WriteStringValue(dt.ToString("O"));
-                    break;
-                case Guid g:
-                    writer.WriteStringValue(g.ToString());
-                    break;
-                case Type t:
-                    writer.WriteStringValue($"Type:{t.AssemblyQualifiedName}");
-                    break;
-                case Enum e:
-                    writer.WriteStringValue(e.ToString());
-                    break;
-                default:
-                    writer.WriteStringValue(value.ToString());
-                    break;
-            }
-        }
-    }
-
-    public class PropertyMetadataConverter : JsonConverter<PropertyMetadata>
-    {
-        public override PropertyMetadata Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-                throw new JsonException("Expected StartObject token");
-
-            var metadata = new PropertyMetadata();
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                    break;
-
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                    throw new JsonException("Expected PropertyName token");
-
-                var propertyName = reader.GetString();
-                reader.Read();
-
-                switch (propertyName)
+                var metadata = new PropertyMetadata();
+                while (reader.Read())
                 {
-                    case "IsEditable":
-                        metadata.IsEditable = reader.GetBoolean();
+                    if (reader.TokenType == JsonTokenType.EndObject)
                         break;
-                    case "IsVisible":
-                        metadata.IsVisible = reader.GetBoolean();
-                        break;
-                    case "DisplayName":
-                        metadata.DisplayName = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                        break;
-                    case "Description":
-                        metadata.Description = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                        break;
+                    if (reader.TokenType != JsonTokenType.PropertyName)
+                        throw new JsonException("Expected PropertyName token");
+
+                    var propertyName = reader.GetString();
+                    reader.Read();
+                    switch (propertyName)
+                    {
+                        case "IsEditable":
+                            metadata.IsEditable = reader.GetBoolean();
+                            break;
+                        case "IsVisible":
+                            metadata.IsVisible = reader.GetBoolean();
+                            break;
+                        case "DisplayName":
+                            metadata.DisplayName = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                            break;
+                        case "Description":
+                            metadata.Description = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                            break;
+                    }
                 }
+                return metadata;
             }
 
-            return metadata;
-        }
-
-        public override void Write(Utf8JsonWriter writer, PropertyMetadata value, JsonSerializerOptions options)
-        {
-            writer.WriteStartObject();
-            writer.WriteBoolean("IsEditable", value.IsEditable);
-            writer.WriteBoolean("IsVisible", value.IsVisible);
-
-            if (value.DisplayName != null)
+            public override void Write(Utf8JsonWriter writer, PropertyMetadata value, JsonSerializerOptions options)
+            {
+                writer.WriteStartObject();
+                writer.WriteBoolean("IsEditable", value.IsEditable);
+                writer.WriteBoolean("IsVisible", value.IsVisible);
                 writer.WriteString("DisplayName", value.DisplayName);
-            else
-                writer.WriteNull("DisplayName");
-
-            if (value.Description != null)
                 writer.WriteString("Description", value.Description);
-            else
-                writer.WriteNull("Description");
-
-            writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
         }
     }
 }

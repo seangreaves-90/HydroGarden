@@ -39,32 +39,14 @@ namespace HydroGarden.Foundation.Core.Serialization
         {
             switch (value)
             {
-                case bool b:
-                    writer.WriteBooleanValue(b);
-                    break;
-                case int i:
-                    writer.WriteNumberValue(i);
-                    break;
-                case long l:
-                    writer.WriteNumberValue(l);
-                    break;
-                case double d:
-                    writer.WriteNumberValue(d);
-                    break;
-                case DateTime dt:
-                    writer.WriteStringValue(dt.ToString("O"));
-                    break;
-                case Guid g:
-                    writer.WriteStringValue(g.ToString());
-                    break;
                 case Type t:
                     writer.WriteStringValue($"Type:{t.AssemblyQualifiedName}");
                     break;
-                case Enum e:
-                    writer.WriteStringValue(e.ToString());
+                case string s:
+                    writer.WriteStringValue(s.Trim()); // Trim whitespace before writing
                     break;
                 default:
-                    writer.WriteStringValue(value.ToString());
+                    JsonSerializer.Serialize(writer, value, options);
                     break;
             }
         }

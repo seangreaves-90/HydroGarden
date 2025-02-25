@@ -26,10 +26,4 @@
 		<ProjectReference Include="..\HydroGarden.Foundation.Core\HydroGarden.Foundation.Core.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<Folder Include="Caching\" />
-		<Folder Include="Device\" />
-		<Folder Include="Store\" />
-	</ItemGroup>
-
 </Project>

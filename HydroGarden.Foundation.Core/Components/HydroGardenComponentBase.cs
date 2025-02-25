@@ -4,6 +4,7 @@ using HydroGarden.Foundation.Common.Locking;
 using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.EventHandlers;
+using System.Reflection;
 
 namespace HydroGarden.Foundation.Core.Components
 {
@@ -27,7 +28,11 @@ namespace HydroGarden.Foundation.Core.Components
         public Guid Id { get; }
         public string Name { get; }
         public Type AssemblyType { get; }
-        public ComponentState State => _state;
+        public ComponentState State
+        {
+            get => _state;
+            private set => _state = value;
+        }
 
         public void SetEventHandler(IHydroGardenEventHandler handler)
         {
@@ -37,9 +42,11 @@ namespace HydroGarden.Foundation.Core.Components
         public virtual async Task SetPropertyAsync(string name, object value, bool isEditable = true, bool isVisible = true, string? displayName = null, string? description = null)
         {
             using var writeLock = await _propertiesLock.WriterLockAsync();
-
             var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
             _properties[name] = value;
+
+            // 🔹 Automatically update matching class properties
+            UpdateClassProperty(name, value);
 
             var metadata = new PropertyMetadata
             {
@@ -52,6 +59,32 @@ namespace HydroGarden.Foundation.Core.Components
 
             await PublishPropertyChangeAsync(name, value, metadata, oldValue);
         }
+
+        private void UpdateClassProperty(string propertyName, object value)
+        {
+            var type = GetType();
+
+            while (type != null) // 🔹 Traverse the class hierarchy
+            {
+                var property = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+                if (property != null)
+                {
+                    var setter = property.GetSetMethod(true); 
+                    if (setter != null)
+                    {
+                        setter.Invoke(this, new[] { value }); 
+                        return; 
+                    }
+                }
+
+                type = type.BaseType; 
+            }
+        }
+
+
+
+
 
         public virtual async Task<T?> GetPropertyAsync<T>(string name)
         {

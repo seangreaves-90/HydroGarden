@@ -19,18 +19,18 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             try
             {
-                await SetPropertyAsync("State", ComponentState.Initializing, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Initializing, false, true);
                 await SetPropertyAsync("Id", Id, false, false, "Device ID", "Unique identifier for this device");
                 await SetPropertyAsync("Name", Name, true, true, "Device Name", "User-friendly name for this device");
                 await SetPropertyAsync("AssemblyType", AssemblyType, false, false, "Device Type", "Technical type of this device");
 
                 await OnInitializeAsync(ct);
 
-                await SetPropertyAsync("State", ComponentState.Ready, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Ready, false, true);
             }
             catch (Exception ex)
             {
-                await SetPropertyAsync("State", ComponentState.Error, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
                 throw;
             }
         }
@@ -42,7 +42,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             if (State != ComponentState.Ready)
                 throw new InvalidOperationException($"Cannot start device in state {State}");
 
-            await SetPropertyAsync("State", ComponentState.Running, false, true);
+            await SetPropertyAsync(nameof(State), ComponentState.Running, false, true);
 
             try
             {
@@ -55,7 +55,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
             catch (Exception)
             {
-                await SetPropertyAsync("State", ComponentState.Error, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
                 throw;
             }
         }
@@ -67,17 +67,17 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             if (State != ComponentState.Running)
                 return;
 
-            await SetPropertyAsync("State", ComponentState.Stopping, false, true);
+            await SetPropertyAsync(nameof(State), ComponentState.Stopping, false, true);
             _executionCts.Cancel();
 
             try
             {
                 await OnStopAsync(ct);
-                await SetPropertyAsync("State", ComponentState.Ready, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Ready, false, true);
             }
             catch (Exception)
             {
-                await SetPropertyAsync("State", ComponentState.Error, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
                 throw;
             }
         }
