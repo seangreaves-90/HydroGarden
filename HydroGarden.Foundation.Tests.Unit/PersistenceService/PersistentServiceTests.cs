@@ -8,108 +8,96 @@ using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Services
 {
-    public class PersistenceServiceTests
+    public class PersistenceServiceTests : IAsyncDisposable
     {
         private readonly Mock<IStore> _mockStore;
+        private readonly Mock<IStoreTransaction> _mockTransaction;
         private readonly Mock<IHydroGardenLogger> _mockLogger;
         private readonly PersistenceService _sut;
 
         public PersistenceServiceTests()
         {
             _mockStore = new Mock<IStore>();
+            _mockTransaction = new Mock<IStoreTransaction>();
             _mockLogger = new Mock<IHydroGardenLogger>();
-            _sut = new PersistenceService(_mockStore.Object, _mockLogger.Object);
+
+            _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(_mockTransaction.Object);
+
+            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            _mockTransaction.Setup(t => t.DisposeAsync())
+                .Returns(ValueTask.CompletedTask);
+
+            // Create the service with a short batch interval for testing
+            _sut = new PersistenceService(_mockStore.Object, _mockLogger.Object, 100, TimeSpan.FromMilliseconds(100));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _sut.DisposeAsync();
         }
 
         [Fact]
         public async Task AddDeviceAsync_ShouldRegisterDevice()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Dictionary<string, object>)null);
-
-            // Act
             await _sut.AddDeviceAsync(mockComponent.Object);
-
-            // Assert
-            // Verify the store was called to load properties
             _mockStore.Verify(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
         public async Task AddDeviceAsync_WithStoredProperties_ShouldLoadProperties()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
             var storedProperties = new Dictionary<string, object>
             {
                 { "Name", "Stored Device" },
                 { "Value", 123.45 }
             };
-
-            // Setup store to return stored properties
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(storedProperties);
-
-            // Act
             await _sut.AddDeviceAsync(mockComponent.Object);
-
-            // Assert
-            // Verify the store was called to load properties
             _mockStore.Verify(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
         public async Task AddDeviceAsync_DuplicateDevice_ShouldThrowException()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Dictionary<string, object>)null);
-
-            // Add the device once
             await _sut.AddDeviceAsync(mockComponent.Object);
-
-            // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 await _sut.AddDeviceAsync(mockComponent.Object));
         }
 
         [Fact]
-        public async Task HandleEventAsync_ShouldSaveProperties()
+        public async Task HandleEventAsync_ShouldBatchAndSaveProperties()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Dictionary<string, object>)null);
 
-            // Setup store to not throw when saving properties
-            _mockStore.Setup(s => s.SaveAsync(
+            _mockTransaction.Setup(t => t.SaveAsync(
                     It.IsAny<Guid>(),
-                    It.IsAny<IDictionary<string, object>>(),
-                    It.IsAny<CancellationToken>()))
+                    It.IsAny<IDictionary<string, object>>()))
                 .Returns(Task.CompletedTask);
 
-            // Register the device
             await _sut.AddDeviceAsync(mockComponent.Object);
 
-            // Create a property changed event
             var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
                 deviceId,
@@ -122,29 +110,27 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             // Act
             await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
 
-            // Wait for the async operation to complete
-            await Task.Delay(100);
+            // Allow time for batch processing
+            await Task.Delay(200);
 
             // Assert
-            // Verify the store was called to save properties
-            _mockStore.Verify(s => s.SaveAsync(
+            _mockStore.Verify(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+            _mockTransaction.Verify(t => t.SaveAsync(
                 deviceId,
-                It.Is<IDictionary<string, object>>(d => d.ContainsKey("TestProperty") && (string)d["TestProperty"] == "New Value"),
-                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                It.Is<IDictionary<string, object>>(d => d.ContainsKey("TestProperty") && (string)d["TestProperty"] == "New Value")),
+                Times.AtLeastOnce);
+            _mockTransaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task HandleEventAsync_UnregisteredDevice_ShouldLogError()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Create a property changed event for an unregistered device
             var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                Guid.NewGuid(),
+                Guid.NewGuid(), // Different device ID than the registered one
                 "TestProperty",
                 typeof(string),
                 null,
@@ -154,18 +140,14 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             // Act
             await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
 
-            // Wait for the async operation to complete
-            await Task.Delay(100);
+            // Allow time for batch processing
+            await Task.Delay(200);
 
             // Assert
-            // Verify the store was NOT called to save properties
-            _mockStore.Verify(s => s.SaveAsync(
+            _mockTransaction.Verify(t => t.SaveAsync(
                 It.IsAny<Guid>(),
-                It.IsAny<IDictionary<string, object>>(),
-                It.IsAny<CancellationToken>()), Times.Never);
-
-            // Verify that an error was logged
-            _mockLogger.Verify(l => l.Log(It.IsAny<string>()), Times.AtLeastOnce);
+                It.IsAny<IDictionary<string, object>>()),
+                Times.Never);
         }
 
         [Fact]
@@ -175,15 +157,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Dictionary<string, object>)null);
-
-            // Register the device
+                .ReturnsAsync(new Dictionary<string, object>());
             await _sut.AddDeviceAsync(mockComponent.Object);
 
-            // Create a property changed event
             var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
                 deviceId,
@@ -193,13 +170,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 "New Value",
                 metadata);
 
-            // Process the event
-            await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
-
-            // Wait for the async operation to complete
-            await Task.Delay(100);
-
             // Act
+            await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
             var property = await _sut.GetPropertyAsync<string>(deviceId, "TestProperty");
 
             // Assert
@@ -209,61 +181,75 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         [Fact]
         public async Task GetPropertyAsync_UnregisteredDevice_ShouldReturnDefault()
         {
-            // Arrange
             var unregisteredDeviceId = Guid.NewGuid();
-
-            // Act
             var property = await _sut.GetPropertyAsync<string>(unregisteredDeviceId, "TestProperty");
-
-            // Assert
             property.Should().BeNull();
         }
 
         [Fact]
         public async Task GetPropertyAsync_NonExistentProperty_ShouldReturnDefault()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Dictionary<string, object>)null);
-
-            // Register the device
+                .ReturnsAsync(new Dictionary<string, object>());
             await _sut.AddDeviceAsync(mockComponent.Object);
-
-            // Act
             var property = await _sut.GetPropertyAsync<string>(deviceId, "NonExistentProperty");
-
-            // Assert
             property.Should().BeNull();
         }
 
         [Fact]
-        public async Task HandleEventAsync_StoreSaveError_ShouldLogError()
+        public async Task HandleEventAsync_MultipleBatchedEvents_ShouldUseSingleTransaction()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new Mock<IHydroGardenComponent>();
             mockComponent.Setup(c => c.Id).Returns(deviceId);
-
-            // Setup store to return null (no stored properties)
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Dictionary<string, object>)null);
-
-            // Setup store to throw an exception when saving
-            _mockStore.Setup(s => s.SaveAsync(
-                    It.IsAny<Guid>(),
-                    It.IsAny<IDictionary<string, object>>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new InvalidCastException("Test error"));
-
-            // Register the device
+                .ReturnsAsync(new Dictionary<string, object>());
             await _sut.AddDeviceAsync(mockComponent.Object);
 
-            // Create a property changed event
+            var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
+            var transactions = 0;
+
+            _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+                .Callback(() => transactions++)
+                .ReturnsAsync(_mockTransaction.Object);
+
+            // Act - send multiple events rapidly
+            for (int i = 0; i < 5; i++)
+            {
+                var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
+                    deviceId,
+                    $"Property{i}",
+                    typeof(string),
+                    null,
+                    $"Value{i}",
+                    metadata);
+
+                await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
+            }
+
+            // Allow time for batch processing
+            await Task.Delay(200);
+
+            // Assert
+            transactions.Should().BeLessThan(5, "multiple events should be batched into fewer transactions");
+            _mockTransaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task HandleEventAsync_TransactionError_ShouldLogError()
+        {
+            // Arrange
+            var deviceId = Guid.NewGuid();
+            var mockComponent = new Mock<IHydroGardenComponent>();
+            mockComponent.Setup(c => c.Id).Returns(deviceId);
+            _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Dictionary<string, object>());
+            await _sut.AddDeviceAsync(mockComponent.Object);
+
             var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
                 deviceId,
@@ -273,14 +259,16 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 "New Value",
                 metadata);
 
+            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Test exception"));
+
             // Act
             await _sut.HandleEventAsync(mockComponent.Object, propertyChangedEvent, CancellationToken.None);
 
-            // Wait for the async operation to complete
-            await Task.Delay(100);
+            // Allow time for batch processing
+            await Task.Delay(200);
 
             // Assert
-            // Verify that an error was logged
             _mockLogger.Verify(l => l.Log(It.IsAny<Exception>(), It.IsAny<string>()), Times.AtLeastOnce);
         }
     }

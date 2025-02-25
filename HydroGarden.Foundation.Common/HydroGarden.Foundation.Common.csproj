@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Caching\" />
     <Folder Include="Result\" />
     <Folder Include="Validation\" />
   </ItemGroup>
