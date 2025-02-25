@@ -30,6 +30,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
             catch (Exception ex)
             {
+                _logger.Log(ex,"Failed to initailzie device");
                 await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
                 throw;
             }
@@ -86,6 +87,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
         public override void Dispose()
         {
+            _executionCts.Cancel();
             _executionCts.Dispose();
             base.Dispose();
         }

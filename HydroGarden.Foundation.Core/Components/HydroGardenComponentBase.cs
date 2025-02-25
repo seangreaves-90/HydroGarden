@@ -14,7 +14,7 @@ namespace HydroGarden.Foundation.Core.Components
     {
         private readonly ConcurrentDictionary<string, object> _properties = new();
         private readonly ConcurrentDictionary<string, PropertyMetadata> _propertyMetadata = new();
-        private readonly IHydroGardenLogger _logger;
+        protected readonly IHydroGardenLogger _logger;
         protected IHydroGardenEventHandler? _eventHandler;
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;

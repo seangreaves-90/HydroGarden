@@ -15,7 +15,7 @@ namespace HydroGarden.TestConsole
 
             // Initialize components
             var logger = new HydroGardenLogger();
-            var store = new JsonStore(Path.Combine(Directory.GetCurrentDirectory(), "DeviceData"));
+            var store = new JsonStore(Path.Combine(Directory.GetCurrentDirectory(), "DeviceData"),new HydroGardenLogger());
             var persistenceService = new PersistenceService(store, logger, 100, TimeSpan.FromSeconds(1));
 
             // Create a unique ID for the pump

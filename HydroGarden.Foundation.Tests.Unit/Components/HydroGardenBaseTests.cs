@@ -10,7 +10,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
     {
         private class TestComponent : HydroGardenComponentBase
         {
-            public TestComponent(Guid id, string name, IHydroGardenLogger logger = null)
+            public TestComponent(Guid id, string name, IHydroGardenLogger logger)
                 : base(id, name, logger)
             {
             }
@@ -74,19 +74,22 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             string propertyName = "TestProperty";
             string propertyValue = "Test Value";
+
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
                     It.IsAny<IHydroGardenPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
+
             await _sut.SetPropertyAsync(propertyName, propertyValue);
+
             _mockEventHandler.Verify(e => e.HandleEventAsync(
                 It.Is<object>(o => o == _sut),
                 It.Is<IHydroGardenPropertyChangedEvent>(evt =>
                     evt.DeviceId == _testId &&
                     evt.PropertyName == propertyName &&
-                    evt.NewValue.ToString() == propertyValue),
+                    (evt.NewValue != null ? evt.NewValue.ToString() : string.Empty) == propertyValue), // ✅ Single expression
                 It.IsAny<CancellationToken>()), Times.Once);
         }
 

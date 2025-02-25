@@ -1,5 +1,5 @@
-﻿using System.Text.Json.Serialization;
-using System.Text.Json;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace HydroGarden.Foundation.Core.Serialization
 {
@@ -11,33 +11,42 @@ namespace HydroGarden.Foundation.Core.Serialization
         {
             switch (reader.TokenType)
             {
-                case JsonTokenType.True:
-                    return true;
-                case JsonTokenType.False:
-                    return false;
-                case JsonTokenType.Number:
-                    if (reader.TryGetInt64(out long l))
-                        return l;
-                    return reader.GetDouble();
                 case JsonTokenType.String:
                     var str = reader.GetString();
-                    if (DateTime.TryParse(str, out var dt))
-                        return dt;
-                    if (Guid.TryParse(str, out var guid))
-                        return guid;
-                    if (str?.StartsWith("Type:") == true)
-                        return Type.GetType(str.Substring(5));
+                    if (str != null && str.StartsWith("Type:", StringComparison.OrdinalIgnoreCase))
+                        return Type.GetType(str.Substring(5), throwOnError: false);
                     return str;
+
+                case JsonTokenType.Number:
+                    if (reader.TryGetInt64(out long longVal))
+                        return longVal;
+                    return reader.GetDouble();
+
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                    return reader.GetBoolean();
+
+                case JsonTokenType.StartObject:
+                    return ReadJsonObject(ref reader, options); // Fix infinite recursion
+
                 case JsonTokenType.Null:
                     return null;
+
                 default:
                     throw new JsonException($"Unexpected token type: {reader.TokenType}");
             }
         }
 
+        private object ReadJsonObject(ref Utf8JsonReader reader, JsonSerializerOptions options)
+        {
+            using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
+            {
+                return doc.RootElement.Clone();
+            }
+        }
+
         public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
         {
-            // Handle null value
             if (value == null)
             {
                 writer.WriteNullValue();
@@ -46,30 +55,39 @@ namespace HydroGarden.Foundation.Core.Serialization
 
             switch (value)
             {
-                case Type t:
-                    writer.WriteStringValue($"Type:{t.AssemblyQualifiedName}");
+                case Type type:
+                    writer.WriteStringValue($"Type:{type.AssemblyQualifiedName}");
                     break;
-                case string s:
-                    writer.WriteStringValue(s.Trim());
-                    break;
-                default:
-                    // Create new options without the custom converter to prevent recursive calls
-                    var newOptions = new JsonSerializerOptions(options);
 
-                    // Remove all converters of the same type to prevent recursion
-                    for (int i = newOptions.Converters.Count - 1; i >= 0; i--)
+                case string str:
+                    writer.WriteStringValue(str.Trim());
+                    break;
+
+                case JsonElement jsonElement:
+                    jsonElement.WriteTo(writer);
+                    break;
+
+                case IDictionary<string, object> dictionary:
+                    writer.WriteStartObject();
+                    foreach (var kvp in dictionary)
                     {
-                        if (newOptions.Converters[i] is ComponentPropertiesConverter)
-                        {
-                            newOptions.Converters.RemoveAt(i);
-                        }
+                        writer.WritePropertyName(kvp.Key);
+                        JsonSerializer.Serialize(writer, kvp.Value, options);
                     }
+                    writer.WriteEndObject();
+                    break;
 
-                    // Handle circular references
-                    newOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+                case IEnumerable<object> list:
+                    writer.WriteStartArray();
+                    foreach (var item in list)
+                    {
+                        JsonSerializer.Serialize(writer, item, options);
+                    }
+                    writer.WriteEndArray();
+                    break;
 
-                    // Use these new options when serializing
-                    JsonSerializer.Serialize(writer, value, newOptions);
+                default:
+                    JsonSerializer.Serialize(writer, value, options);
                     break;
             }
         }

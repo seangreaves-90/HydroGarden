@@ -18,7 +18,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             public bool StartCalled { get; private set; }
             public bool StopCalled { get; private set; }
 
-            public TestIoTDevice(Guid id, string name, IHydroGardenLogger logger = null)
+            public TestIoTDevice(Guid id, string name, IHydroGardenLogger logger)
                 : base(id, name, logger)
             {
             }

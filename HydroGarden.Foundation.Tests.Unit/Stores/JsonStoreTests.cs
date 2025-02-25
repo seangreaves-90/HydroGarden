@@ -2,6 +2,7 @@
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Stores;
+using Moq;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Store
@@ -11,13 +12,15 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
         private readonly string _testDirectory;
         private readonly string _testFilePath;
         private readonly JsonStore _sut;
+        private readonly Mock<IHydroGardenLogger> _mockLogger;
 
         public JsonStoreTests()
         {
             _testDirectory = Path.Combine(Path.GetTempPath(), "HydroGardenTests", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_testDirectory);
             _testFilePath = Path.Combine(_testDirectory, "ComponentProperties.json");
-            _sut = new JsonStore(_testDirectory);
+            _mockLogger = new Mock<IHydroGardenLogger>();
+            _sut = new JsonStore("testPath", _mockLogger.Object);
         }
 
         public void Dispose()
@@ -235,45 +238,49 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
         [Fact]
         public async Task Transaction_SaveWithMetadataAsync_ShouldPersistMetadata()
         {
-            // Arrange
             var deviceId = Guid.NewGuid();
             var properties = new Dictionary<string, object>
-            {
-                { "Name", "Test Device" },
-                { "Value", 42.5 }
-            };
-            var metadata = new Dictionary<string, IPropertyMetadata>
-            {
-                {
-                    "Name",
-                    new PropertyMetadata {
-                        IsEditable = true,
-                        IsVisible = true,
-                        DisplayName = "Device Name",
-                        Description = "The name of the device"
-                    }
-                },
-                {
-                    "Value",
-                    new PropertyMetadata {
-                        IsEditable = false,
-                        IsVisible = true,
-                        DisplayName = "Sensor Value",
-                        Description = "The current value from the sensor"
-                    }
-                }
-            };
+    {
+        { "Name", "Test Device" },
+        { "Value", 42.5 }
+    };
 
-            // Act
+            var metadata = new Dictionary<string, IPropertyMetadata>
+    {
+        {
+            "Name",
+            new PropertyMetadata
+            {
+                IsEditable = true,
+                IsVisible = true,
+                DisplayName = "Device Name",
+                Description = "The name of the device"
+            }
+        },
+        {
+            "Value",
+            new PropertyMetadata
+            {
+                IsEditable = false,
+                IsVisible = true,
+                DisplayName = "Sensor Value",
+                Description = "The current value from the sensor"
+            }
+        }
+    };
+
             await using (var transaction = await _sut.BeginTransactionAsync())
             {
                 await transaction.SaveWithMetadataAsync(deviceId, properties, metadata);
                 await transaction.CommitAsync();
             }
 
-            // Assert
+            // Ensure async write operations are completed before reading
+            await Task.Delay(100);
+
             var loadedMetadata = await _sut.LoadMetadataAsync(deviceId);
-            loadedMetadata.Should().NotBeNull();
+
+            loadedMetadata.Should().NotBeNull("Metadata should be stored and retrievable.");
             loadedMetadata.Should().ContainKey("Name");
             loadedMetadata["Name"].DisplayName.Should().Be("Device Name");
             loadedMetadata["Name"].IsEditable.Should().BeTrue();
@@ -281,6 +288,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             loadedMetadata["Value"].DisplayName.Should().Be("Sensor Value");
             loadedMetadata["Value"].IsEditable.Should().BeFalse();
         }
+
+
 
         [Fact]
         public async Task Transaction_MultipleSaves_ShouldPersistAllChanges()

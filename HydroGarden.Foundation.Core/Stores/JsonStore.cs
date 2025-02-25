@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Serialization;
 
@@ -14,12 +15,13 @@ namespace HydroGarden.Foundation.Core.Stores
         private readonly string _filePath;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly JsonSerializerOptions _serializerOptions;
+        private readonly IHydroGardenLogger _logger;
 
         /// <summary>
         /// Initializes a new instance of the JsonStore class.
         /// </summary>
         /// <param name="basePath">The base directory path for storing JSON files.</param>
-        public JsonStore(string basePath)
+        public JsonStore(string basePath, IHydroGardenLogger logger)
         {
             _filePath = Path.Combine(Path.GetFullPath(basePath), "ComponentProperties.json");
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
@@ -35,6 +37,7 @@ namespace HydroGarden.Foundation.Core.Stores
                                 new ComponentPropertiesConverter()
                             }
             };
+            _logger = logger ?? new HydroGardenLogger();
         }
 
         /// <inheritdoc/>
@@ -90,15 +93,43 @@ namespace HydroGarden.Foundation.Core.Stores
             await _lock.WaitAsync(ct);
             try
             {
-                if (!File.Exists(_filePath)) return null;
+                if (!File.Exists(_filePath))
+                {
+                    _logger.Log($"[DEBUG] LoadMetadataAsync: File {_filePath} does not exist.");
+                    return null;
+                }
+
                 string json = await File.ReadAllTextAsync(_filePath, ct);
+
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    _logger.Log($"[DEBUG] LoadMetadataAsync: JSON file is empty.");
+                    return null;
+                }
+
                 var store = JsonSerializer.Deserialize<Dictionary<string, ComponentStore>>(json, _serializerOptions);
-                return store?.GetValueOrDefault(id.ToString())?.Metadata?
-                    .ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value)
-                    ?? new Dictionary<string, IPropertyMetadata>();
+
+                if (store == null || !store.ContainsKey(id.ToString()))
+                {
+                    _logger.Log($"[DEBUG] LoadMetadataAsync: No entry found for ID {id}");
+                    return null;
+                }
+
+                var metadata = store[id.ToString()].Metadata;
+
+                if (metadata == null || metadata.Count == 0)
+                {
+                    _logger.Log($"[DEBUG] LoadMetadataAsync: Metadata is empty for ID {id}");
+                    return null;
+                }
+
+                _logger.Log($"[DEBUG] LoadMetadataAsync: Successfully loaded metadata for ID {id}");
+
+                return metadata.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+                _logger.Log(ex, $"[ERROR] LoadMetadataAsync: JSON Parsing failed - {ex.Message}");
                 return null;
             }
             finally
@@ -106,6 +137,8 @@ namespace HydroGarden.Foundation.Core.Stores
                 _lock.Release();
             }
         }
+
+
 
         /// <inheritdoc/>
         public async Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default)
@@ -152,6 +185,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 _lock.Release();
             }
         }
+
 
         internal async Task SaveStoreAsync(Dictionary<string, ComponentStore> store, CancellationToken ct = default)
         {

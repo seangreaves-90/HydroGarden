@@ -151,7 +151,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
                         evt.NewValue != null),
                     It.IsAny<CancellationToken>()))
                 .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
-                    (_, evt, __) => capturedFlowRate = (double)evt.NewValue)
+                    (_, evt, __) => capturedFlowRate = evt.NewValue as double? ?? 0.0)
                 .Returns(Task.CompletedTask);
 
             // Act
@@ -204,20 +204,22 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         {
             // Arrange
             await _sut.InitializeAsync();
-            var startTask = _sut.StartAsync();
+            var cts = new CancellationTokenSource();
+            var startTask = _sut.StartAsync(cts.Token); // Pass a CancellationToken
 
-            // Allow some time for the start operation to complete
-            await Task.Delay(100);
+            await Task.Delay(100); // Give some time to start
 
             // Act
+            cts.Cancel(); // Cancel the task
             _sut.Dispose();
 
-            // Try to ensure the startTask completes
-            try { await startTask; } catch { }
+            // Ensure the startTask completes without blocking indefinitely
+            try { await startTask; } catch (OperationCanceledException) { }
 
             // Assert - verify it's disposed
             _sut.State.Should().Be(ComponentState.Disposed);
         }
+
 
         [Fact]
         public async Task ZeroFlowRate_ShouldNotGenerateActualValue()
@@ -304,8 +306,9 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
                         evt.NewValue != null),
                     It.IsAny<CancellationToken>()))
                 .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
-                    (_, evt, __) => eventCompletion.TrySetResult((double)evt.NewValue))
+                    (_, evt, __) => eventCompletion.TrySetResult((double)(evt.NewValue ?? 0.0)))
                 .Returns(Task.CompletedTask);
+
 
             // Act
             var startTask = _sut.StartAsync();

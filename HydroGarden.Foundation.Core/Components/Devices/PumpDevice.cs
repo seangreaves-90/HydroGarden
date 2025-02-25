@@ -122,9 +122,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
             catch (Exception ex)
             {
-                // Log error but don't crash the timer
-                // In a real implementation, you might want to report this error via a dedicated property
-                // await SetPropertyAsync("LastError", ex.Message, false, true, "Last Error", "Most recent error message");
+               _logger.Log(ex, "Error updating pump properties");
             }
         }
 
