@@ -1,4 +1,9 @@
-﻿
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
 namespace HydroGarden.Foundation.Abstractions.Interfaces
 {
     public enum ComponentState
@@ -25,6 +30,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         IDictionary<string, object> GetProperties();
         IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata();
         Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
+
         void SetEventHandler(IHydroGardenEventHandler handler);
     }
 }
