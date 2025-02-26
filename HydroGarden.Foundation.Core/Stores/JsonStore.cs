@@ -7,6 +7,9 @@ using HydroGarden.Foundation.Core.Serialization;
 
 namespace HydroGarden.Foundation.Core.Stores
 {
+    /// <summary>
+    /// JsonStore provides a persistent key-value store using JSON file storage.
+    /// </summary>
     public class JsonStore : IStore
     {
         private readonly string _filePath;
@@ -14,13 +17,21 @@ namespace HydroGarden.Foundation.Core.Stores
         private readonly JsonSerializerOptions _serializerOptions;
         private readonly IHydroGardenLogger _logger;
 
+        /// <summary>
+        /// Initializes the JsonStore with a specified base path for storage and a logger.
+        /// </summary>
+        /// <param name="basePath">The directory where the store file will be saved.</param>
+        /// <param name="logger">Logger for capturing store-related logs.</param>
         public JsonStore(string basePath, IHydroGardenLogger logger)
         {
+            // Set up the storage file path
             string fullPath = Path.GetFullPath(basePath);
             _filePath = Path.Combine(fullPath, "ComponentProperties.json");
 
+            // Ensure the directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
 
+            // Configure JSON serialization options
             _serializerOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -33,15 +44,22 @@ namespace HydroGarden.Foundation.Core.Stores
                 }
             };
 
+            // Assign logger, defaulting to a new instance if not provided
             _logger = logger ?? new HydroGardenLogger();
             _logger.Log($"JsonStore initialized with file path: {_filePath}");
         }
 
+        /// <summary>
+        /// Begins a new store transaction with thread safety.
+        /// </summary>
+        /// <param name="ct">Cancellation token for async operation.</param>
+        /// <returns>An instance of JsonStoreTransaction.</returns>
         public async Task<IStoreTransaction> BeginTransactionAsync(CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
             try
             {
+                // Load store data if file exists, otherwise create an empty store
                 var store = File.Exists(_filePath)
                     ? await LoadStoreAsync(ct)
                     : new Dictionary<string, ComponentStore>();
@@ -54,6 +72,12 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Loads the stored properties for a specific component.
+        /// </summary>
+        /// <param name="id">The component ID.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Dictionary of properties if found, otherwise null.</returns>
         public async Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
@@ -62,12 +86,9 @@ namespace HydroGarden.Foundation.Core.Stores
                 if (!File.Exists(_filePath)) return null;
 
                 var store = await LoadStoreAsync(ct);
-                if (store.TryGetValue(id.ToString(), out var component))
-                {
-                    return DeserializeComponentProperties(component.Properties);
-                }
-
-                return null;
+                return store.TryGetValue(id.ToString(), out var component)
+                    ? DeserializeComponentProperties(component.Properties)
+                    : null;
             }
             finally
             {
@@ -75,6 +96,12 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Loads metadata associated with a specific component.
+        /// </summary>
+        /// <param name="id">The component ID.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Dictionary of metadata if found, otherwise null.</returns>
         public async Task<IDictionary<string, IPropertyMetadata>?> LoadMetadataAsync(Guid id, CancellationToken ct = default)
         {
             await _lock.WaitAsync(ct);
@@ -83,12 +110,9 @@ namespace HydroGarden.Foundation.Core.Stores
                 if (!File.Exists(_filePath)) return null;
 
                 var store = await LoadStoreAsync(ct);
-                if (store.TryGetValue(id.ToString(), out var component))
-                {
-                    return component.Metadata?.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value);
-                }
-
-                return null;
+                return store.TryGetValue(id.ToString(), out var component)
+                    ? component.Metadata?.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)kvp.Value)
+                    : null;
             }
             finally
             {
@@ -96,20 +120,28 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Saves properties for a component without metadata.
+        /// </summary>
         public async Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default)
         {
             await SaveWithMetadataAsync(id, properties, null, ct);
         }
 
+        /// <summary>
+        /// Saves properties and metadata for a component.
+        /// </summary>
         public async Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default)
         {
-
             await _lock.WaitAsync(ct);
             try
             {
+                // Load existing store data or initialize a new store
                 var store = File.Exists(_filePath)
                     ? await LoadStoreAsync(ct)
                     : new Dictionary<string, ComponentStore>();
+
+                // Store properties and metadata
                 store[id.ToString()] = new ComponentStore
                 {
                     Properties = properties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is Type type ? type.FullName! : kvp.Value),
@@ -129,6 +161,9 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Loads the entire store from a JSON file.
+        /// </summary>
         private async Task<Dictionary<string, ComponentStore>> LoadStoreAsync(CancellationToken ct)
         {
             try
@@ -146,6 +181,9 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Saves the current store state to a JSON file.
+        /// </summary>
         internal async Task SaveStoreAsync(Dictionary<string, ComponentStore> store, CancellationToken ct = default)
         {
             string tempFile = $"{_filePath}.tmp";
@@ -163,6 +201,9 @@ namespace HydroGarden.Foundation.Core.Stores
             }
         }
 
+        /// <summary>
+        /// Deserializes stored JSON properties into a usable dictionary.
+        /// </summary>
         private Dictionary<string, object> DeserializeComponentProperties(Dictionary<string, object> properties)
         {
             return properties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is JsonElement jsonElement
@@ -170,6 +211,9 @@ namespace HydroGarden.Foundation.Core.Stores
                 : kvp.Value);
         }
 
+        /// <summary>
+        /// Converts JsonElement to a strongly typed object.
+        /// </summary>
         private object DeserializeJsonElement(JsonElement element)
         {
             return element.ValueKind switch
@@ -188,95 +232,19 @@ namespace HydroGarden.Foundation.Core.Stores
             };
         }
 
-        // Convert DateTime strings back to DateTime
-        private DateTime? TryParseDateTime(string? value)
-        {
-            return DateTime.TryParse(value, null, System.Globalization.DateTimeStyles.RoundtripKind, out var result)
-                ? result
-                : null;
-        }
+        // Helper methods for type conversion
+        private DateTime? TryParseDateTime(string? value) => DateTime.TryParse(value, null, System.Globalization.DateTimeStyles.RoundtripKind, out var result) ? result : null;
+        private Guid? TryParseGuid(string? value) => Guid.TryParse(value, out var result) ? result : null;
+        private TimeSpan? TryParseTimeSpan(string? value) => TimeSpan.TryParse(value, out var result) ? result : null;
+        private Type? TryParseType(string? value) => !string.IsNullOrWhiteSpace(value) ? Type.GetType(value) : null;
 
-        // Convert GUID strings back to GUID
-        private Guid? TryParseGuid(string? value)
-        {
-            return Guid.TryParse(value, out var result) ? result : null;
-        }
-
-        // Convert TimeSpan strings back to TimeSpan
-        private TimeSpan? TryParseTimeSpan(string? value)
-        {
-            return TimeSpan.TryParse(value, out var result) ? result : null;
-        }
-
-        // Convert Type strings back to Type
-        private Type? TryParseType(string? value)
-        {
-            return !string.IsNullOrWhiteSpace(value) ? Type.GetType(value) : null;
-        }
-
-
+        /// <summary>
+        /// Represents a stored component with properties and metadata.
+        /// </summary>
         public class ComponentStore
         {
             public Dictionary<string, object> Properties { get; set; } = new();
             public Dictionary<string, IPropertyMetadata> Metadata { get; set; } = new();
-
-        }
-    }
-
-
-    public class JsonStoreTransaction : IStoreTransaction
-    {
-        private readonly JsonStore _store;
-        private readonly Dictionary<string, JsonStore.ComponentStore> _workingState;
-        private bool _isCommitted;
-        private bool _isRolledBack;
-        private bool _isDisposed;
-
-        internal JsonStoreTransaction(JsonStore store, Dictionary<string, JsonStore.ComponentStore> currentState)
-        {
-            _store = store;
-            _workingState = new Dictionary<string, JsonStore.ComponentStore>(currentState);
-        }
-
-        public Task SaveAsync(Guid id, IDictionary<string, object> properties)
-        {
-            var componentId = id.ToString();
-            _workingState[componentId] = new JsonStore.ComponentStore
-            {
-                Properties = new Dictionary<string, object>(properties)
-            };
-            return Task.CompletedTask;
-        }
-
-        public Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata)
-        {
-            var componentId = id.ToString();
-            _workingState[componentId] = new JsonStore.ComponentStore
-            {
-                Properties = new Dictionary<string, object>(properties),
-                Metadata = metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, IPropertyMetadata>()
-            };
-            return Task.CompletedTask;
-        }
-
-        public async Task CommitAsync(CancellationToken ct = default)
-        {
-            if (_isCommitted || _isRolledBack) throw new InvalidOperationException("Transaction already finalized.");
-            await _store.SaveStoreAsync(_workingState, ct);
-            _isCommitted = true;
-        }
-
-        public Task RollbackAsync(CancellationToken ct = default)
-        {
-            _isRolledBack = true;
-            return Task.CompletedTask;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_isDisposed) return;
-            if (!_isCommitted && !_isRolledBack) await RollbackAsync();
-            _isDisposed = true;
         }
     }
 }

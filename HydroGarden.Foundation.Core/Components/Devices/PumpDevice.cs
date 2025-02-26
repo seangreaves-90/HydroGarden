@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
+    /// <summary>
+    /// Represents a pump device in the HydroGarden system.
+    /// </summary>
     public class PumpDevice : IoTDeviceBase
     {
         private double _flowRate;
@@ -14,6 +17,14 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         private readonly double _maxFlowRate;
         private readonly double _minFlowRate;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PumpDevice"/> class.
+        /// </summary>
+        /// <param name="id">The unique identifier of the pump.</param>
+        /// <param name="name">The name of the pump.</param>
+        /// <param name="maxFlowRate">The maximum flow rate of the pump.</param>
+        /// <param name="minFlowRate">The minimum flow rate of the pump.</param>
+        /// <param name="logger">Optional logger instance.</param>
         public PumpDevice(Guid id, string name, double maxFlowRate = 100, double minFlowRate = 0, IHydroGardenLogger? logger = null)
             : base(id, name, logger)
         {
@@ -22,6 +33,10 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             _monitorTimer = new Timer(OnMonitorTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
+        /// <summary>
+        /// Sets the flow rate of the pump asynchronously.
+        /// </summary>
+        /// <param name="value">The desired flow rate.</param>
         public async Task SetFlowRateAsync(double value)
         {
             if (value < _minFlowRate || value > _maxFlowRate)
@@ -31,24 +46,23 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             await SetPropertyAsync("FlowRate", _flowRate);
         }
 
+        /// <inheritdoc/>
         protected override async Task OnInitializeAsync(CancellationToken ct)
         {
             _flowRate = 0;
             _isRunning = false;
-
             await SetPropertyAsync("FlowRate", _flowRate);
             await SetPropertyAsync("IsRunning", _isRunning);
             await SetPropertyAsync("MaxFlowRate", _maxFlowRate);
             await SetPropertyAsync("MinFlowRate", _minFlowRate);
-
             await base.OnInitializeAsync(ct);
         }
 
+        /// <inheritdoc/>
         protected override async Task OnStartAsync(CancellationToken ct)
         {
             _isRunning = true;
             await SetPropertyAsync("IsRunning", _isRunning);
-
             _monitorTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
             try
@@ -67,6 +81,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <inheritdoc/>
         protected override async Task OnStopAsync(CancellationToken ct)
         {
             _monitorTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -83,7 +98,6 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 var random = new Random();
                 actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
             }
-
             await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
         }
 
@@ -99,7 +113,6 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                         var random = new Random();
                         actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
                     }
-
                     await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
                     await SetPropertyAsync("Timestamp", DateTime.UtcNow);
                 }
@@ -110,6 +123,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
             _monitorTimer.Dispose();

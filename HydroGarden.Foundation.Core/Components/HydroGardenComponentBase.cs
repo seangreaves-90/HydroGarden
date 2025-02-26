@@ -4,10 +4,12 @@ using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.EventHandlers;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.Components
 {
+    /// <summary>
+    /// Base class for all HydroGarden components, implementing common functionality such as property management and event handling.
+    /// </summary>
     public abstract class HydroGardenComponentBase : IHydroGardenComponent
     {
         private readonly ConcurrentDictionary<string, object> _properties = new();
@@ -17,6 +19,12 @@ namespace HydroGarden.Foundation.Core.Components
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HydroGardenComponentBase"/> class.
+        /// </summary>
+        /// <param name="id">The unique identifier of the component.</param>
+        /// <param name="name">The name of the component.</param>
+        /// <param name="logger">Optional logger instance.</param>
         protected HydroGardenComponentBase(Guid id, string name, IHydroGardenLogger? logger = null)
         {
             Id = id;
@@ -25,10 +33,16 @@ namespace HydroGarden.Foundation.Core.Components
             _logger = logger ?? new HydroGardenLogger();
         }
 
+        /// <inheritdoc/>
         public Guid Id { get; }
+
+        /// <inheritdoc/>
         public string Name { get; }
+
+        /// <inheritdoc/>
         public string AssemblyType { get; }
 
+        /// <inheritdoc/>
         public ComponentState State
         {
             get => _state;
@@ -39,22 +53,19 @@ namespace HydroGarden.Foundation.Core.Components
             }
         }
 
+        /// <inheritdoc/>
         public void SetEventHandler(IHydroGardenEventHandler handler) => _eventHandler = handler;
 
+        /// <inheritdoc/>
         public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)
         {
             var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
-
             UpdateClassProperty(name, value);
-
             _properties[name] = value;
 
             if (metadata != null)
             {
-                if (!_propertyMetadata.TryGetValue(name, out var existingMetadata) || !MetadataEquals(existingMetadata, metadata))
-                {
-                    _propertyMetadata[name] = new PropertyMetadata(metadata.IsEditable, metadata.IsVisible, metadata.DisplayName, metadata.Description);
-                }
+                _propertyMetadata[name] = new PropertyMetadata(metadata.IsEditable, metadata.IsVisible, metadata.DisplayName, metadata.Description);
             }
             else if (!_propertyMetadata.ContainsKey(name))
             {
@@ -67,13 +78,13 @@ namespace HydroGarden.Foundation.Core.Components
             }
         }
 
+        /// <inheritdoc/>
         public virtual async Task<bool> UpdatePropertyOptimisticAsync<T>(string name, Func<T?, T> updateFunc)
         {
             int attempts = 0;
             while (attempts < MaxOptimisticRetries)
             {
                 attempts++;
-
                 _properties.TryGetValue(name, out var currentValueObj);
                 var currentValue = currentValueObj is T typedValue ? typedValue : default;
                 var newValue = updateFunc(currentValue);
@@ -121,16 +132,23 @@ namespace HydroGarden.Foundation.Core.Components
             }
         }
 
+        /// <inheritdoc/>
         public virtual Task<T?> GetPropertyAsync<T>(string name) =>
-            _properties.TryGetValue(name, out var value) && value is T typedValue ?
-                Task.FromResult<T?>(typedValue) : Task.FromResult<T?>(default);
+            _properties.TryGetValue(name, out var value) && value is T typedValue
+                ? Task.FromResult<T?>(typedValue)
+                : Task.FromResult<T?>(default);
 
+        /// <inheritdoc/>
         public virtual IPropertyMetadata? GetPropertyMetadata(string name) =>
             _propertyMetadata.TryGetValue(name, out var metadata) ? metadata : null;
 
+        /// <inheritdoc/>
         public virtual IDictionary<string, object> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);
+
+        /// <inheritdoc/>
         public virtual IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata() => _propertyMetadata.ToDictionary(x => x.Key, x => (IPropertyMetadata)x.Value);
 
+        /// <inheritdoc/>
         public virtual Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null)
         {
             _properties.Clear();
@@ -165,6 +183,7 @@ namespace HydroGarden.Foundation.Core.Components
             await _eventHandler.HandleEventAsync(this, evt);
         }
 
+        /// <inheritdoc/>
         public virtual void Dispose() => _state = ComponentState.Disposed;
 
         private bool MetadataEquals(IPropertyMetadata existing, IPropertyMetadata newMetadata) =>

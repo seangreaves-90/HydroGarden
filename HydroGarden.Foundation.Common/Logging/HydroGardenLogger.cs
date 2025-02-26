@@ -4,18 +4,19 @@ using System.IO;
 
 namespace HydroGarden.Foundation.Common.Logging
 {
-#if DEBUG
     /// <summary>
-    /// Debug-only plain text logger that logs messages, exceptions, and objects with structured formatting.
+    /// Provides logging functionality for HydroGarden components.
     /// </summary>
     public class HydroGardenLogger : IHydroGardenLogger
     {
         private readonly string _logDirectory;
         private readonly object _syncLock = new();
 
-        public HydroGardenLogger() : this(string.Empty) { }
-
-        public HydroGardenLogger(string logDirectory)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HydroGardenLogger"/> class.
+        /// </summary>
+        /// <param name="logDirectory">The directory where logs should be stored.</param>
+        public HydroGardenLogger(string logDirectory = "")
         {
             if (string.IsNullOrWhiteSpace(logDirectory))
                 logDirectory = Environment.CurrentDirectory;
@@ -24,17 +25,13 @@ namespace HydroGarden.Foundation.Common.Logging
             Directory.CreateDirectory(_logDirectory);
         }
 
-        /// <summary>
-        /// Logs a simple message.
-        /// </summary>
+        /// <inheritdoc/>
         public void Log(string message)
         {
             WriteLogRecord($"[{DateTimeOffset.UtcNow:O}] [INFO] {message}");
         }
 
-        /// <summary>
-        /// Logs an exception with a message.
-        /// </summary>
+        /// <inheritdoc/>
         public void Log(Exception ex, string message)
         {
             WriteLogRecord(
@@ -45,9 +42,7 @@ namespace HydroGarden.Foundation.Common.Logging
             );
         }
 
-        /// <summary>
-        /// Logs an object with a message.
-        /// </summary>
+        /// <inheritdoc/>
         public void Log(object obj, string message)
         {
             WriteLogRecord(
@@ -56,9 +51,6 @@ namespace HydroGarden.Foundation.Common.Logging
             );
         }
 
-        /// <summary>
-        /// Writes log entries to a text file with a rolling daily format.
-        /// </summary>
         private void WriteLogRecord(string logEntry)
         {
             var fileName = $"log_{DateTime.UtcNow:yyyy-MM-dd}.txt";
@@ -70,15 +62,4 @@ namespace HydroGarden.Foundation.Common.Logging
             }
         }
     }
-#else
-    /// <summary>
-    /// No-op logger for Release mode (ensures no logs are written).
-    /// </summary>
-    public class HydroGardenLogger : IHydroGardenLogger
-    {
-        public void Log(string message) { }
-        public void Log(Exception ex, string message) { }
-        public void Log(object obj, string message) { }
-    }
-#endif
 }

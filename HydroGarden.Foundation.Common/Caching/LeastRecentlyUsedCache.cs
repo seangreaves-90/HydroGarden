@@ -1,12 +1,16 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Common.Caching
 {
     /// <summary>
-    /// Thread-safe Least Recently Used (LRU) cache implementation with size constraints.
+    /// Implements a Least Recently Used (LRU) cache with eviction policy.
     /// </summary>
-    /// <typeparam name="TKey">The type of keys in the cache.</typeparam>
-    /// <typeparam name="TValue">The type of values in the cache.</typeparam>
+    /// <typeparam name="TKey">The type of the cache key.</typeparam>
+    /// <typeparam name="TValue">The type of the cache value.</typeparam>
     public class LruCache<TKey, TValue> : IDisposable where TKey : notnull
     {
         private readonly int _capacity;
@@ -15,14 +19,13 @@ namespace HydroGarden.Foundation.Common.Caching
         private readonly SemaphoreSlim _evictionLock = new(1, 1);
         private readonly TimeSpan _evictionCheckInterval;
         private readonly Timer _evictionTimer;
-        private long _evictionCounter;
         private bool _isDisposed;
 
         /// <summary>
-        /// Initializes a new instance of the LruCache class with the specified capacity.
+        /// Initializes a new instance of the <see cref="LruCache{TKey, TValue}"/> class.
         /// </summary>
-        /// <param name="capacity">The maximum number of items to store in the cache.</param>
-        /// <param name="evictionCheckIntervalSeconds">The interval in seconds at which to check for items to evict.</param>
+        /// <param name="capacity">The maximum number of items the cache can hold.</param>
+        /// <param name="evictionCheckIntervalSeconds">Interval in seconds for checking evictions.</param>
         public LruCache(int capacity, int evictionCheckIntervalSeconds = 60)
         {
             if (capacity <= 0)
@@ -39,79 +42,60 @@ namespace HydroGarden.Foundation.Common.Caching
         public int Count => _cache.Count;
 
         /// <summary>
-        /// Gets the maximum capacity of the cache.
+        /// Gets the cache capacity.
         /// </summary>
         public int Capacity => _capacity;
 
         /// <summary>
-        /// Gets the time of last eviction run.
+        /// Tries to retrieve a value from the cache.
         /// </summary>
-        public DateTime LastEvictionTime => new(Interlocked.Read(ref _evictionCounter), DateTimeKind.Utc);
-
-        /// <summary>
-        /// Attempts to get the value associated with the specified key.
-        /// </summary>
-        /// <param name="key">The key to get the value for.</param>
-        /// <param name="value">When this method returns, contains the value associated with the specified key, 
-        /// if the key is found; otherwise, the default value for the type of the value parameter.</param>
-        /// <returns>true if the cache contains an element with the specified key; otherwise, false.</returns>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">The retrieved value, if found.</param>
+        /// <returns>True if the key exists, otherwise false.</returns>
         public bool TryGetValue(TKey key, out TValue? value)
         {
             if (_cache.TryGetValue(key, out value))
             {
-                // Update access timestamp on successful retrieval
                 _accessTimestamps[key] = DateTime.UtcNow.Ticks;
                 return true;
             }
-
             value = default;
             return false;
         }
 
         /// <summary>
-        /// Adds or updates a key-value pair in the cache.
+        /// Adds or updates an entry in the cache asynchronously.
         /// </summary>
-        /// <param name="key">The key to add or update.</param>
-        /// <param name="value">The value to add or update.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
+        /// <param name="key">The key to store the value.</param>
+        /// <param name="value">The value to store.</param>
         public async Task AddOrUpdateAsync(TKey key, TValue value)
         {
-            // First, update the item in the cache
             _cache[key] = value;
             _accessTimestamps[key] = DateTime.UtcNow.Ticks;
 
-            // Then check if eviction is needed
             if (_cache.Count > _capacity)
             {
                 await EvictOldestItemAsync();
             }
         }
 
-        /// <summary>
-        /// Adds or updates a key-value pair in the cache.
-        /// </summary>
-        /// <param name="key">The key to add or update.</param>
-        /// <param name="value">The value to add or update.</param>
         public void AddOrUpdate(TKey key, TValue value)
         {
-            // This is a synchronous version of AddOrUpdateAsync
             _cache[key] = value;
             _accessTimestamps[key] = DateTime.UtcNow.Ticks;
-
-            // Then check if eviction is needed (non-blocking)
             if (_cache.Count > _capacity)
             {
                 _ = EvictOldestItemAsync();
             }
         }
 
+
         /// <summary>
-        /// Attempts to remove the value with the specified key.
+        /// Removes an entry from the cache.
         /// </summary>
         /// <param name="key">The key to remove.</param>
-        /// <param name="value">When this method returns, contains the value associated with the specified key, 
-        /// if the key is found; otherwise, the default value for the type of the value parameter.</param>
-        /// <returns>true if the cache contains an element with the specified key; otherwise, false.</returns>
+        /// <param name="value">The removed value, if found.</param>
+        /// <returns>True if the key was found and removed, otherwise false.</returns>
         public bool TryRemove(TKey key, out TValue? value)
         {
             if (_cache.TryRemove(key, out value))
@@ -119,13 +103,12 @@ namespace HydroGarden.Foundation.Common.Caching
                 _accessTimestamps.TryRemove(key, out _);
                 return true;
             }
-
             value = default;
             return false;
         }
 
         /// <summary>
-        /// Removes all items from the cache.
+        /// Clears all items from the cache.
         /// </summary>
         public void Clear()
         {
@@ -134,7 +117,7 @@ namespace HydroGarden.Foundation.Common.Caching
         }
 
         /// <summary>
-        /// Dispose resources used by the cache.
+        /// Disposes of cache resources.
         /// </summary>
         public void Dispose()
         {
@@ -148,14 +131,6 @@ namespace HydroGarden.Foundation.Common.Caching
             GC.SuppressFinalize(this);
         }
 
-        /// <summary>
-        /// Finalizer to ensure resources are cleaned up.
-        /// </summary>
-        ~LruCache()
-        {
-            Dispose();
-        }
-
         private async void EvictionTimerCallback(object? state)
         {
             if (_isDisposed)
@@ -163,36 +138,25 @@ namespace HydroGarden.Foundation.Common.Caching
 
             try
             {
-                // Only perform eviction if we're over capacity
                 if (_cache.Count > _capacity)
                 {
                     await EvictOldestItemAsync();
                 }
-
-                Interlocked.Exchange(ref _evictionCounter, DateTime.UtcNow.Ticks);
             }
             catch (Exception)
             {
-                // Swallow exceptions in the timer callback to prevent unhandled exceptions
             }
         }
 
         private async Task EvictOldestItemAsync()
         {
-            if (await _evictionLock.WaitAsync(0)) // Non-blocking acquire
+            if (await _evictionLock.WaitAsync(0))
             {
                 try
                 {
-                    // We do a second check here to avoid duplicate evictions
-                    // from multiple concurrent callers
                     while (_cache.Count > _capacity)
                     {
-                        // Find the oldest item by timestamp
-                        var oldest = _accessTimestamps
-                            .OrderBy(x => x.Value)
-                            .FirstOrDefault();
-
-                        // It's possible another thread already removed this item
+                        var oldest = _accessTimestamps.OrderBy(x => x.Value).FirstOrDefault();
                         if (oldest.Key != null && _cache.TryRemove(oldest.Key, out _))
                         {
                             _accessTimestamps.TryRemove(oldest.Key, out _);

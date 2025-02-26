@@ -1,89 +1,81 @@
 ﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
 {
     /// <summary>
-    /// Represents a storage mechanism for component properties and metadata.
+    /// Defines a storage interface for saving and retrieving component properties.
     /// </summary>
     public interface IStore
     {
         /// <summary>
-        /// Begins a new transaction for batch operations.
+        /// Begins a new transaction asynchronously.
         /// </summary>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A transaction object that can be used for batch operations.</returns>
+        /// <param name="ct">An optional cancellation token.</param>
+        /// <returns>A task representing the asynchronous transaction.</returns>
         Task<IStoreTransaction> BeginTransactionAsync(CancellationToken ct = default);
 
         /// <summary>
-        /// Loads properties for a specific component.
+        /// Loads stored properties asynchronously.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A dictionary of property names and values, or null if the component is not found.</returns>
+        /// <param name="id">The unique identifier of the component.</param>
+        /// <param name="ct">An optional cancellation token.</param>
+        /// <returns>A task returning a dictionary of stored properties.</returns>
         Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default);
 
         /// <summary>
-        /// Loads metadata for a specific component.
+        /// Loads metadata associated with stored properties asynchronously.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A dictionary of property names and metadata, or null if the component is not found.</returns>
+        /// <param name="id">The unique identifier of the component.</param>
+        /// <param name="ct">An optional cancellation token.</param>
+        /// <returns>A task returning a dictionary of property metadata.</returns>
         Task<IDictionary<string, IPropertyMetadata>?> LoadMetadataAsync(Guid id, CancellationToken ct = default);
 
         /// <summary>
-        /// Saves properties for a specific component.
+        /// Saves properties asynchronously.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
-        /// <param name="properties">The properties to save.</param>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
+        /// <param name="id">The unique identifier of the component.</param>
+        /// <param name="properties">The dictionary of properties to save.</param>
+        /// <param name="ct">An optional cancellation token.</param>
         Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default);
 
         /// <summary>
-        /// Saves properties and metadata for a specific component.
+        /// Saves properties along with their metadata asynchronously.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
-        /// <param name="properties">The properties to save.</param>
-        /// <param name="metadata">The metadata to save.</param>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
+        /// <param name="id">The unique identifier of the component.</param>
+        /// <param name="properties">The dictionary of properties to save.</param>
+        /// <param name="metadata">The dictionary of property metadata.</param>
+        /// <param name="ct">An optional cancellation token.</param>
         Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties,
             IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default);
     }
 
     /// <summary>
-    /// Represents a transaction for batch operations on a store.
+    /// Defines a transaction interface for handling batch property storage operations.
     /// </summary>
     public interface IStoreTransaction : IAsyncDisposable
     {
         /// <summary>
-        /// Saves properties for a specific component within this transaction.
+        /// Saves properties within a transaction.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
+        /// <param name="id">The unique identifier of the component.</param>
         /// <param name="properties">The properties to save.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         Task SaveAsync(Guid id, IDictionary<string, object> properties);
 
         /// <summary>
-        /// Saves properties and metadata for a specific component within this transaction.
+        /// Saves properties with metadata within a transaction.
         /// </summary>
-        /// <param name="id">The component identifier.</param>
+        /// <param name="id">The unique identifier of the component.</param>
         /// <param name="properties">The properties to save.</param>
         /// <param name="metadata">The metadata to save.</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties,
             IDictionary<string, IPropertyMetadata>? metadata);
 
         /// <summary>
-        /// Commits all changes made in this transaction.
+        /// Commits the transaction asynchronously.
         /// </summary>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         Task CommitAsync(CancellationToken ct = default);
 
         /// <summary>
-        /// Rolls back all changes made in this transaction.
+        /// Rolls back the transaction asynchronously.
         /// </summary>
-        /// <param name="ct">Cancellation token</param>
-        /// <returns>A task that represents the asynchronous operation.</returns>
         Task RollbackAsync(CancellationToken ct = default);
     }
 }

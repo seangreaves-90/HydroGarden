@@ -1,19 +1,27 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Common.Logging;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
+    /// <summary>
+    /// Base class for IoT devices in the HydroGarden system.
+    /// Implements the <see cref="IIoTDevice"/> interface and provides lifecycle management.
+    /// </summary>
     public abstract class IoTDeviceBase : HydroGardenComponentBase, IIoTDevice
     {
         private readonly CancellationTokenSource _executionCts = new();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="IoTDeviceBase"/> class.
+        /// </summary>
+        /// <param name="id">The unique identifier of the device.</param>
+        /// <param name="name">The name of the device.</param>
+        /// <param name="logger">Optional logger instance.</param>
         protected IoTDeviceBase(Guid id, string name, IHydroGardenLogger? logger = null)
             : base(id, name, logger)
         {
         }
 
+        /// <inheritdoc />
         public virtual async Task InitializeAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Created)
@@ -25,9 +33,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 await SetPropertyAsync("Id", Id);
                 await SetPropertyAsync("Name", Name);
                 await SetPropertyAsync("AssemblyType", AssemblyType);
-
                 await OnInitializeAsync(ct);
-
                 await SetPropertyAsync(nameof(State), ComponentState.Ready);
             }
             catch (Exception ex)
@@ -38,15 +44,19 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <summary>
+        /// Performs device-specific initialization logic.
+        /// Override this method to customize initialization behavior.
+        /// </summary>
         protected virtual Task OnInitializeAsync(CancellationToken ct) => Task.CompletedTask;
 
+        /// <inheritdoc />
         public virtual async Task StartAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Ready)
                 throw new InvalidOperationException($"Cannot start device in state {State}");
 
             await SetPropertyAsync(nameof(State), ComponentState.Running);
-
             try
             {
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _executionCts.Token);
@@ -54,7 +64,6 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Normal cancellation
             }
             catch (Exception)
             {
@@ -63,8 +72,13 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <summary>
+        /// Performs device-specific startup logic.
+        /// Override this method to implement custom start behavior.
+        /// </summary>
         protected virtual Task OnStartAsync(CancellationToken ct) => Task.CompletedTask;
 
+        /// <inheritdoc />
         public virtual async Task StopAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Running)
@@ -85,8 +99,13 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <summary>
+        /// Performs device-specific stop logic.
+        /// Override this method to implement custom stop behavior.
+        /// </summary>
         protected virtual Task OnStopAsync(CancellationToken ct) => Task.CompletedTask;
 
+        /// <inheritdoc />
         public override void Dispose()
         {
             _executionCts.Cancel();
