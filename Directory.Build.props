@@ -9,7 +9,7 @@
 
 		<!-- Shared Project Properties-->
 		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
-		<RootNamespace>$(MSBuildProjectDirectory.Replace('\', '.').Replace('/', '.'))</RootNamespace>
+		<RootNamespace>$(MSBuildProjectName)</RootNamespace>
 		<Company>HydroGarden Inc.</Company>
 		<Product>HydroGarden Automation</Product>
 		<Copyright>© $([System.DateTime]::Now.Year) $(Company) All rights reserved. All trademarks are the property of $(Company) and its subsidiaries.</Copyright>
@@ -17,5 +17,13 @@
 		<Trademark>$(Product) is a trademark of $(Company)</Trademark>
 
 	</PropertyGroup>
+
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<DocumentationFile>$(SolutionDir)\docs\$(AssemblyName).xml</DocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+		<!-- Suppresses warnings for missing XML comments -->
+	</PropertyGroup>
+
 
 </Project>

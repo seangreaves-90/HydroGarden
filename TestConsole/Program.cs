@@ -1,79 +1,141 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Common.Caching;
-using HydroGarden.Foundation.Core.Devices;
-using HydroGarden.Foundation.Core.PropertyManager;
+using HydroGarden.Foundation.Common.Logging;
+using HydroGarden.Foundation.Core.Components.Devices;
+using HydroGarden.Foundation.Core.Services;
 using HydroGarden.Foundation.Core.Stores;
-
-namespace TestConsole
+namespace HydroGarden.TestConsole
 {
-    // A simple concrete IoTDevice for demonstration.
-    public class DemoIoTDevice : IoTDeviceBase
-    {
-        public DemoIoTDevice(Guid id, string displayName, IPropertyManager properties, ILogger logger)
-            : base(id, displayName, "DemoDevice", properties, logger)
-        {
-        }
-
-        // For demo purposes, no real execution logic.
-        public override Task ExecuteCoreAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
-
-    internal class Program
+    class Program
     {
         static async Task Main(string[] args)
         {
-            // Define a directory for property storage.
-            string basePath = Path.Combine(Directory.GetCurrentDirectory(), "DeviceProperties");
-            Directory.CreateDirectory(basePath);
+            Console.WriteLine("Starting HydroGarden Pump Device Test");
+            Console.WriteLine("=====================================");
 
-            // Create a JSON file-based property store.
-            IPropertyStore store = new JsonPropertyStore(basePath, logger: null);
+            var logger = new HydroGardenLogger();
+            var store = new JsonStore(Path.Combine(Directory.GetCurrentDirectory(), "DeviceData"), new HydroGardenLogger());
+            var persistenceService = new PersistenceService(store, logger, 100, TimeSpan.FromSeconds(1));
 
-            // Create a SmartCache instance with a 5-minute sliding expiration.
-            IPropertyCache cache = new SmartCache(TimeSpan.FromMinutes(5), maxSize: 100);
+            var pumpId = Guid.NewGuid();
+            Console.WriteLine($"Creating pump with ID: {pumpId}");
+            var pump = new PumpDevice(pumpId, "Main Nutrient Pump", 100, 0, logger);
+            
+            await persistenceService.AddOrUpdateDeviceAsync(pump);
+            Console.WriteLine("Pump registered with persistence service");
 
-            // Create a PropertyManager for our device (with id "device1").
-            IPropertyManager propManager = new PropertyManager("device1", store, cache, logger: null);
+            Console.WriteLine("Initializing pump...");
+            await pump.InitializeAsync();
+            Console.WriteLine("Pump initialized");
 
-            // IMPORTANT: Load properties from the store into the PropertyManager.
-            await propManager.LoadAsync(CancellationToken.None);
+            Console.WriteLine("Setting flow rate to 50%...");
+            await pump.SetFlowRateAsync(50);
+            await DisplayPumpStatus(pump, persistenceService);
 
-            // Create and initialize a new IoT device.
-            Guid deviceId = Guid.NewGuid();
-            DemoIoTDevice device = new DemoIoTDevice(deviceId, "Test Device", propManager, logger: null);
+            Console.WriteLine("Starting pump...");
+            var pumpTask = pump.StartAsync();
 
-            // Initialization sets default properties: "Id", "DisplayName", "DeviceType".
-            await device.InitializeAsync(CancellationToken.None);
+            Console.WriteLine("Pump running for 3 seconds...");
+            await Task.Delay(3000);
+            await DisplayPumpStatus(pump, persistenceService);
 
-            // Save the device properties to file via the PropertyManager.
-            await device.SaveAsync(CancellationToken.None);
-            Console.WriteLine("Device properties saved to file.");
+            Console.WriteLine("Changing flow rate to 75%...");
+            await pump.SetFlowRateAsync(75);
+            await Task.Delay(2000);
+            await DisplayPumpStatus(pump, persistenceService);
 
-            // --------------------------------------------------------------
-            // Simulate a new device instance by creating a new PropertyManager,
-            // with a fresh cache but using the same underlying store.
-            IPropertyCache newCache = new SmartCache(TimeSpan.FromMinutes(5), maxSize: 100);
-            IPropertyManager newPropManager = new PropertyManager("device1", store, newCache, logger: null);
+            Console.WriteLine("Stopping pump...");
+            await pump.StopAsync();
+            Console.WriteLine("Pump stopped");
+            await DisplayPumpStatus(pump, persistenceService);
 
-            // IMPORTANT: Load properties from file into the new PropertyManager.
-            await newPropManager.LoadAsync(CancellationToken.None);
-            Console.WriteLine("Device properties loaded from file.");
+            Console.WriteLine("\nTesting optimistic property updates...");
+            bool success = await pump.UpdatePropertyOptimisticAsync<double>("FlowRate", current => current + 10);
+            Console.WriteLine($"Optimistic update {(success ? "succeeded" : "failed")}");
+            await DisplayPumpStatus(pump, persistenceService);
 
-            // Create a new IoT device instance using the loaded properties.
-            DemoIoTDevice loadedDevice = new DemoIoTDevice(deviceId, "Test Device", newPropManager, logger: null);
+            // Test persistence by creating a new pump with the same ID
+            Console.WriteLine("\nTesting device properties persistence...");
+            Console.WriteLine("Creating new pump instance with same ID to simulate restart");
+            var reloadedPump = new PumpDevice(pumpId, "Reloaded Pump", 100, 0, logger);
 
-            // Retrieve a property to observe cache usage.
-            string? displayName = await newPropManager.GetPropertyAsync<string>("DisplayName", CancellationToken.None);
-            Console.WriteLine($"Loaded DisplayName: {displayName}");
+            // Updated to use AddOrUpdateDeviceAsync
+            await persistenceService.AddOrUpdateDeviceAsync(reloadedPump);
+            await reloadedPump.InitializeAsync();
 
-            // Update the "DisplayName" property and read it back to see caching in effect.
-            await newPropManager.SetPropertyAsync("DisplayName", "Updated Test Device", isReadOnly: false, validator: null, CancellationToken.None);
-            string? updatedDisplayName = await newPropManager.GetPropertyAsync<string>("DisplayName", CancellationToken.None);
-            Console.WriteLine($"Updated DisplayName: {updatedDisplayName}");
+            Console.WriteLine("Reloaded pump properties:");
+            await DisplayPumpStatus(reloadedPump, persistenceService);
 
-            // At this point, subsequent calls to GetPropertyAsync("DisplayName") will hit the cache until expiration.
-            Console.WriteLine("Demo complete. Press any key to exit.");
+            Console.WriteLine("\nTesting transaction support...");
+            await using (var transaction = await store.BeginTransactionAsync())
+            {
+                var transactionProps = new Dictionary<string, object>
+                {
+                    { "TransactionTest", "This value was set in a transaction!" },
+                    { "Timestamp", DateTime.UtcNow }
+                };
+                await transaction.SaveAsync(pumpId, transactionProps);
+                Console.WriteLine("Transaction created and committed");
+                await transaction.CommitAsync();
+            }
+
+            var finalPump = new PumpDevice(pumpId, "Final Test Pump", 100, 0, logger);
+
+            // Updated to use AddOrUpdateDeviceAsync
+            await persistenceService.AddOrUpdateDeviceAsync(finalPump);
+            await finalPump.InitializeAsync();
+
+            Console.WriteLine("Pump after transaction changes:");
+            await DisplayPumpStatus(finalPump, persistenceService);
+
+            pump.Dispose();
+            reloadedPump.Dispose();
+            finalPump.Dispose();
+            await persistenceService.DisposeAsync();
+
+            Console.WriteLine("\nTest completed");
+            Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
+        }
+
+        static async Task DisplayPumpStatus(PumpDevice pump, PersistenceService persistenceService)
+        {
+            Console.WriteLine("\nPump Status:");
+            Console.WriteLine("------------");
+            var flowRate = await pump.GetPropertyAsync<double>("FlowRate");
+            var currentFlowRate = await pump.GetPropertyAsync<double>("CurrentFlowRate");
+            var isRunning = await pump.GetPropertyAsync<bool>("IsRunning");
+            var state = await pump.GetPropertyAsync<ComponentState>("State");
+            var timestamp = await pump.GetPropertyAsync<DateTime?>("Timestamp");
+
+            Console.WriteLine($"State: {state}");
+            Console.WriteLine($"Flow Rate Setting: {flowRate}%");
+            Console.WriteLine($"Current Flow Rate: {currentFlowRate.ToString("F2") ?? "N/A"}%");
+            Console.WriteLine($"Running: {isRunning}");
+            Console.WriteLine($"Last Update: {timestamp?.ToString() ?? "N/A"}");
+
+            // Show transaction test property if it exists
+            var transactionTest = await pump.GetPropertyAsync<string>("TransactionTest");
+            if (transactionTest != null)
+            {
+                Console.WriteLine($"Transaction Test: {transactionTest}");
+            }
+
+            Console.WriteLine("\nAll Pump Properties with Metadata:");
+            var allMetadata = pump.GetAllPropertyMetadata();
+            var allProps = pump.GetProperties();
+
+            foreach (var prop in allProps)
+            {
+                var metadata = allMetadata.TryGetValue(prop.Key, out var meta) ? meta : null;
+                string displayName = metadata?.DisplayName ?? prop.Key;
+                string editableStatus = metadata?.IsEditable == true ? "Editable" : "Read-only";
+                string description = metadata?.Description ?? "No description";
+
+                Console.WriteLine($"- {displayName} ({prop.Key}): {prop.Value} [{editableStatus}]");
+                Console.WriteLine($"  Description: {description}");
+            }
+
+            Console.WriteLine();
         }
     }
 }
