@@ -18,4 +18,12 @@
 
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<DocumentationFile>$(SolutionDir)\docs\$(AssemblyName).xml</DocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+		<!-- Suppresses warnings for missing XML comments -->
+	</PropertyGroup>
+
+
 </Project>
