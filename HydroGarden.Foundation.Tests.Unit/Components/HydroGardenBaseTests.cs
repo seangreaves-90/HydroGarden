@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components;
 using Moq;
 using System.Xml.Linq;
@@ -62,13 +63,14 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             string description = "Test Description";
             bool isEditable = true;
             bool isVisible = true;
-            await _sut.SetPropertyAsync(propertyName, propertyValue, isEditable, isVisible, displayName, description);
-            var metadata = _sut.GetPropertyMetadata(propertyName);
-            metadata.Should().NotBeNull();
-            metadata.DisplayName.Should().Be(displayName);
-            metadata.Description.Should().Be(description);
-            metadata.IsEditable.Should().Be(isEditable);
-            metadata.IsVisible.Should().Be(isVisible);
+            var metadata = new PropertyMetadata(isEditable, isVisible, displayName, description);
+            await _sut.SetPropertyAsync(propertyName, propertyValue, metadata);
+            var storedMetadata = _sut.GetPropertyMetadata(propertyName);
+            storedMetadata.Should().NotBeNull();
+            storedMetadata.DisplayName.Should().Be(displayName);
+            storedMetadata.Description.Should().Be(description);
+            storedMetadata.IsEditable.Should().Be(isEditable);
+            storedMetadata.IsVisible.Should().Be(isVisible);
         }
 
         [Fact]
@@ -196,8 +198,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         [Fact]
         public async Task GetAllPropertyMetadata_ShouldReturnAllMetadata()
         {
-            await _sut.SetPropertyAsync("Property1", "Value1", true, true, "Display1", "Description1");
-            await _sut.SetPropertyAsync("Property2", 42, false, true, "Display2", "Description2");
+            var metadata1 = new PropertyMetadata(true, true, "Display1", "Description1");
+            var metadata2 = new PropertyMetadata(false, true, "Display2", "Description2");
+
+            await _sut.SetPropertyAsync("Property1", "Value1", metadata1);
+            await _sut.SetPropertyAsync("Property2", 42, metadata2);
+
             var metadata = _sut.GetAllPropertyMetadata();
             metadata.Should().NotBeNull();
             metadata.Count.Should().Be(2);
@@ -241,23 +247,13 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             {
                 {
                     "Property1",
-                    new HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata
-                    {
-                        IsEditable = true,
-                        IsVisible = true,
-                        DisplayName = "Display1",
-                        Description = "Description1"
-                    }
+                    new Common.PropertyMetadata.PropertyMetadata(
+                        true, true, "Display1", "Description1")
                 },
                 {
                     "Property2",
-                    new HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata
-                    {
-                        IsEditable = false,
-                        IsVisible = true,
-                        DisplayName = "Display2",
-                        Description = "Description2"
-                    }
+                    new Common.PropertyMetadata.PropertyMetadata(
+                        false, true, "Display2", "Description2")
                 }
             };
             await _sut.LoadPropertiesAsync(properties, metadata);

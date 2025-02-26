@@ -1,5 +1,7 @@
-﻿// HydroGarden.Foundation.Core.Components.Devices/IoTDeviceBase.cs
-using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.Logging;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
@@ -19,19 +21,19 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             try
             {
-                await SetPropertyAsync(nameof(State), ComponentState.Initializing, false, true);
-                await SetPropertyAsync("Id", Id, false, false, "Device ID", "Unique identifier for this device");
-                await SetPropertyAsync("Name", Name, true, true, "Device Name", "User-friendly name for this device");
-                await SetPropertyAsync("AssemblyType", AssemblyType, false, false, "Device Type", "Technical type of this device");
+                await SetPropertyAsync(nameof(State), ComponentState.Initializing);
+                await SetPropertyAsync("Id", Id);
+                await SetPropertyAsync("Name", Name);
+                await SetPropertyAsync("AssemblyType", AssemblyType);
 
                 await OnInitializeAsync(ct);
 
-                await SetPropertyAsync(nameof(State), ComponentState.Ready, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Ready);
             }
             catch (Exception ex)
             {
-                _logger.Log(ex,"Failed to initailzie device");
-                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
+                _logger.Log(ex, "Failed to initialize device");
+                await SetPropertyAsync(nameof(State), ComponentState.Error);
                 throw;
             }
         }
@@ -43,7 +45,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             if (State != ComponentState.Ready)
                 throw new InvalidOperationException($"Cannot start device in state {State}");
 
-            await SetPropertyAsync(nameof(State), ComponentState.Running, false, true);
+            await SetPropertyAsync(nameof(State), ComponentState.Running);
 
             try
             {
@@ -56,7 +58,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
             catch (Exception)
             {
-                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Error);
                 throw;
             }
         }
@@ -68,17 +70,17 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             if (State != ComponentState.Running)
                 return;
 
-            await SetPropertyAsync(nameof(State), ComponentState.Stopping, false, true);
+            await SetPropertyAsync(nameof(State), ComponentState.Stopping);
             _executionCts.Cancel();
 
             try
             {
                 await OnStopAsync(ct);
-                await SetPropertyAsync(nameof(State), ComponentState.Ready, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Ready);
             }
             catch (Exception)
             {
-                await SetPropertyAsync(nameof(State), ComponentState.Error, false, true);
+                await SetPropertyAsync(nameof(State), ComponentState.Error);
                 throw;
             }
         }

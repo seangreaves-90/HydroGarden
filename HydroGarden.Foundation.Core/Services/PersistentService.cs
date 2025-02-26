@@ -124,10 +124,10 @@ namespace HydroGarden.Foundation.Core.Services
                         // Create a test device ID and properties if none available
                         var testDeviceId = Guid.NewGuid();
                         var testProperties = new Dictionary<string, object>
-                {
-                    { "TestProperty", "Test Value" },
-                    { "TestTimestamp", DateTime.UtcNow }
-                };
+                        {
+                            { "TestProperty", "Test Value" },
+                            { "TestTimestamp", DateTime.UtcNow }
+                        };
 
                         _logger.Log($"[DEBUG] Using generated device {testDeviceId} for transaction");
                         await transaction.SaveAsync(testDeviceId, testProperties);

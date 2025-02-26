@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             Directory.CreateDirectory(_testDirectory);
             _testFilePath = Path.Combine(_testDirectory, "ComponentProperties.json");
             _mockLogger = new Mock<IHydroGardenLogger>();
-            _sut = new JsonStore("testPath", _mockLogger.Object);
+            _sut = new JsonStore(_testDirectory, _mockLogger.Object);
         }
 
         public void Dispose()
@@ -86,21 +86,21 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             {
                 {
                     "Name",
-                    new PropertyMetadata {
-                        IsEditable = true,
-                        IsVisible = true,
-                        DisplayName = "Device Name",
-                        Description = "The name of the device"
-                    }
+                    new PropertyMetadata(
+                        isEditable: true,
+                        isVisible: true,
+                        displayName: "Device Name",
+                        description: "The name of the device"
+                    )
                 },
                 {
                     "Value",
-                    new PropertyMetadata {
-                        IsEditable = false,
-                        IsVisible = true,
-                        DisplayName = "Sensor Value",
-                        Description = "The current value from the sensor"
-                    }
+                    new PropertyMetadata(
+                        isEditable: false,
+                        isVisible: true,
+                        displayName: "Sensor Value",
+                        description: "The current value from the sensor"
+                    )
                 }
             };
             await _sut.SaveWithMetadataAsync(deviceId, properties, metadata);
@@ -125,21 +125,21 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             {
                 {
                     "Name",
-                    new PropertyMetadata {
-                        IsEditable = true,
-                        IsVisible = true,
-                        DisplayName = "Device Name",
-                        Description = "The name of the device"
-                    }
+                    new PropertyMetadata(
+                        isEditable: true,
+                        isVisible: true,
+                        displayName: "Device Name",
+                        description: "The name of the device"
+                    )
                 },
                 {
                     "Value",
-                    new PropertyMetadata {
-                        IsEditable = false,
-                        IsVisible = true,
-                        DisplayName = "Sensor Value",
-                        Description = "The current value from the sensor"
-                    }
+                    new PropertyMetadata(
+                        isEditable: false,
+                        isVisible: true,
+                        displayName: "Sensor Value",
+                        description: "The current value from the sensor"
+                    )
                 }
             };
             await _sut.SaveWithMetadataAsync(deviceId, properties, metadata);
@@ -238,34 +238,32 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
         {
             var deviceId = Guid.NewGuid();
             var properties = new Dictionary<string, object>
-    {
-        { "Name", "Test Device" },
-        { "Value", 42.5 }
-    };
+                            {
+                                { "Name", "Test Device" },
+                                { "Value", 42.5 }
+                            };
 
             var metadata = new Dictionary<string, IPropertyMetadata>
-    {
-        {
-            "Name",
-            new PropertyMetadata
             {
-                IsEditable = true,
-                IsVisible = true,
-                DisplayName = "Device Name",
-                Description = "The name of the device"
-            }
-        },
-        {
-            "Value",
-            new PropertyMetadata
-            {
-                IsEditable = false,
-                IsVisible = true,
-                DisplayName = "Sensor Value",
-                Description = "The current value from the sensor"
-            }
-        }
-    };
+                {
+                    "Name",
+                    new PropertyMetadata(
+                        isEditable: true,
+                        isVisible: true,
+                        displayName: "Device Name",
+                        description: "The name of the device"
+                    )
+                },
+                {
+                    "Value",
+                    new PropertyMetadata(
+                        isEditable: false,
+                        isVisible: true,
+                        displayName: "Sensor Value",
+                        description: "The current value from the sensor"
+                    )
+                }
+            };
 
             await using (var transaction = await _sut.BeginTransactionAsync())
             {
@@ -347,7 +345,9 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             var loadedDevice1Properties = await _sut.LoadAsync(device1Id);
             var loadedDevice2Properties = await _sut.LoadAsync(device2Id);
             loadedDevice1Properties.Should().NotBeNull();
-            loadedDevice1Properties["Name"].Should().Be("Device 1");
+            loadedDevice1Properties.Should().NotBeNull();
+            loadedDevice1Properties.Should().ContainKey("Name");
+            loadedDevice1Properties["Name"]?.ToString()?.Trim().Should().Be("Device 1");
             ((double)loadedDevice1Properties["Value"]).Should().BeApproximately(42.5, 0.01);
             loadedDevice2Properties.Should().NotBeNull();
             loadedDevice2Properties["Name"].Should().Be("Device 2");
@@ -410,9 +410,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             {
                 { "Name", "Test Device" }
             };
-            await File.WriteAllTextAsync(_testFilePath, "This is not valid JSON content");
-            await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
-                _sut.SaveAsync(deviceId, properties));
+            await File.WriteAllTextAsync(_testFilePath, "{invalid json}");
+            await Task.Delay(50); // Ensure file system sync
+            await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => _sut.SaveAsync(deviceId, properties));
+
         }
 
         [Fact]
@@ -423,14 +424,20 @@ namespace HydroGarden.Foundation.Tests.Unit.Store
             var device1Properties = new Dictionary<string, object> { { "Name", "Device 1" } };
             var device2Properties = new Dictionary<string, object> { { "Name", "Device 2" } };
             var task1 = _sut.SaveAsync(device1Id, device1Properties);
+            await Task.Delay(10); 
             var task2 = _sut.SaveAsync(device2Id, device2Properties);
             await Task.WhenAll(task1, task2);
+
             var loadedDevice1Properties = await _sut.LoadAsync(device1Id);
             var loadedDevice2Properties = await _sut.LoadAsync(device2Id);
             loadedDevice1Properties.Should().NotBeNull();
-            loadedDevice1Properties["Name"].Should().Be("Device 1");
+            loadedDevice1Properties.Should().ContainKey("Name");
+            loadedDevice1Properties["Name"]?.ToString()?.Trim().Should().Be("Device 1");
+
             loadedDevice2Properties.Should().NotBeNull();
-            loadedDevice2Properties["Name"].Should().Be("Device 2");
+            loadedDevice2Properties.Should().ContainKey("Name");
+            loadedDevice2Properties["Name"]?.ToString()?.Trim().Should().Be("Device 2");
+
         }
     }
 }

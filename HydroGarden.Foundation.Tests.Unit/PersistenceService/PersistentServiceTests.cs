@@ -82,7 +82,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             {
                 {
                     "StoredProp",
-                    new PropertyMetadata { IsEditable = true, IsVisible = true }
+                    new PropertyMetadata(true, true, null, null)
                 }
             };
 
@@ -135,7 +135,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _sut.HasDevice(deviceId).Should().BeTrue("The device should be registered in the service");
 
             // Act
-            var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
+            var metadata = new PropertyMetadata(true, true, null, null);
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
                 deviceId,
                 "TestProperty",
@@ -181,7 +181,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 
             await _sut.AddOrUpdateDeviceAsync(mockComponent);
 
-            var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
+            var metadata = new PropertyMetadata(true, true, null, null);
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
                 deviceId,
                 "TestProperty",
@@ -228,7 +228,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 
             await _sut.AddOrUpdateDeviceAsync(mockComponent);
 
-            var metadata = new PropertyMetadata { IsEditable = true, IsVisible = true };
+            var metadata = new PropertyMetadata(true, true, null, null);
             var transactions = 0;
 
             _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))

@@ -24,7 +24,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         string AssemblyType { get; }
         ComponentState State { get; }
 
-        Task SetPropertyAsync(string name, object value, bool isEditable = true, bool isVisible = true, string? displayName = null, string? description = null);
+        Task SetPropertyAsync(string name, object value, IPropertyMetadata metadata);
         Task<T?> GetPropertyAsync<T>(string name);
         IPropertyMetadata? GetPropertyMetadata(string name);
         IDictionary<string, object> GetProperties();

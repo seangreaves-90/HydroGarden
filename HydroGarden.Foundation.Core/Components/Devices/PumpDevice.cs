@@ -1,6 +1,8 @@
-﻿// HydroGarden.Foundation.Core.Components.Devices/PumpDevice.cs
-using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Common.Logging;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
@@ -26,20 +28,18 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 throw new ArgumentOutOfRangeException(nameof(value), $"Flow rate must be between {_minFlowRate} and {_maxFlowRate}");
 
             _flowRate = value;
-            await SetPropertyAsync("FlowRate", _flowRate, true, true, "Flow Rate", "Current flow rate setting (0-100%)");
+            await SetPropertyAsync("FlowRate", _flowRate);
         }
 
         protected override async Task OnInitializeAsync(CancellationToken ct)
         {
-            // Initialize with default values
             _flowRate = 0;
             _isRunning = false;
 
-            // Set the properties with metadata
-            await SetPropertyAsync("FlowRate", _flowRate, true, true, "Flow Rate", "Current flow rate setting (0-100%)");
-            await SetPropertyAsync("IsRunning", _isRunning, false, true, "Running Status", "Indicates if the pump is currently running");
-            await SetPropertyAsync("MaxFlowRate", _maxFlowRate, false, true, "Maximum Flow Rate", "Maximum possible flow rate for this pump");
-            await SetPropertyAsync("MinFlowRate", _minFlowRate, false, true, "Minimum Flow Rate", "Minimum possible flow rate for this pump");
+            await SetPropertyAsync("FlowRate", _flowRate);
+            await SetPropertyAsync("IsRunning", _isRunning);
+            await SetPropertyAsync("MaxFlowRate", _maxFlowRate);
+            await SetPropertyAsync("MinFlowRate", _minFlowRate);
 
             await base.OnInitializeAsync(ct);
         }
@@ -47,17 +47,14 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         protected override async Task OnStartAsync(CancellationToken ct)
         {
             _isRunning = true;
-            await SetPropertyAsync("IsRunning", _isRunning, false, true);
+            await SetPropertyAsync("IsRunning", _isRunning);
 
-            // Start the monitoring timer
             _monitorTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
-            // Main pump operation loop
             try
             {
                 while (!ct.IsCancellationRequested)
                 {
-                    // Simulate pump operation - in a real device this would control hardware
                     await SimulatePumpOperationAsync(ct);
                     await Task.Delay(100, ct);
                 }
@@ -66,7 +63,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             {
                 _monitorTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 _isRunning = false;
-                await SetPropertyAsync("IsRunning", _isRunning, false, true);
+                await SetPropertyAsync("IsRunning", _isRunning);
             }
         }
 
@@ -74,27 +71,20 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         {
             _monitorTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _isRunning = false;
-            await SetPropertyAsync("IsRunning", _isRunning, false, true);
-
+            await SetPropertyAsync("IsRunning", _isRunning);
             await base.OnStopAsync(ct);
         }
 
         private async Task SimulatePumpOperationAsync(CancellationToken ct)
         {
-            // In a real implementation, this would control actual pump hardware
-            // For simulation, we just periodically update the properties
-
-            // Simulate some minor fluctuation in the actual flow rate
             double actualFlowRate = _flowRate;
             if (_isRunning && _flowRate > 0)
             {
-                // Add small random variation to simulate real-world conditions
                 var random = new Random();
                 actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
             }
 
-            await SetPropertyAsync("CurrentFlowRate", actualFlowRate, false, true,
-                "Current Flow Rate", "Actual measured flow rate from sensors");
+            await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
         }
 
         private async void OnMonitorTimer(object? state)
@@ -103,26 +93,20 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             {
                 if (_isRunning)
                 {
-                    // Simulate sensor readings
                     double actualFlowRate = _flowRate;
                     if (_flowRate > 0)
                     {
-                        // Add small random variation to simulate real-world conditions
                         var random = new Random();
                         actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
                     }
 
-                    await SetPropertyAsync("CurrentFlowRate", actualFlowRate, false, true,
-                        "Current Flow Rate", "Actual measured flow rate from sensors");
-                    await SetPropertyAsync("Timestamp", DateTime.UtcNow, false, true,
-                        "Last Update", "Timestamp of the most recent sensor reading");
-
-                    // We could add more properties here like power consumption, temperature, etc.
+                    await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
+                    await SetPropertyAsync("Timestamp", DateTime.UtcNow);
                 }
             }
             catch (Exception ex)
             {
-               _logger.Log(ex, "Error updating pump properties");
+                _logger.Log(ex, "Error updating pump properties");
             }
         }
 
