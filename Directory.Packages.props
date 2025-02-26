@@ -1,25 +1,26 @@
 <Project>
-	<PropertyGroup>
-		<InfragisticsVersion11>11.2.20112.2135</InfragisticsVersion11>
-		<InfragisticsCompositeVersion>1.0.20112.2138</InfragisticsCompositeVersion>
-		<MicrosoftAspNetCoreVersion>2.3.0</MicrosoftAspNetCoreVersion>
-		<MicrosoftExtensionsVersion>8.0.1</MicrosoftExtensionsVersion>
-		<MicrosoftIdentityModelVersion>7.5.2</MicrosoftIdentityModelVersion>
-		<MicrosoftPracticesVersion>1.0.51206</MicrosoftPracticesVersion>
-		<MicrosoftPracticesObjectBuilderVersion>1.0.51205</MicrosoftPracticesObjectBuilderVersion>
-		<SystemDiagnosticsVersion>8.0.1</SystemDiagnosticsVersion>
-		<SystemIOPipelinesVersion>8.0.0</SystemIOPipelinesVersion>
-		<SystemTextJsonVersion>8.0.5</SystemTextJsonVersion>
-		<SwashbuckleAspNetCoreVersion>6.6.2</SwashbuckleAspNetCoreVersion>
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageVersion Include="coverlet.collector" Version="6.0.4" />
-		<PackageVersion Include="FluentAssertions" Version="8.1.1" />
-		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
-		<PackageVersion Include="Moq" Version="4.20.72" />
-		<PackageVersion Include="xunit" Version="2.9.3" />
-		<PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
-	</ItemGroup>
+  <PropertyGroup>
+    <InfragisticsVersion11>11.2.20112.2135</InfragisticsVersion11>
+    <InfragisticsCompositeVersion>1.0.20112.2138</InfragisticsCompositeVersion>
+    <MicrosoftAspNetCoreVersion>2.3.0</MicrosoftAspNetCoreVersion>
+    <MicrosoftExtensionsVersion>8.0.1</MicrosoftExtensionsVersion>
+    <MicrosoftIdentityModelVersion>7.5.2</MicrosoftIdentityModelVersion>
+    <MicrosoftPracticesVersion>1.0.51206</MicrosoftPracticesVersion>
+    <MicrosoftPracticesObjectBuilderVersion>1.0.51205</MicrosoftPracticesObjectBuilderVersion>
+    <SystemDiagnosticsVersion>8.0.1</SystemDiagnosticsVersion>
+    <SystemIOPipelinesVersion>8.0.0</SystemIOPipelinesVersion>
+    <SystemTextJsonVersion>8.0.5</SystemTextJsonVersion>
+    <SwashbuckleAspNetCoreVersion>6.6.2</SwashbuckleAspNetCoreVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="FluentAssertions" Version="8.1.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10" />
+	<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.10" />
+	<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+  </ItemGroup>
 </Project>
-
-
