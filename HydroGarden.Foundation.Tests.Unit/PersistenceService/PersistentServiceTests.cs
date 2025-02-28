@@ -1,8 +1,8 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components;
-using HydroGarden.Foundation.Core.EventHandlers;
 using HydroGarden.Foundation.Core.Services;
 using Moq;
 using Xunit;
@@ -137,12 +137,13 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             // Act
             var metadata = new PropertyMetadata(true, true, null, null);
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                deviceId,
-                "TestProperty",
-                typeof(string),
-                null,
-                "New Value",
-                metadata);
+                deviceId,       // deviceId
+                deviceId,       // sourceId - same as deviceId for test
+                "TestProperty", // propertyName
+                typeof(string), // propertyType
+                null,           // oldValue
+                "New Value",    // newValue
+                metadata);      // metadata
 
             await _sut.HandleEventAsync(mockComponent, propertyChangedEvent, CancellationToken.None);
 
@@ -183,12 +184,13 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 
             var metadata = new PropertyMetadata(true, true, null, null);
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                deviceId,
-                "TestProperty",
-                typeof(string),
-                null,
-                "New Value",
-                metadata);
+                deviceId,       // deviceId
+                deviceId,       // sourceId - same as deviceId for test
+                "TestProperty", // propertyName
+                typeof(string), // propertyType
+                null,           // oldValue
+                "New Value",    // newValue
+                metadata);      // metadata
 
             var testException = new InvalidOperationException("Test exception");
             _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
@@ -238,13 +240,16 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             // Act
             for (int i = 0; i < 5; i++)
             {
+                // Fix: Use Guid for sourceId instead of string, and make sure parameters are in the right order
                 var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                    deviceId,
-                    $"Property{i}",
-                    typeof(string),
-                    null,
-                    $"Value{i}",
-                    metadata);
+                    deviceId,         // deviceId
+                    deviceId,         // sourceId - using deviceId, not converting to string
+                    $"Property{i}",   // propertyName
+                    typeof(string),   // propertyType
+                    null,             // oldValue
+                    $"Value{i}",      // newValue
+                    metadata);        // metadata
+
                 await _sut.HandleEventAsync(mockComponent, propertyChangedEvent, CancellationToken.None);
             }
 

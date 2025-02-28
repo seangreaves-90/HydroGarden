@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
-using HydroGarden.Foundation.Core.EventHandlers;
+using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
 using System.Reflection;
 
@@ -171,6 +171,14 @@ namespace HydroGarden.Foundation.Core.Components
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Publishes a property change event to registered event handlers
+        /// </summary>
+        /// <param name="name">The name of the property that changed</param>
+        /// <param name="value">The new property value</param>
+        /// <param name="metadata">Metadata about the property</param>
+        /// <param name="oldValue">The previous property value (optional)</param>
+        /// <returns>A task representing the asynchronous operation</returns>
         protected async Task PublishPropertyChangeAsync(string name, object? value, IPropertyMetadata metadata, object? oldValue = null)
         {
             if (_eventHandler == null)
@@ -179,7 +187,18 @@ namespace HydroGarden.Foundation.Core.Components
                 return;
             }
 
-            var evt = new HydroGardenPropertyChangedEvent(Id, name, value?.GetType() ?? typeof(object), oldValue, value, metadata);
+            // Create the event with the deviceId as both deviceId and sourceId (for backward compatibility)
+            var evt = new HydroGardenPropertyChangedEvent(
+                Id,                             // deviceId
+                Id,                             // sourceId (using the same ID)
+                name,                           // propertyName
+                value?.GetType() ?? typeof(object), // propertyType
+                oldValue,                       // oldValue
+                value,                          // newValue
+                metadata                        // metadata
+                                                // routingData is left as null
+            );
+
             await _eventHandler.HandleEventAsync(this, evt);
         }
 
