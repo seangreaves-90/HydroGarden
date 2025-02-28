@@ -1,5 +1,7 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
 using Moq;
 using Xunit;

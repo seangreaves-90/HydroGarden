@@ -1,5 +1,4 @@
-﻿
-namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     public interface IEventSubscriptionOptions
     {
@@ -11,7 +10,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         /// <summary>
         /// Optional filter for specific source components
         /// </summary>
-        public Guid[] SourceIds { get; set; } 
+        public Guid[] SourceIds { get; set; }
 
         /// <summary>
         /// Custom filter predicate for fine-grained control
@@ -21,11 +20,11 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
         /// <summary>
         /// Whether to receive events from all connected components
         /// </summary>
-        public bool IncludeConnectedSources { get; set; } 
+        public bool IncludeConnectedSources { get; set; }
 
         /// <summary>
         /// Whether to handle events synchronously
         /// </summary>
-        public bool Synchronous { get; set; } 
+        public bool Synchronous { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
 {
     /// <summary>
     /// Represents an IoT device within the HydroGarden system.

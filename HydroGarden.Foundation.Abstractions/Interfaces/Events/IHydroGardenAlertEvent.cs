@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
     /// Alert severity levels

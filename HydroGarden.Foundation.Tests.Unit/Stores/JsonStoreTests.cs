@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Stores;
 using Moq;

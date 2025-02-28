@@ -1,4 +1,6 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+
+namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
     /// Interface for lifecycle events

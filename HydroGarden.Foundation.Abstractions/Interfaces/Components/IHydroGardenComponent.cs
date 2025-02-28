@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
 {
     /// <summary>
     /// Defines the possible states of a HydroGarden component.

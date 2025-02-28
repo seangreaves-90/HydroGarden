@@ -1,4 +1,6 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+
+namespace HydroGarden.Foundation.Abstractions.Interfaces
 {
     /// <summary>
     /// Represents an event triggered when a property of a HydroGarden component changes.

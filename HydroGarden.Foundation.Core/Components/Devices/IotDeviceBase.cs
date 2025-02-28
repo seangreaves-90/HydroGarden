@@ -1,4 +1,5 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {

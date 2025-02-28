@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Services
 {
     /// <summary>
     /// Defines a storage interface for saving and retrieving component properties.

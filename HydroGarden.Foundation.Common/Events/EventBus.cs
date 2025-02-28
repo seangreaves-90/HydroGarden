@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.Extensions;
 using HydroGarden.Foundation.Common.Results;

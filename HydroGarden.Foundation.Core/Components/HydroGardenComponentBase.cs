@@ -4,6 +4,8 @@ using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
 using System.Reflection;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 
 namespace HydroGarden.Foundation.Core.Components
 {

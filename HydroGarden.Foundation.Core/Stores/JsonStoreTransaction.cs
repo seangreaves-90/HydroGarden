@@ -1,4 +1,5 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 
 namespace HydroGarden.Foundation.Core.Stores
 {
