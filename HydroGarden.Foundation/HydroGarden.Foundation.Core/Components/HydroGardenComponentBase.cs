@@ -17,7 +17,7 @@ namespace HydroGarden.Foundation.Core.Components
         private readonly ConcurrentDictionary<string, object> _properties = new();
         private readonly ConcurrentDictionary<string, PropertyMetadata> _propertyMetadata = new();
         protected readonly IHydroGardenLogger _logger;
-        protected IHydroGardenEventHandler? _eventHandler;
+        protected IHydroGardenPropertyChangedEventHandler? _eventHandler;
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
 
@@ -56,7 +56,7 @@ namespace HydroGarden.Foundation.Core.Components
         }
 
         /// <inheritdoc/>
-        public void SetEventHandler(IHydroGardenEventHandler handler) => _eventHandler = handler;
+        public void SetEventHandler(IHydroGardenPropertyChangedEventHandler handler) => _eventHandler = handler;
 
         /// <inheritdoc/>
         public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)

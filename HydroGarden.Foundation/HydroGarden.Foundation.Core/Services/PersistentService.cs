@@ -1,14 +1,22 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Logging;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
+
 namespace HydroGarden.Foundation.Core.Services
 {
-    public class PersistenceService : IHydroGardenEventHandler, IAsyncDisposable
+    /// <summary>
+    /// The PersistenceService is responsible for managing device properties, persisting them to storage,
+    /// and propagating changes via the event bus.
+    /// </summary>
+    public class PersistenceService : IPersistenceService, IHydroGardenPropertyChangedEventHandler
     {
         private readonly IStore _store;
+        private readonly IEventBus _eventBus;
         private readonly IHydroGardenLogger _logger;
         private readonly Dictionary<Guid, Dictionary<string, object>> _deviceProperties;
         private readonly Channel<IHydroGardenPropertyChangedEvent> _eventChannel;
@@ -19,43 +27,135 @@ namespace HydroGarden.Foundation.Core.Services
         private readonly TimeSpan _batchInterval;
         private bool _isDisposed;
 
-        // For testing - expose flag to disable batch processing
+        /// <summary>
+        /// Enables or disables batch processing of events.
+        /// </summary>
         public bool IsBatchProcessingEnabled { get; set; } = true;
 
-        // For testing - add a flag to force transaction creation even if there are no events
+        /// <summary>
+        /// Forces transaction creation even when there are no pending events (for testing).
+        /// </summary>
         public bool ForceTransactionCreation { get; set; } = false;
 
-        // For testing - provide a way to set test events for ProcessPendingEventsAsync
+        /// <summary>
+        /// Stores a test event for validation in testing environments.
+        /// </summary>
         public IHydroGardenPropertyChangedEvent? TestEvent { get; set; }
 
-        public PersistenceService(IStore store)
-            : this(store, new HydroGardenLogger(), 1000, TimeSpan.FromSeconds(5))
+        /// <summary>
+        /// Initializes the PersistenceService.
+        /// </summary>
+        public PersistenceService(IStore store, IEventBus eventBus)
+            : this(store, eventBus, new HydroGardenLogger(), 1000, TimeSpan.FromSeconds(5))
         {
         }
 
-        public PersistenceService(IStore store, IHydroGardenLogger logger, int maxCachedDevices = 1000, TimeSpan? batchInterval = null)
+        /// <summary>
+        /// Initializes the PersistenceService with configurable options.
+        /// </summary>
+        public PersistenceService(IStore store, IEventBus eventBus, IHydroGardenLogger logger, int maxCachedDevices = 1000, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
+            _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _maxCachedDevices = maxCachedDevices;
             _batchInterval = batchInterval ?? TimeSpan.FromSeconds(5);
-            _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>(_maxCachedDevices);
+            _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>();
             _eventChannel = Channel.CreateUnbounded<IHydroGardenPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
         }
 
-        // For testing - allows checking if a device exists in the cache
-        public bool HasDevice(Guid deviceId)
+        /// <summary>
+        /// Registers a new device or updates an existing device's properties.
+        /// Ensures component properties are loaded and stored efficiently.
+        /// </summary>
+        public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IHydroGardenComponent
         {
-            return _deviceProperties.TryGetValue(deviceId, out _);
+            if (component == null)
+                throw new ArgumentNullException(nameof(component));
+
+            component.SetEventHandler(this);
+
+            if (!_deviceProperties.ContainsKey(component.Id))
+            {
+                _logger.Log($"[INFO] Registering new device {component.Id}");
+                _deviceProperties[component.Id] = new Dictionary<string, object>();
+            }
+            else
+            {
+                _logger.Log($"[INFO] Device {component.Id} already exists, updating properties.");
+            }
+
+            var storedProperties = await _store.LoadAsync(component.Id, ct);
+            var storedMetadata = await _store.LoadMetadataAsync(component.Id, ct);
+
+            if (storedProperties != null)
+            {
+                _deviceProperties[component.Id] = new Dictionary<string, object>(storedProperties);
+                await component.LoadPropertiesAsync(storedProperties, storedMetadata);
+                _logger.Log($"[INFO] Properties loaded for device {component.Id}");
+            }
+            else
+            {
+                var deviceProps = component.GetProperties();
+                if (deviceProps.Count > 0)
+                {
+                    _deviceProperties[component.Id] = new Dictionary<string, object>(deviceProps);
+                    await _store.SaveWithMetadataAsync(component.Id, deviceProps, component.GetAllPropertyMetadata(), ct);
+                    _logger.Log($"[INFO] Device {component.Id} persisted.");
+                }
+                else
+                {
+                    _logger.Log($"[WARNING] No properties found for device {component.Id}");
+                }
+            }
         }
 
-        // For testing - allows directly triggering batch processing
+        /// <summary>
+        /// Retrieves a stored property value for a given device.
+        /// </summary>
+        public Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default)
+        {
+            if (_deviceProperties.TryGetValue(deviceId, out var properties) && properties.TryGetValue(propertyName, out var value))
+            {
+                return Task.FromResult(value is T typedValue ? typedValue : default);
+            }
+            return Task.FromResult(default(T?));
+        }
+
+        /// <summary>
+        /// Handles property change events from IoT devices.
+        /// </summary>
+        public async Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct)
+        {
+            try
+            {
+                _logger.Log($"[DEBUG] Handling event for device {e.DeviceId}, property {e.PropertyName}");
+
+                if (!_deviceProperties.TryGetValue(e.DeviceId, out var properties))
+                {
+                    properties = new Dictionary<string, object>();
+                    _deviceProperties[e.DeviceId] = properties;
+                }
+
+                properties[e.PropertyName] = e.NewValue ?? new object();
+
+                await _eventChannel.Writer.WriteAsync(e, ct);
+                await _eventBus.PublishAsync(this, e, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ex, $"Failed to handle property change event for {e.DeviceId}, property {e.PropertyName}");
+            }
+        }
+
+        /// <summary>
+        /// Manually triggers batch processing of pending events.
+        /// </summary>
         public async Task ProcessPendingEventsAsync()
         {
             var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
 
-            // Read all events from the channel
             while (_eventChannel.Reader.TryRead(out var evt))
             {
                 if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
@@ -64,28 +164,6 @@ namespace HydroGarden.Foundation.Core.Services
                     pendingEvents[evt.DeviceId] = deviceEvents;
                 }
                 deviceEvents[evt.PropertyName] = evt;
-            }
-
-            // If we have a test event and no events were read from the channel, add it
-            if (TestEvent != null && pendingEvents.Count == 0)
-            {
-                _logger.Log($"[DEBUG] Using test event for device {TestEvent.DeviceId}, property {TestEvent.PropertyName}");
-
-                if (!pendingEvents.TryGetValue(TestEvent.DeviceId, out var deviceEvents))
-                {
-                    deviceEvents = new Dictionary<string, IHydroGardenPropertyChangedEvent>();
-                    pendingEvents[TestEvent.DeviceId] = deviceEvents;
-                }
-
-                deviceEvents[TestEvent.PropertyName] = TestEvent;
-            }
-
-            // For testing - force transaction creation even if there are no pending events
-            if (ForceTransactionCreation && pendingEvents.Count == 0)
-            {
-                _logger.Log("[DEBUG] ForceTransactionCreation is true but no events were found - forcing a transaction");
-                await CreateEmptyTestTransaction();
-                return;
             }
 
             if (pendingEvents.Count > 0)
@@ -99,155 +177,10 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-        // For testing - create an empty transaction to verify that BeginTransactionAsync is called
-        private async Task CreateEmptyTestTransaction()
-        {
-            try
-            {
-                await _transactionLock.WaitAsync();
-                try
-                {
-                    _logger.Log("[DEBUG] Creating test transaction");
-                    await using var transaction = await _store.BeginTransactionAsync();
-
-                    // For testing purposes, create a dummy transaction with test data
-                    // This ensures that SaveAsync will be called on the transaction
-
-                    // Try to use the TestEvent's DeviceId if available
-                    if (TestEvent != null && _deviceProperties.TryGetValue(TestEvent.DeviceId, out var testEventProperties) && testEventProperties != null)
-                    {
-                        _logger.Log($"[DEBUG] Using TestEvent device {TestEvent.DeviceId} for transaction");
-                        await transaction.SaveAsync(TestEvent.DeviceId, testEventProperties);
-                    }
-                    // Otherwise, create a test device ID and properties
-                    else
-                    {
-                        // Create a test device ID and properties if none available
-                        var testDeviceId = Guid.NewGuid();
-                        var testProperties = new Dictionary<string, object>
-                        {
-                            { "TestProperty", "Test Value" },
-                            { "TestTimestamp", DateTime.UtcNow }
-                        };
-
-                        _logger.Log($"[DEBUG] Using generated device {testDeviceId} for transaction");
-                        await transaction.SaveAsync(testDeviceId, testProperties);
-                    }
-
-                    await transaction.CommitAsync();
-                    _logger.Log("[DEBUG] Test transaction committed");
-                }
-                finally
-                {
-                    _transactionLock.Release();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Log(ex, "Error in test transaction");
-            }
-        }
-
         /// <summary>
-        /// Adds a device to the persistence service if it doesn't exist, or updates it if it does.
+        /// Asynchronously processes queued events in batches.
+        /// This method continuously reads from the event channel and persists updates.
         /// </summary>
-        public async Task AddOrUpdateDeviceAsync(IHydroGardenComponent component, CancellationToken ct = default)
-        {
-            if (component == null)
-                throw new ArgumentNullException(nameof(component));
-
-            // Always set the event handler regardless of whether the device is new or existing
-            component.SetEventHandler(this);
-
-            bool exists = _deviceProperties.TryGetValue(component.Id, out _);
-
-            if (exists)
-            {
-                _logger.Log($"[INFO] Device {component.Id} is already registered. Reloading properties and ensuring event handler is set.");
-            }
-            else
-            {
-                _logger.Log($"[INFO] Registering new device {component.Id}");
-            }
-
-            // Whether the device is new or existing, always try to load properties from storage
-            var storedProperties = await _store.LoadAsync(component.Id, ct);
-            var storedMetadata = await _store.LoadMetadataAsync(component.Id, ct);
-
-            if (storedProperties != null && storedProperties.Count > 0)
-            {
-                // Update the cache
-                _deviceProperties.AddOrUpdate(component.Id, new Dictionary<string, object>(storedProperties));
-
-                // Always load properties into the component regardless of whether it's new or existing
-                await component.LoadPropertiesAsync(storedProperties, storedMetadata);
-
-                _logger.Log($"[INFO] Properties loaded for device {component.Id}");
-                return;
-            }
-
-            // If no stored properties or it's a new device, save the current properties
-            var deviceProps = component.GetProperties();
-            if (deviceProps != null && deviceProps.Count > 0)
-            {
-                await _deviceProperties.AddOrUpdateAsync(component.Id, new Dictionary<string, object>(deviceProps));
-                await _store.SaveWithMetadataAsync(component.Id, deviceProps, component.GetAllPropertyMetadata(), ct);
-                _logger.Log($"[INFO] Device {component.Id} persisted to JSON storage.");
-            }
-            else
-            {
-                _logger.Log($"[WARNING] No properties found for device {component.Id}");
-            }
-        }
-
-        /// <summary>
-        /// Obsolete method, use AddOrUpdateDeviceAsync instead
-        /// </summary>
-        [Obsolete("Use AddOrUpdateDeviceAsync instead")]
-        public Task AddDeviceAsync(IHydroGardenComponent component, CancellationToken ct = default)
-            => AddOrUpdateDeviceAsync(component, ct);
-
-        public async Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct)
-        {
-            try
-            {
-                _logger.Log($"[DEBUG] Handling event for device {e.DeviceId}, property {e.PropertyName}");
-
-                // Update the device properties immediately rather than waiting for the batch process
-                if (!_deviceProperties.TryGetValue(e.DeviceId, out var properties) || properties == null)
-                {
-                    properties = new Dictionary<string, object>();
-                    _deviceProperties.AddOrUpdate(e.DeviceId, properties);
-                }
-
-                if (!string.IsNullOrEmpty(e.PropertyName))
-                {
-                    properties[e.PropertyName] = e.NewValue ?? new object();
-                    _logger.Log($"[DEBUG] Updated property {e.PropertyName} to {e.NewValue} in cache");
-                }
-
-                // For testing - save the event as the TestEvent
-                TestEvent = e;
-
-                // Add to the channel for batch processing
-                await _eventChannel.Writer.WriteAsync(e, ct);
-                _logger.Log($"[DEBUG] Added event to channel for batch processing");
-            }
-            catch (Exception ex)
-            {
-                _logger.Log(ex, $"Failed to handle property change event for device {e.DeviceId}, property {e.PropertyName}");
-            }
-        }
-
-        public Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default)
-        {
-            if (_deviceProperties.TryGetValue(deviceId, out var properties) && properties != null && properties.TryGetValue(propertyName, out var value))
-            {
-                return Task.FromResult(value is T typedValue ? typedValue : default);
-            }
-            return Task.FromResult<T?>(default);
-        }
-
         private async Task ProcessEventsAsync(CancellationToken ct)
         {
             var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
@@ -259,100 +192,74 @@ namespace HydroGarden.Foundation.Core.Services
                 {
                     bool hasEvents = false;
 
-                    try
+                    // Process all queued events
+                    while (_eventChannel.Reader.TryRead(out var evt))
                     {
-                        while (await _eventChannel.Reader.WaitToReadAsync(ct) &&
-                               _eventChannel.Reader.TryRead(out var evt))
+                        hasEvents = true;
+                        if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
                         {
-                            hasEvents = true;
-                            if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
-                            {
-                                deviceEvents = new Dictionary<string, IHydroGardenPropertyChangedEvent>();
-                                pendingEvents[evt.DeviceId] = deviceEvents;
-                            }
-                            deviceEvents[evt.PropertyName] = evt;
+                            deviceEvents = new Dictionary<string, IHydroGardenPropertyChangedEvent>();
+                            pendingEvents[evt.DeviceId] = deviceEvents;
                         }
-                    }
-                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                    {
-                        break;
+                        deviceEvents[evt.PropertyName] = evt;
                     }
 
-                    if (hasEvents || (await batchTimer.WaitForNextTickAsync(ct).ConfigureAwait(false) == false))
+                    // Either process events immediately or wait for the batch timer to expire
+                    if (hasEvents || !await batchTimer.WaitForNextTickAsync(ct))
                     {
-                        if ((pendingEvents.Count > 0 || ForceTransactionCreation) && IsBatchProcessingEnabled)
+                        if (pendingEvents.Count > 0)
                         {
-                            if (pendingEvents.Count > 0)
-                            {
-                                await PersistPendingEventsAsync(pendingEvents).ConfigureAwait(false);
-                                pendingEvents.Clear();
-                            }
-                            else if (ForceTransactionCreation)
-                            {
-                                await CreateEmptyTestTransaction().ConfigureAwait(false);
-                            }
+                            await PersistPendingEventsAsync(pendingEvents);
+                            pendingEvents.Clear();
                         }
                     }
                 }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                // Expected when cancellation is requested
-                if (pendingEvents.Count > 0)
-                {
-                    await PersistPendingEventsAsync(pendingEvents).ConfigureAwait(false);
-                }
+                _logger.Log("[INFO] Event processing loop canceled.");
             }
             catch (Exception ex)
             {
-                _logger.Log(ex, "Error in event processing loop");
+                _logger.Log(ex, "[ERROR] Error occurred while processing events.");
             }
         }
 
+        /// <summary>
+        /// Persists batched property change events to the database.
+        /// </summary>
+        /// <param name="pendingEvents">A dictionary of device property updates.</param>
         private async Task PersistPendingEventsAsync(Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>> pendingEvents)
         {
-            if (pendingEvents.Count == 0 && !ForceTransactionCreation) return;
+            if (pendingEvents.Count == 0) return;
 
             try
             {
                 await _transactionLock.WaitAsync();
                 try
                 {
-                    _logger.Log($"[DEBUG] Beginning transaction for {pendingEvents.Count} devices");
+                    _logger.Log($"[INFO] Persisting {pendingEvents.Count} batched device events.");
+
                     await using var transaction = await _store.BeginTransactionAsync();
 
                     foreach (var (deviceId, deviceEvents) in pendingEvents)
                     {
-                        if (!_deviceProperties.TryGetValue(deviceId, out var properties) || properties == null)
+                        if (!_deviceProperties.TryGetValue(deviceId, out var properties))
                         {
                             properties = new Dictionary<string, object>();
-                            _deviceProperties.AddOrUpdate(deviceId, properties);
+                            _deviceProperties[deviceId] = properties;
                         }
 
                         foreach (var (propName, evt) in deviceEvents)
                         {
-                            if (!string.IsNullOrEmpty(propName))
-                            {
-                                properties[propName] = evt.NewValue ?? new object();
-                                _logger.Log($"[DEBUG] Persisting property {propName} = {evt.NewValue} for device {deviceId}");
-                            }
-                            else
-                            {
-                                _logger.Log($"[WARNING] Null or empty property name in PersistPendingEventsAsync for device {deviceId}");
-                            }
+                            properties[propName] = evt.NewValue ?? new object();
                         }
 
                         await transaction.SaveAsync(deviceId, properties);
-                        _logger.Log($"[DEBUG] Saved properties for device {deviceId}");
                     }
 
                     await transaction.CommitAsync();
-                    _logger.Log($"[DEBUG] Transaction committed successfully");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Log(ex, $"Failed to persist {pendingEvents.Count} device events");
-                    throw; // Re-throw to ensure error handling tests pass
+                    _logger.Log("[INFO] Event batch successfully persisted.");
                 }
                 finally
                 {
@@ -361,27 +268,33 @@ namespace HydroGarden.Foundation.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.Log(ex, $"Failed to acquire transaction lock for persisting {pendingEvents.Count} device events");
+                _logger.Log(ex, "[ERROR] Failed to persist device events.");
+                throw; 
             }
         }
 
+        /// <summary>
+        /// Disposes the persistence service asynchronously.
+        /// </summary>
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
+
             _isDisposed = true;
             _processingCts.Cancel();
 
             try
             {
-                await Task.WhenAny(_processingTask, Task.Delay(5000));
+                await _processingTask;
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                _logger.Log(ex, "Error while disposing persistence service");
+                // Ignore the cancellation exception
             }
 
             _processingCts.Dispose();
             _transactionLock.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

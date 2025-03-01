@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         }
 
         private readonly Mock<IHydroGardenLogger> _mockLogger;
-        private readonly Mock<IHydroGardenEventHandler> _mockEventHandler;
+        private readonly Mock<IHydroGardenPropertyChangedEventHandler> _mockEventHandler;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestComponent _sut;
@@ -29,7 +29,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         public HydroGardenComponentBaseTests()
         {
             _mockLogger = new Mock<IHydroGardenLogger>();
-            _mockEventHandler = new Mock<IHydroGardenEventHandler>();
+            _mockEventHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
             _testId = Guid.NewGuid();
             _testName = "Test Component";
             _sut = new TestComponent(_testId, _testName, _mockLogger.Object);

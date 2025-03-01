@@ -13,7 +13,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// This method should be implemented by consumers to handle specific event types.
         /// </summary>
         public static async Task HandleEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenEvent evt,
             CancellationToken ct = default)
@@ -51,7 +51,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Handles a lifecycle event. Override this method to provide custom implementation.
         /// </summary>
         public static Task HandleLifecycleEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenLifecycleEvent evt,
             CancellationToken ct = default)
@@ -65,7 +65,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Handles a command event. Override this method to provide custom implementation.
         /// </summary>
         public static Task HandleCommandEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenCommandEvent evt,
             CancellationToken ct = default)
@@ -79,7 +79,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Handles a telemetry event. Override this method to provide custom implementation.
         /// </summary>
         public static Task HandleTelemetryEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenTelemetryEvent evt,
             CancellationToken ct = default)
@@ -93,7 +93,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Handles an alert event. Override this method to provide custom implementation.
         /// </summary>
         public static Task HandleAlertEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenAlertEvent evt,
             CancellationToken ct = default)
@@ -107,7 +107,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Handles a generic event. Override this method to provide custom implementation.
         /// </summary>
         public static Task HandleGenericEventAsync(
-            this IHydroGardenEventHandler handler,
+            this IHydroGardenPropertyChangedEventHandler handler,
             object sender,
             IHydroGardenEvent evt,
             CancellationToken ct = default)

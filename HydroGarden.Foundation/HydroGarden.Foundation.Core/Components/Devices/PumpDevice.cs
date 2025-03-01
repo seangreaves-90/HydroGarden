@@ -64,7 +64,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             _isRunning = true;
             await SetPropertyAsync("IsRunning", _isRunning);
             _monitorTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
-
+            
             try
             {
                 while (!ct.IsCancellationRequested)

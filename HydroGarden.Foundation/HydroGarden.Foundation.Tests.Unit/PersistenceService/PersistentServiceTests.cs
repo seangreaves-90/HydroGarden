@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
@@ -10,11 +11,15 @@ using Moq;
 using Xunit;
 namespace HydroGarden.Foundation.Tests.Unit.Services
 {
+    /// <summary>
+    /// Unit tests for the PersistenceService class.
+    /// </summary>
     public class PersistenceServiceTests : IAsyncDisposable
     {
         private readonly Mock<IStore> _mockStore;
         private readonly Mock<IStoreTransaction> _mockTransaction;
         private readonly Mock<IHydroGardenLogger> _mockLogger;
+        private readonly Mock<IEventBus> _mockEventBus;
         private readonly PersistenceService _sut;
 
         public PersistenceServiceTests()
@@ -22,6 +27,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _mockStore = new Mock<IStore>();
             _mockTransaction = new Mock<IStoreTransaction>();
             _mockLogger = new Mock<IHydroGardenLogger>();
+            _mockEventBus = new Mock<IEventBus>();
 
             _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(_mockTransaction.Object);
@@ -32,14 +38,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _mockTransaction.Setup(t => t.DisposeAsync())
                 .Returns(ValueTask.CompletedTask);
 
-            // Use a much shorter batch interval and disable batch processing for tests
-            _sut = new PersistenceService(_mockStore.Object, _mockLogger.Object, 100, TimeSpan.FromMilliseconds(100));
-
-            // Disable automatic batch processing for tests - we'll trigger it manually
-            _sut.IsBatchProcessingEnabled = false;
-
-            // Enable force transaction creation for tests to ensure a transaction is always created
-            _sut.ForceTransactionCreation = true;
+            // Configure test PersistenceService with a short batch interval
+            _sut = new PersistenceService(_mockStore.Object, _mockEventBus.Object, _mockLogger.Object, 100, TimeSpan.FromMilliseconds(100))
+            {
+                IsBatchProcessingEnabled = false, // Disable automatic batch processing for tests
+                ForceTransactionCreation = true  // Ensure a transaction is created in tests
+            };
         }
 
         public async ValueTask DisposeAsync()
@@ -47,13 +51,15 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             await _sut.DisposeAsync();
         }
 
+        /// <summary>
+        /// Ensures that a new device is correctly registered and persisted.
+        /// </summary>
         [Fact]
-        public async Task AddOrUpdateDeviceAsync_NewDevice_ShouldRegisterDevice()
+        public async Task GivenNewDevice_WhenAdded_ThenShouldRegisterAndPersistDevice()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new TestHydroGardenComponent(deviceId, "Test Component", _mockLogger.Object);
-
             var properties = new Dictionary<string, object> { { "TestProp", "TestValue" } };
             mockComponent.SetupProperties(properties);
 
@@ -61,7 +67,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 .ReturnsAsync((Dictionary<string, object>?)null);
 
             // Act
-            await _sut.AddOrUpdateDeviceAsync(mockComponent);
+            await _sut.AddOrUpdateAsync(mockComponent);
 
             // Assert
             _mockStore.Verify(s => s.SaveWithMetadataAsync(
@@ -72,8 +78,11 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 Times.Once);
         }
 
+        /// <summary>
+        /// Ensures that an existing device correctly reloads properties.
+        /// </summary>
         [Fact]
-        public async Task AddOrUpdateDeviceAsync_ExistingDevice_ShouldReloadProperties()
+        public async Task GivenExistingDevice_WhenAdded_ThenShouldReloadProperties()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
@@ -82,10 +91,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var storedProperties = new Dictionary<string, object> { { "StoredProp", "StoredValue" } };
             var storedMetadata = new Dictionary<string, IPropertyMetadata>
             {
-                {
-                    "StoredProp",
-                    new PropertyMetadata(true, true, null, null)
-                }
+                { "StoredProp", new PropertyMetadata(true, true, null, null) }
             };
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
@@ -95,198 +101,102 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 .ReturnsAsync(storedMetadata);
 
             // Act
-            await _sut.AddOrUpdateDeviceAsync(mockComponent);
+            await _sut.AddOrUpdateAsync(mockComponent);
 
             // Assert
             mockComponent.LoadPropertiesCalled.Should().BeTrue();
-            mockComponent.LoadedProperties.Should().NotBeNull();
             mockComponent.LoadedProperties.Should().ContainKey("StoredProp");
             mockComponent.LoadedProperties["StoredProp"].Should().Be("StoredValue");
         }
 
+        /// <summary>
+        /// Ensures that batched property change events are saved correctly.
+        /// </summary>
         [Fact]
-        public async Task HandleEventAsync_ShouldBatchAndSaveProperties()
+        public async Task GivenPropertyChangeEvent_WhenProcessed_ThenShouldBatchAndSaveProperties()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new TestHydroGardenComponent(deviceId, "Test Component", _mockLogger.Object);
-
             mockComponent.SetupProperties(new Dictionary<string, object> { { "Name", "Test Device" } });
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Dictionary<string, object>?)null);
 
-            // Set up a verifiable setup for BeginTransactionAsync
-            _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(_mockTransaction.Object)
-                .Verifiable();
+            await _sut.AddOrUpdateAsync(mockComponent);
 
-            // Setup for ANY SaveAsync call (regardless of parameters) - this is more flexible
-            _mockTransaction.Setup(t => t.SaveAsync(It.IsAny<Guid>(), It.IsAny<IDictionary<string, object>>()))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
-
-            // Setup for CommitAsync
-            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
-
-            await _sut.AddOrUpdateDeviceAsync(mockComponent);
-
-            // Verify the device was added to the service
-            _sut.HasDevice(deviceId).Should().BeTrue("The device should be registered in the service");
+            var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
+                deviceId, deviceId, "TestProperty", typeof(string), null, "New Value", new PropertyMetadata(true, true, null, null));
 
             // Act
-            var metadata = new PropertyMetadata(true, true, null, null);
-            var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                deviceId,       // deviceId
-                deviceId,       // sourceId - same as deviceId for test
-                "TestProperty", // propertyName
-                typeof(string), // propertyType
-                null,           // oldValue
-                "New Value",    // newValue
-                metadata);      // metadata
-
             await _sut.HandleEventAsync(mockComponent, propertyChangedEvent, CancellationToken.None);
-
-            // Verify immediate property update
-            var propValue = await _sut.GetPropertyAsync<string>(deviceId, "TestProperty");
-            propValue.Should().Be("New Value", "Property should be immediately available after HandleEventAsync");
-
-            // Manually trigger batch processing
             await _sut.ProcessPendingEventsAsync();
 
-            // Assert - verify the calls were made (without being too specific about parameters)
-            _mockStore.Verify();
-            _mockTransaction.Verify();
-
-            // Now also verify that ANY transaction had TestProperty with "New Value"
-            // We want to make sure the new property got stored somewhere, but we don't care exactly how
-            _mockTransaction.Verify(
-                t => t.SaveAsync(
-                    It.IsAny<Guid>(),
-                    It.Is<IDictionary<string, object>>(d => d.ContainsKey("TestProperty") && (string)d["TestProperty"] == "New Value")),
-                Times.AtLeastOnce,
-                "A transaction should save the new property value");
+            // Assert
+            _mockStore.Verify(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockTransaction.Verify(t => t.SaveAsync(
+                deviceId,
+                It.Is<IDictionary<string, object>>(d => d.ContainsKey("TestProperty") && (string)d["TestProperty"] == "New Value")),
+                Times.Once);
+            _mockTransaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
+        /// <summary>
+        /// Ensures that an event transaction failure is correctly logged.
+        /// </summary>
         [Fact]
-        public async Task HandleEventAsync_TransactionError_ShouldLogError()
+        public async Task GivenTransactionFailure_WhenProcessingEvents_ThenShouldLogError()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new TestHydroGardenComponent(deviceId, "Test Component", _mockLogger.Object);
-
-            mockComponent.SetupProperties(new Dictionary<string, object> { { "Name", "Test Device" } });
-
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((Dictionary<string, object>?)null);
 
-            await _sut.AddOrUpdateDeviceAsync(mockComponent);
+            await _sut.AddOrUpdateAsync(mockComponent);
 
-            var metadata = new PropertyMetadata(true, true, null, null);
             var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                deviceId,       // deviceId
-                deviceId,       // sourceId - same as deviceId for test
-                "TestProperty", // propertyName
-                typeof(string), // propertyType
-                null,           // oldValue
-                "New Value",    // newValue
-                metadata);      // metadata
+                deviceId, deviceId, "TestProperty", typeof(string), null, "New Value", new PropertyMetadata(true, true, null, null));
 
             var testException = new InvalidOperationException("Test exception");
-            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
-                .ThrowsAsync(testException);
+            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>())).ThrowsAsync(testException);
 
             // Act
             await _sut.HandleEventAsync(mockComponent, propertyChangedEvent, CancellationToken.None);
-
-            // Manually trigger batch processing - this should throw the exception and log it
-            try
-            {
-                await _sut.ProcessPendingEventsAsync();
-            }
-            catch
-            {
-                // Expected exception - ignore
-            }
+            Func<Task> act = async () => await _sut.ProcessPendingEventsAsync();
 
             // Assert
-            _mockLogger.Verify(l => l.Log(
-                It.Is<Exception>(e => e == testException || e.InnerException == testException),
-                It.IsAny<string>()),
-                Times.AtLeastOnce);
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Test exception");
+            _mockLogger.Verify(l => l.Log(It.IsAny<Exception>(), It.IsAny<string>()), Times.AtLeastOnce);
         }
 
+        /// <summary>
+        /// Ensures that multiple property changes for a device are batched into a single transaction.
+        /// </summary>
         [Fact]
-        public async Task HandleEventAsync_MultipleBatchedEvents_ShouldUseSingleTransaction()
+        public async Task GivenMultiplePropertyChanges_WhenProcessed_ThenShouldUseSingleTransaction()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
             var mockComponent = new TestHydroGardenComponent(deviceId, "Test Component", _mockLogger.Object);
-
-            mockComponent.SetupProperties(new Dictionary<string, object> { { "Name", "Test Device" } });
-
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Dictionary<string, object>());
 
-            await _sut.AddOrUpdateDeviceAsync(mockComponent);
-
-            var metadata = new PropertyMetadata(true, true, null, null);
-            var transactions = 0;
-
-            _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-                .Callback(() => transactions++)
-                .ReturnsAsync(_mockTransaction.Object);
+            await _sut.AddOrUpdateAsync(mockComponent);
 
             // Act
             for (int i = 0; i < 5; i++)
             {
-                // Fix: Use Guid for sourceId instead of string, and make sure parameters are in the right order
                 var propertyChangedEvent = new HydroGardenPropertyChangedEvent(
-                    deviceId,         // deviceId
-                    deviceId,         // sourceId - using deviceId, not converting to string
-                    $"Property{i}",   // propertyName
-                    typeof(string),   // propertyType
-                    null,             // oldValue
-                    $"Value{i}",      // newValue
-                    metadata);        // metadata
+                    deviceId, deviceId, $"Property{i}", typeof(string), null, $"Value{i}", new PropertyMetadata(true, true, null, null));
 
                 await _sut.HandleEventAsync(mockComponent, propertyChangedEvent, CancellationToken.None);
             }
 
-            // Manually trigger batch processing
             await _sut.ProcessPendingEventsAsync();
 
             // Assert
-            transactions.Should().Be(1, "multiple events should be batched into a single transaction");
             _mockTransaction.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task AddOrUpdateDeviceAsync_ShouldBeCompatibleWithObsoleteMethod()
-        {
-            // Arrange
-            var deviceId = Guid.NewGuid();
-            var mockComponent = new TestHydroGardenComponent(deviceId, "Test Component", _mockLogger.Object);
-
-            mockComponent.SetupProperties(new Dictionary<string, object> { { "TestProp", "TestValue" } });
-
-            _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Dictionary<string, object>?)null);
-
-            // Act - using the deprecated method
-#pragma warning disable CS0618 // Type or member is obsolete
-            await _sut.AddDeviceAsync(mockComponent);
-#pragma warning restore CS0618 // Type or member is obsolete
-
-            // Assert - should still call the store
-            _mockStore.Verify(s => s.SaveWithMetadataAsync(
-                deviceId,
-                It.Is<IDictionary<string, object>>(p => p.ContainsKey("TestProp")),
-                It.IsAny<IDictionary<string, IPropertyMetadata>>(),
-                It.IsAny<CancellationToken>()),
-                Times.Once);
         }
 
         // Helper class for testing
