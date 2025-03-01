@@ -39,5 +39,11 @@
         /// Whether any errors occurred during event processing
         /// </summary>
         public bool HasErrors => Errors.Count > 0;
+
+        /// <summary>
+        /// Tasks representing the asynchronous processing of the event by handlers.
+        /// Used for tracking completion status.
+        /// </summary>
+        public List<Task> HandlerTasks { get; }
     }
 }

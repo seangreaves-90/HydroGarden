@@ -27,7 +27,10 @@ namespace HydroGarden.Foundation.Common.Results
         /// <inheritdoc />
         public List<Exception> Errors { get; set; } = new();
 
-        /// <inheritdoc />
+        
         public bool HasErrors => Errors.Count > 0;
+
+        /// <inheritdoc />
+        public List<Task> HandlerTasks { get; } = new List<Task>();
     }
 }
