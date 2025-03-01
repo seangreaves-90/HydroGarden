@@ -29,4 +29,20 @@
         /// <returns>Result of the publish operation</returns>
         Task<IPublishResult> PublishAsync(object sender, IHydroGardenEvent evt, CancellationToken ct = default);
     }
+
+    public interface IEventStore
+    {
+        Task PersistEventAsync(IHydroGardenEvent evt);
+        Task<IHydroGardenEvent?> RetrieveFailedEventAsync();
+    }
+
+    public interface IEventRetryPolicy
+    {
+        Task<bool> ShouldRetryAsync(IHydroGardenEvent evt, int attemptCount);
+    }
+
+    public interface IEventTransformer
+    {
+        IHydroGardenEvent Transform(IHydroGardenEvent evt);
+    }
 }

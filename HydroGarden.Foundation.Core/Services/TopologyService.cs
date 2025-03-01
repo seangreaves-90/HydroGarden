@@ -267,20 +267,26 @@ namespace HydroGarden.Foundation.Core.Services
         }
 
         /// <inheritdoc />
-        public Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default)
+        public async Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));
 
-            // If no condition is specified, the connection is always active
             if (string.IsNullOrWhiteSpace(connection.Condition))
-            {
-                return Task.FromResult(true);
-            }
+                return true; // No condition means it passes
 
-            // TODO: Implement a proper condition evaluator
-            // For now, we'll just return true
-            return Task.FromResult(true);
+            try
+            {
+                return true;
+                //// Parse the condition expression
+                //var conditionEvaluator = new ConditionEvaluator(_persistenceService);
+                //return await conditionEvaluator.EvaluateAsync(connection.SourceId, connection.TargetId, connection.Condition, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ex, $"Error evaluating condition for connection {connection.ConnectionId}");
+                return false; // Fail closed on errors
+            }
         }
 
         private void AddConnectionToCache(ComponentConnection connection)

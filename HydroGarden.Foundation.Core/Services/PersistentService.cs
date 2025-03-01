@@ -2,9 +2,7 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Caching;
 using HydroGarden.Foundation.Common.Logging;
-using HydroGarden.Foundation.Core.Components;
 using System.Threading.Channels;
 namespace HydroGarden.Foundation.Core.Services
 {
@@ -12,7 +10,7 @@ namespace HydroGarden.Foundation.Core.Services
     {
         private readonly IStore _store;
         private readonly IHydroGardenLogger _logger;
-        private readonly LruCache<Guid, Dictionary<string, object>> _deviceProperties;
+        private readonly Dictionary<Guid, Dictionary<string, object>> _deviceProperties;
         private readonly Channel<IHydroGardenPropertyChangedEvent> _eventChannel;
         private readonly CancellationTokenSource _processingCts = new();
         private readonly Task _processingTask;
@@ -41,7 +39,7 @@ namespace HydroGarden.Foundation.Core.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _maxCachedDevices = maxCachedDevices;
             _batchInterval = batchInterval ?? TimeSpan.FromSeconds(5);
-            _deviceProperties = new LruCache<Guid, Dictionary<string, object>>(_maxCachedDevices);
+            _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>(_maxCachedDevices);
             _eventChannel = Channel.CreateUnbounded<IHydroGardenPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
         }
