@@ -69,14 +69,14 @@ namespace HydroGarden.Foundation.Core.Services
         /// Registers a new device or updates an existing device's properties.
         /// Ensures component properties are loaded and stored efficiently.
         /// </summary>
-        public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IHydroGardenComponent
+        public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice
         {
             if (component == null)
                 throw new ArgumentNullException(nameof(component));
 
             component.SetEventHandler(this);
-
-            if (!_deviceProperties.ContainsKey(component.Id))
+            bool containsDevice = _deviceProperties.ContainsKey(component.Id);
+            if (!containsDevice)
             {
                 _logger.Log($"[INFO] Registering new device {component.Id}");
                 _deviceProperties[component.Id] = new Dictionary<string, object>();
@@ -108,6 +108,11 @@ namespace HydroGarden.Foundation.Core.Services
                 {
                     _logger.Log($"[WARNING] No properties found for device {component.Id}");
                 }
+            }
+
+            if (!containsDevice)
+            {
+                await component.InitializeAsync();
             }
         }
 
