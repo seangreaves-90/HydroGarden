@@ -46,7 +46,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// Generic handler interface for HydroGarden events
     /// </summary>
     /// <typeparam name="T">The type of event to handle, must implement IHydroGardenEvent</typeparam>
-    public interface IHydroGardenEventHandler: IAsyncDisposable
+    public interface IHydroGardenEventHandler : IAsyncDisposable
     {
         /// <summary>
         /// Handles a HydroGarden event of type T
@@ -55,7 +55,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <param name="evt">The event to handle</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>A task representing the asynchronous operation</returns>
-        Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default);
+        Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent;
     }
 
     /// <summary>

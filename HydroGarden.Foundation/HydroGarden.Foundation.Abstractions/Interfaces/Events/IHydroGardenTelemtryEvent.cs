@@ -19,7 +19,9 @@
     /// <summary>
     /// Specialized handler for telemetry events
     /// </summary>
-    public interface IHydroGardenTelemetryEventHandler : IHydroGardenEventHandler<IHydroGardenTelemetryEvent>
-    {
+    public interface IHydroGardenTelemetryEventHandler : IHydroGardenEventHandler 
+    { 
+    
     }
+    
 }

@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Specialized handler for lifecycle events
     /// </summary>
-    public interface IHydroGardenLifecycleEventHandler : IHydroGardenEventHandler<IHydroGardenLifecycleEvent>
+    public interface IHydroGardenLifecycleEventHandler : IHydroGardenEventHandler
     {
     }
 }

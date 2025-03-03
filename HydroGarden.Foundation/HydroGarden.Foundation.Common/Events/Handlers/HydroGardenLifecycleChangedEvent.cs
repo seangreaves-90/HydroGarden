@@ -9,7 +9,7 @@ namespace HydroGarden.Foundation.Common.Events.Handlers
             throw new NotImplementedException();
         }
 
-        public Task HandleEventAsync(object sender, IHydroGardenLifecycleEvent evt, CancellationToken ct = default)
+        Task IHydroGardenEventHandler.HandleEventAsync<T>(object sender, T evt, CancellationToken ct)
         {
             throw new NotImplementedException();
         }

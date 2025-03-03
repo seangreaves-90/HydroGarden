@@ -92,7 +92,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
         /// <summary>
         /// Subscribes an event handler to the bus.
         /// </summary>
-        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null)
+        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IHydroGardenEventHandler
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
 
@@ -101,7 +101,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
             foreach (var eventType in subscription.Options.EventTypes)
             {
-                _subscriptionsByType.AddOrUpdate(eventType, _ => new List<IEventSubscription> { subscription }, (_, list) =>
+                _subscriptionsByType.AddOrUpdate(eventType, new List<IEventSubscription> { subscription }, (_, list) =>
                 {
                     list.Add(subscription);
                     return list;
@@ -111,7 +111,6 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             _logger.Log(this, $"Handler subscribed with ID {subscription.Id}");
             return subscription.Id;
         }
-
 
         /// <summary>
         /// Unsubscribes an event handler from the bus.

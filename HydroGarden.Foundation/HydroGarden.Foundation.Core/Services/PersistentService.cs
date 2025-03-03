@@ -130,28 +130,29 @@ namespace HydroGarden.Foundation.Core.Services
         /// <summary>
         /// Handles property change events from IoT devices.
         /// </summary>
-        public async Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct)
+        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
         {
-            try
+            if (evt is IHydroGardenPropertyChangedEvent propertyChangedEvent)
             {
-                _logger.Log($"[DEBUG] Handling event for device {e.DeviceId}, property {e.PropertyName}");
+                _logger.Log($"[DEBUG] Handling property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
 
-                if (!_deviceProperties.TryGetValue(e.DeviceId, out var properties))
+                if (!_deviceProperties.TryGetValue(propertyChangedEvent.DeviceId, out var properties))
                 {
                     properties = new Dictionary<string, object>();
-                    _deviceProperties[e.DeviceId] = properties;
+                    _deviceProperties[propertyChangedEvent.DeviceId] = properties;
                 }
 
-                properties[e.PropertyName] = e.NewValue ?? new object();
+                properties[propertyChangedEvent.PropertyName] = propertyChangedEvent.NewValue ?? new object();
 
-                await _eventChannel.Writer.WriteAsync(e, ct);
-                await _eventBus.PublishAsync(this, e, ct);
+                await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
+                await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.Log(ex, $"Failed to handle property change event for {e.DeviceId}, property {e.PropertyName}");
+                _logger.Log($"[WARNING] Received event of unsupported type: {evt.GetType().Name}");
             }
         }
+
 
         /// <summary>
         /// Manually triggers batch processing of pending events.
@@ -300,5 +301,6 @@ namespace HydroGarden.Foundation.Core.Services
             _transactionLock.Dispose();
             GC.SuppressFinalize(this);
         }
+
     }
 }

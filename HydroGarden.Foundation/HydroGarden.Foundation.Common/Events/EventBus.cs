@@ -47,7 +47,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Subscribes an event handler to the bus.
         /// </summary>
-        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null)
+        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IHydroGardenEventHandler
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
 

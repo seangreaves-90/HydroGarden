@@ -11,7 +11,7 @@
         /// <param name="handler">The event handler</param>
         /// <param name="options">Options that control event filtering</param>
         /// <returns>Subscription ID that can be used to unsubscribe</returns>
-        Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null);
+        Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IHydroGardenEventHandler;
 
         /// <summary>
         /// Unsubscribes from events using the given subscription ID

@@ -34,7 +34,7 @@
     /// <summary>
     /// Defines an event handler that processes property change events in HydroGarden components.
     /// </summary>
-    public interface IHydroGardenPropertyChangedEventHandler<out T> : IHydroGardenEventHandler where T : IHydroGardenPropertyChangedEvent
+    public interface IHydroGardenPropertyChangedEventHandler : IHydroGardenEventHandler 
     {
     }
 }

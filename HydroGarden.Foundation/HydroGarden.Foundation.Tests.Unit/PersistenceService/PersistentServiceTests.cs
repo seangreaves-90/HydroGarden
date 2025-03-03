@@ -441,7 +441,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             int commitCount = 0;
 
             _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
-                .Returns(async () => {
+                .Returns(async () =>
+                {
                     Interlocked.Increment(ref commitCount);
                     if (commitCount == 1)
                     {
