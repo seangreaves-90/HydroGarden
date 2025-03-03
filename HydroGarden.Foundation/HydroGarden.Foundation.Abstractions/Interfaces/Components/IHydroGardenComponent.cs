@@ -72,7 +72,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// <param name="isEditable">The property should be editable.</param>
         /// <param name="isVisible">The property should be visible.</param>
         /// <returns>The property metadata, or null if not found.</returns>
-        protected IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable, bool isVisible);
+        IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable, bool isVisible);
 
         /// <summary>
         /// Retrieves all property values of the component.

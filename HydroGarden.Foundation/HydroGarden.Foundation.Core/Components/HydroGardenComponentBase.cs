@@ -115,7 +115,14 @@ namespace HydroGarden.Foundation.Core.Components
             return false;
         }
 
-        protected virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true) =>
+        /// <summary>
+        /// Constructs the default property metadata for general HydroGarden components.
+        /// </summary>
+        /// <param name="name">The property name.</param>
+        /// <param name="isEditable">Indicates whether the property is editable.</param>
+        /// <param name="isVisible">Indicates whether the property is visible.</param>
+        /// <returns>The default <see cref="IPropertyMetadata"/> for the property.</returns>
+        public virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true) =>
             name switch
             {
                 "State" => new PropertyMetadata(false, true, "Component State", "The current state of the component"),
@@ -124,6 +131,7 @@ namespace HydroGarden.Foundation.Core.Components
                 "AssemblyType" => new PropertyMetadata(false, true, "Component Type", "The assembly type of the component"),
                 _ => new PropertyMetadata(isEditable, isVisible, name, $"Property {name}")
             };
+
 
 
 

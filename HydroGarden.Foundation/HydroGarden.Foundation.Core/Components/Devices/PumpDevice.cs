@@ -95,6 +95,32 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <summary>
+        /// Constructs the default property metadata for the Pump device.
+        /// Overrides the base metadata for IoT devices with pump-specific values.
+        /// </summary>
+        /// <param name="name">The property name.</param>
+        /// <param name="isEditable">Indicates whether the property is editable.</param>
+        /// <param name="isVisible">Indicates whether the property is visible.</param>
+        /// <returns>The default <see cref="IPropertyMetadata"/> for the property.</returns>
+        public override IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true)
+        {
+            // Retrieve base metadata from IoTDeviceBase
+            var baseMetadata = base.ConstructDefaultPropertyMetadata(name, isEditable, isVisible);
+
+            return name switch
+            {
+                "FlowRate" => new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate"),
+                "IsRunning" => new PropertyMetadata(false, true, "Pump Running", "Indicates if the pump is running"),
+                "MaxFlowRate" => new PropertyMetadata(false, true, "Max Flow Rate", "The maximum possible flow rate"),
+                "MinFlowRate" => new PropertyMetadata(false, true, "Min Flow Rate", "The minimum possible flow rate"),
+                "CurrentFlowRate" => new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate"),
+                "Timestamp" => new PropertyMetadata(false, true, "Last Updated", "The last recorded update timestamp"),
+                _ => baseMetadata
+            };
+        }
+
+
         /// <inheritdoc/>
         protected override async Task OnStopAsync(CancellationToken ct)
         {

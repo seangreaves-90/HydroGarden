@@ -1,5 +1,7 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
@@ -105,6 +107,29 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         /// Override this method to implement custom stop behavior.
         /// </summary>
         protected virtual Task OnStopAsync(CancellationToken ct) => Task.CompletedTask;
+
+        /// <summary>
+        /// Constructs the default property metadata for IoT devices.
+        /// Overrides the base metadata for component properties with IoT-specific values.
+        /// </summary>
+        /// <param name="name">The property name.</param>
+        /// <param name="isEditable">Indicates whether the property is editable.</param>
+        /// <param name="isVisible">Indicates whether the property is visible.</param>
+        /// <returns>The default <see cref="IPropertyMetadata"/> for the property.</returns>
+        public virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true)
+        {
+            // Retrieve base metadata for common properties
+            var baseMetadata = base.ConstructDefaultPropertyMetadata(name, isEditable, isVisible);
+
+            return name switch
+            {
+                "State" => new PropertyMetadata(false, true, "Device State", "The current state of the IoT device"),
+                "Id" => new PropertyMetadata(false, true, "Device ID", "The unique identifier of the IoT device"),
+                "Name" => new PropertyMetadata(true, true, "Device Name", "The name of the IoT device"),
+                _ => baseMetadata
+            };
+        }
+
 
         /// <inheritdoc />
         public override void Dispose()
