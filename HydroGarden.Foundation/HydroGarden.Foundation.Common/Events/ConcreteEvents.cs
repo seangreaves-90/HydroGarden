@@ -149,33 +149,55 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device lifecycle changes
     /// </summary>
-    public class LifecycleEvent : HydroGardenEventBase, IHydroGardenLifecycleEvent
+    public class HydroGardenLifecycleChangedEvent : IHydroGardenLifecycleEventHandler
     {
-        /// <inheritdoc />
-        public ComponentState State { get; }
+        private readonly List<ComponentState> _stateChanges;
+        private readonly TaskCompletionSource<bool> _completionSource;
 
-        /// <inheritdoc />
-        public string? Details { get; }
-
-        /// <inheritdoc />
-        public override EventType EventType => EventType.Lifecycle;
-
-        /// <summary>
-        /// Creates a new lifecycle event
-        /// </summary>
-        /// <param name="deviceId">The source device ID</param>
-        /// <param name="state">The new state of the component</param>
-        /// <param name="details">Optional details about the state change</param>
-        /// <param name="routingData">Optional routing data</param>
-        public LifecycleEvent(
-            Guid deviceId,
-            ComponentState state,
-            string? details = null,
-            IEventRoutingData? routingData = null)
-            : base(deviceId, routingData)
+        public HydroGardenLifecycleChangedEvent()
         {
-            State = state;
-            Details = details;
+            _stateChanges = new List<ComponentState>();
+            _completionSource = new TaskCompletionSource<bool>();
+        }
+
+        public HydroGardenLifecycleChangedEvent(List<ComponentState> stateChanges, TaskCompletionSource<bool> completionSource)
+        {
+            _stateChanges = stateChanges ?? throw new ArgumentNullException(nameof(stateChanges));
+            _completionSource = completionSource ?? throw new ArgumentNullException(nameof(completionSource));
+        }
+
+        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+        {
+            // Handle property changed events that represent state changes
+            if (evt is IHydroGardenPropertyChangedEvent propEvt &&
+                propEvt.PropertyName == "State" &&
+                propEvt.NewValue is ComponentState state)
+            {
+                _stateChanges.Add(state);
+
+                // Signal completion if we've received enough state changes
+                if (_stateChanges.Count >= 5)
+                {
+                    _completionSource.TrySetResult(true);
+                }
+            }
+            // Handle lifecycle events directly
+            else if (evt is IHydroGardenLifecycleEvent lifecycleEvt)
+            {
+                _stateChanges.Add(lifecycleEvt.State);
+
+                // Signal completion if we've received enough state changes
+                if (_stateChanges.Count >= 5)
+                {
+                    _completionSource.TrySetResult(true);
+                }
+            }
+            await Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 

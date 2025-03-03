@@ -1,6 +1,8 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.QueueProcessor;
 using HydroGarden.Foundation.Common.Results;
 using System.Collections.Concurrent;
@@ -15,9 +17,11 @@ namespace HydroGarden.Foundation.Common.Events
     /// - Dead-letter queue for failed events.
     /// - Dynamic runtime subscription management.
     /// - Event correlation for tracking event chains.
+    /// - Topology-aware routing for component integration.
     /// </summary>
     public class EventBus : IEventBus, IDisposable
     {
+        private ITopologyService? _topologyService;
         private readonly IHydroGardenLogger _logger;
         private readonly IEventStore _eventStore;
         private readonly IEventRetryPolicy _retryPolicy;
@@ -42,6 +46,16 @@ namespace HydroGarden.Foundation.Common.Events
             _retryPolicy = retryPolicy;
             _transformer = transformer;
             _eventQueueProcessor = new EventQueueProcessor(logger, maxConcurrentProcessing);
+        }
+
+        /// <summary>
+        /// Sets the topology service for the EventBus.
+        /// This allows routing events based on component relationships.
+        /// </summary>
+        /// <param name="topologyService">The topology service to use.</param>
+        public void SetTopologyService(ITopologyService topologyService)
+        {
+            _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
         }
 
         /// <summary>
@@ -101,7 +115,26 @@ namespace HydroGarden.Foundation.Common.Events
 
             try
             {
-                foreach (var subscription in _subscriptions.Values)
+                // Check if this event should be persisted based on routing data
+                if (transformedEvent.RoutingData?.Persist == true)
+                {
+                    await _eventStore.PersistEventAsync(transformedEvent);
+                }
+
+                // Get matching subscriptions based on event type, source ID, and topology
+                var matchingSubscriptions = await GetMatchingSubscriptionsAsync(transformedEvent, ct);
+
+                // Set the handler count in the result
+                result.HandlerCount = matchingSubscriptions.Count;
+
+                // If there are no matching subscriptions, return early
+                if (matchingSubscriptions.Count == 0)
+                {
+                    return result;
+                }
+
+                // Enqueue event processing for each matching subscription
+                foreach (var subscription in matchingSubscriptions)
                 {
                     _eventQueueProcessor.Enqueue(new EventQueueItem
                     {
@@ -116,10 +149,151 @@ namespace HydroGarden.Foundation.Common.Events
             catch (Exception ex)
             {
                 _logger.Log(ex, $"[EventBus] Event {evt.EventId} failed.");
+                result.Errors.Add(ex);
                 await _eventStore.PersistEventAsync(evt);
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Gets all subscriptions that match the given event based on event type, source ID,
+        /// and topology relationships.
+        /// </summary>
+        private async Task<List<IEventSubscription>> GetMatchingSubscriptionsAsync(
+            IHydroGardenEvent evt,
+            CancellationToken ct = default)
+        {
+            var matchingSubs = new List<IEventSubscription>();
+
+            // Check if we have any subscriptions for this event type
+            if (!_subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions))
+            {
+                return matchingSubs;
+            }
+
+            // Check for explicit target routing
+            if (evt.RoutingData != null && evt.RoutingData.TargetIds.Length > 0)
+            {
+                // Filter subscriptions based on target IDs
+                var targetIds = new HashSet<Guid>(evt.RoutingData.TargetIds);
+
+                foreach (var subscription in typeSubscriptions)
+                {
+                    var options = subscription.Options;
+
+                    // Only include if subscription is for one of the target IDs
+                    if (options.SourceIds != null && options.SourceIds.Length > 0)
+                    {
+                        foreach (var sourceId in options.SourceIds)
+                        {
+                            if (targetIds.Contains(sourceId))
+                            {
+                                matchingSubs.Add(subscription);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                return matchingSubs;
+            }
+
+            // Standard subscription filtering based on source ID, etc.
+            foreach (var subscription in typeSubscriptions)
+            {
+                var options = subscription.Options;
+
+                // Check source ID filter if provided
+                if (options.SourceIds != null && options.SourceIds.Length > 0)
+                {
+                    bool sourceMatch = false;
+
+                    foreach (var sourceId in options.SourceIds)
+                    {
+                        if (sourceId == evt.SourceId)
+                        {
+                            sourceMatch = true;
+                            break;
+                        }
+                    }
+
+                    if (!sourceMatch && !options.IncludeConnectedSources)
+                    {
+                        continue; // No match, skip this subscription
+                    }
+
+                    // Check topology only if needed
+                    if (!sourceMatch && options.IncludeConnectedSources && _topologyService != null)
+                    {
+                        // Check if there's a connection from event source to subscribed source
+                        var connections = await _topologyService.GetConnectionsForSourceAsync(
+                            evt.SourceId, ct);
+
+                        bool connectedMatch = false;
+
+                        foreach (var connection in connections)
+                        {
+                            if (!connection.IsEnabled)
+                                continue;
+
+                            // Check if target of connection is one we're interested in
+                            foreach (var subSourceId in options.SourceIds)
+                            {
+                                if (connection.TargetId == subSourceId)
+                                {
+                                    // Check if connection condition is met
+                                    var conditionMet = await _topologyService.EvaluateConnectionConditionAsync(
+                                        connection, ct);
+
+                                    if (conditionMet)
+                                    {
+                                        connectedMatch = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (connectedMatch)
+                                break;
+                        }
+
+                        if (!connectedMatch)
+                            continue; // No connection match
+                    }
+                }
+
+                // Apply custom filter if specified
+                if (options.Filter != null && !options.Filter(evt))
+                {
+                    continue;
+                }
+
+                // This subscription matches
+                matchingSubs.Add(subscription);
+            }
+
+            return matchingSubs;
+        }
+
+        /// <summary>
+        /// Process any failed events that were stored for retry.
+        /// </summary>
+        public async Task ProcessFailedEventsAsync(CancellationToken ct = default)
+        {
+            var failedEvent = await _eventStore.RetrieveFailedEventAsync();
+            if (failedEvent != null)
+            {
+                // Check if we should retry
+                bool shouldRetry = await _retryPolicy.ShouldRetryAsync(failedEvent, 1);
+                if (shouldRetry)
+                {
+                    // Transform and republish
+                    var transformedEvent = _transformer.Transform(failedEvent);
+                    // The actual republishing logic would go here in a real implementation
+                    await PublishAsync(this, transformedEvent, ct);
+                }
+            }
         }
 
         /// <summary>
