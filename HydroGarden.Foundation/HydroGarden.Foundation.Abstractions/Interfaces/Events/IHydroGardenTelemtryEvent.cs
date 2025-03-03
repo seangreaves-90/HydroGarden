@@ -15,4 +15,11 @@
         /// </summary>
         IDictionary<string, string>? Units { get; }
     }
+
+    /// <summary>
+    /// Specialized handler for telemetry events
+    /// </summary>
+    public interface IHydroGardenTelemetryEventHandler : IHydroGardenEventHandler<IHydroGardenTelemetryEvent>
+    {
+    }
 }

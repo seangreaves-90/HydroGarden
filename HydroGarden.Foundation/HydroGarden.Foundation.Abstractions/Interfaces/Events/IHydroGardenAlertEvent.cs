@@ -36,4 +36,11 @@
         /// </summary>
         bool IsAcknowledged { get; set; }
     }
+
+    /// <summary>
+    /// Specialized handler for alert events
+    /// </summary>
+    public interface IHydroGardenAlertEventHandler : IHydroGardenEventHandler
+    {
+    }
 }

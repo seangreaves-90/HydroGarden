@@ -10,7 +10,7 @@
         /// <summary>
         /// The event handler for this subscription
         /// </summary>
-        public IHydroGardenPropertyChangedEventHandler Handler { get; }
+        public IHydroGardenEventHandler Handler { get; }
 
         /// <summary>
         /// Options that control how events are routed to this subscription

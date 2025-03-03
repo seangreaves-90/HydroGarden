@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 
-namespace HydroGarden.Foundation.Core.EventHandlers
+namespace HydroGarden.Foundation.Common.Events.Handlers
 {
     /// <summary>
     /// Event fired when a property value changes on a component

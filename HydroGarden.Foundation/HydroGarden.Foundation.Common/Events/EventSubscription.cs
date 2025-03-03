@@ -1,5 +1,4 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 
 
 namespace HydroGarden.Foundation.Common.Events
@@ -13,7 +12,7 @@ namespace HydroGarden.Foundation.Common.Events
         public Guid Id { get; }
 
         /// <inheritdoc/>
-        public IHydroGardenPropertyChangedEventHandler Handler { get; }
+        public IHydroGardenEventHandler Handler { get; }
 
         /// <inheritdoc/>
         public IEventSubscriptionOptions Options { get; }
@@ -24,7 +23,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="id">Unique identifier</param>
         /// <param name="handler">Event handler</param>
         /// <param name="options">Subscription options</param>
-        public EventSubscription(Guid id, IHydroGardenPropertyChangedEventHandler handler, IEventSubscriptionOptions options)
+        public EventSubscription(Guid id, IHydroGardenEventHandler handler, IEventSubscriptionOptions options)
         {
             Id = id;
             Handler = handler ?? throw new ArgumentNullException(nameof(handler));

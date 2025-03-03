@@ -15,4 +15,11 @@
         /// </summary>
         IDictionary<string, object?>? Parameters { get; }
     }
+
+    /// <summary>
+    /// Specialized handler for command events
+    /// </summary>
+    public interface IHydroGardenCommandEventHandler : IHydroGardenEventHandler
+    {
+    }
 }

@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 
 namespace HydroGarden.Foundation.Core.Components
 {

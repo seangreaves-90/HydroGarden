@@ -1,12 +1,9 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.QueueProcessor;
 using HydroGarden.Foundation.Common.Results;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Text.Json;
 
 namespace HydroGarden.Foundation.Common.Events
 {
@@ -50,7 +47,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Subscribes an event handler to the bus.
         /// </summary>
-        public Guid Subscribe(IHydroGardenPropertyChangedEventHandler handler, IEventSubscriptionOptions? options = null)
+        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null)
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
 
@@ -59,7 +56,7 @@ namespace HydroGarden.Foundation.Common.Events
 
             foreach (var eventType in subscription.Options.EventTypes)
             {
-                _subscriptionsByType.AddOrUpdate(eventType, _ => new List<IEventSubscription> { subscription }, (_, list) =>
+                _subscriptionsByType.AddOrUpdate(eventType, new List<IEventSubscription> { subscription }, (_, list) =>
                 {
                     list.Add(subscription);
                     return list;

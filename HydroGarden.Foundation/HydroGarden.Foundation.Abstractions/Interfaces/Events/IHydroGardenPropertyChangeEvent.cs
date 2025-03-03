@@ -1,6 +1,4 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-
-namespace HydroGarden.Foundation.Abstractions.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
     /// Represents an event triggered when a property of a HydroGarden component changes.
@@ -36,15 +34,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces
     /// <summary>
     /// Defines an event handler that processes property change events in HydroGarden components.
     /// </summary>
-    public interface IHydroGardenPropertyChangedEventHandler : IAsyncDisposable
+    public interface IHydroGardenPropertyChangedEventHandler<out T> : IHydroGardenEventHandler where T : IHydroGardenPropertyChangedEvent
     {
-        /// <summary>
-        /// Handles an event asynchronously when a property of a HydroGarden component changes.
-        /// </summary>
-        /// <param name="sender">The source object of the event.</param>
-        /// <param name="e">The event details containing property change information.</param>
-        /// <param name="ct">An optional cancellation token.</param>
-        /// <returns>A task representing the asynchronous operation.</returns>
-        Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct = default);
     }
 }
