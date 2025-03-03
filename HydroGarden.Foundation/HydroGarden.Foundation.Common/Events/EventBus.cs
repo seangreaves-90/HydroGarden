@@ -115,26 +115,45 @@ namespace HydroGarden.Foundation.Common.Events
 
             try
             {
-                // Check if this event should be persisted based on routing data
-                if (transformedEvent.RoutingData?.Persist == true)
-                {
-                    await _eventStore.PersistEventAsync(transformedEvent);
-                }
-
-                // Get matching subscriptions based on event type, source ID, and topology
+                // Existing persistence code...
                 var matchingSubscriptions = await GetMatchingSubscriptionsAsync(transformedEvent, ct);
-
-                // Set the handler count in the result
                 result.HandlerCount = matchingSubscriptions.Count;
 
-                // If there are no matching subscriptions, return early
                 if (matchingSubscriptions.Count == 0)
                 {
                     return result;
                 }
 
-                // Enqueue event processing for each matching subscription
-                foreach (var subscription in matchingSubscriptions)
+                // NEW CODE: Separate synchronous and asynchronous subscriptions
+                var syncSubscriptions = matchingSubscriptions.Where(s => s.Options.Synchronous).ToList();
+                var asyncSubscriptions = matchingSubscriptions.Where(s => !s.Options.Synchronous).ToList();
+
+                // Process synchronous subscriptions directly
+                foreach (var subscription in syncSubscriptions)
+                {
+                    try
+                    {
+                        if (transformedEvent is IHydroGardenPropertyChangedEvent propChangedEvent)
+                        {
+                            await subscription.Handler.HandleEventAsync(sender, propChangedEvent, ct);
+                            result.SuccessCount++;
+                        }
+                        else
+                        {
+                            // Handle other event types as needed
+                            await subscription.Handler.HandleEventAsync(sender, transformedEvent, ct);
+                            result.SuccessCount++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Log(ex, $"[EventBus] Error in synchronous handler for event {transformedEvent.EventId}");
+                        result.Errors.Add(ex);
+                    }
+                }
+
+                // Enqueue asynchronous event processing as before
+                foreach (var subscription in asyncSubscriptions)
                 {
                     _eventQueueProcessor.Enqueue(new EventQueueItem
                     {
@@ -288,10 +307,8 @@ namespace HydroGarden.Foundation.Common.Events
                 bool shouldRetry = await _retryPolicy.ShouldRetryAsync(failedEvent, 1);
                 if (shouldRetry)
                 {
-                    // Transform and republish
-                    var transformedEvent = _transformer.Transform(failedEvent);
-                    // The actual republishing logic would go here in a real implementation
-                    await PublishAsync(this, transformedEvent, ct);
+                    // CHANGE: Don't transform here, PublishAsync will handle it
+                    await PublishAsync(this, failedEvent, ct);
                 }
             }
         }

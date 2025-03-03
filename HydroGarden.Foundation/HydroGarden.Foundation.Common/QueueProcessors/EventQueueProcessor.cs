@@ -104,7 +104,15 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
         public void Dispose()
         {
             _cancellationSource.Cancel();
-            Task.WaitAll(_processingTasks.ToArray(), TimeSpan.FromSeconds(5));
+            try
+            {
+                Task.WaitAll(_processingTasks.ToArray(), TimeSpan.FromSeconds(5));
+            }
+            catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is TaskCanceledException))
+            {
+                // Task cancellations are expected during disposal when we cancel the token
+                // We can safely ignore these exceptions
+            }
             _cancellationSource.Dispose();
         }
     }
