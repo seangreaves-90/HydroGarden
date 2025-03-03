@@ -121,8 +121,14 @@ namespace HydroGarden.Foundation.Common.Events
 
                 if (matchingSubscriptions.Count == 0)
                 {
+                    // Ensure events are persisted when specified in routing
+                    if (evt.RoutingData?.Persist == true)
+                    {
+                        await _eventStore.PersistEventAsync(evt);
+                    }
                     return result;
                 }
+
 
                 // NEW CODE: Separate synchronous and asynchronous subscriptions
                 var syncSubscriptions = matchingSubscriptions.Where(s => s.Options.Synchronous).ToList();
@@ -149,10 +155,10 @@ namespace HydroGarden.Foundation.Common.Events
                     {
                         _logger.Log(ex, $"[EventBus] Error in synchronous handler for event {transformedEvent.EventId}");
                         result.Errors.Add(ex);
+                        await _eventStore.PersistEventAsync(transformedEvent);
                     }
                 }
 
-                // Enqueue asynchronous event processing as before
                 foreach (var subscription in asyncSubscriptions)
                 {
                     _eventQueueProcessor.Enqueue(new EventQueueItem
