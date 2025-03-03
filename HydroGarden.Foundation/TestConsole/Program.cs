@@ -7,8 +7,9 @@ using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
 using HydroGarden.Foundation.Core.Services;
 using HydroGarden.Foundation.Core.Stores;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 
-namespace HydroGarden.TestConsole
+namespace TestConsole
 {
     class Program
     {
@@ -53,36 +54,34 @@ namespace HydroGarden.TestConsole
             Console.WriteLine($"Creating pump with ID: {pumpId}");
 
             using var pump = new PumpDevice(pumpId, "Test Pump", 100, 0, logger);
+            // Define property metadata
+            var metadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
+            await pump.SetPropertyAsync("Sean", 50, metadata);
             await persistenceService.AddOrUpdateAsync(pump);
 
+
             await DisplayPumpStatus(pump);
 
-            // Set flow rate
+            // Set flow rate with metadata
             Console.WriteLine("\nSetting flow rate to 50%...");
-            await pump.SetFlowRateAsync(50);
+            await pump.SetPropertyAsync("FlowRate", 50, metadata);
             await DisplayPumpStatus(pump);
 
-            // Start the pump without blocking using CancellationTokenSource
+            // Start the pump asynchronously
             Console.WriteLine("\nStarting pump...");
 
-            // Create a CancellationTokenSource with a timeout
-            // This ensures the pump will automatically stop after the specified duration
             using var pumpCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
-            // Create a TaskCompletionSource to signal when pump operation is complete
             var pumpCompletionSource = new TaskCompletionSource<bool>();
 
-            // Start the pump in a separate task
-            _ = Task.Run(async () => {
+            _ = Task.Run(async () =>
+            {
                 try
                 {
-                    // The pump will run until the token is canceled or an exception occurs
                     await pump.StartAsync(pumpCts.Token);
                     pumpCompletionSource.TrySetResult(true);
                 }
                 catch (OperationCanceledException)
                 {
-                    // This is expected when the token is canceled
                     Console.WriteLine("Pump operation was canceled as expected");
                     pumpCompletionSource.TrySetResult(true);
                 }
@@ -93,14 +92,13 @@ namespace HydroGarden.TestConsole
                 }
             });
 
-            // Wait a moment for the pump to start running
             Console.WriteLine("Pump is running...");
             await Task.Delay(2000);
             await DisplayPumpStatus(pump);
 
-            // Simulate adjusting flow rate while running
+            // Adjust flow rate while running
             Console.WriteLine("\nAdjusting flow rate to 75%...");
-            await pump.SetFlowRateAsync(75);
+            await pump.SetPropertyAsync("FlowRate", 75, metadata);
             await Task.Delay(2000);
             await DisplayPumpStatus(pump);
 
@@ -108,19 +106,11 @@ namespace HydroGarden.TestConsole
             Console.WriteLine("\nPress any key to stop the pump...");
             Console.ReadKey(true);
 
-            // Stop the pump
             Console.WriteLine("Stopping pump...");
-
-            // Cancel the token to signal the pump to stop
             pumpCts.Cancel();
-
-            // Also call StopAsync to ensure proper shutdown
             await pump.StopAsync();
-
-            // Wait for the pump operation to complete
             await Task.WhenAny(pumpCompletionSource.Task, Task.Delay(3000));
 
-            // Show final status
             await DisplayPumpStatus(pump);
             Console.WriteLine("Pump test completed successfully!");
         }
@@ -135,11 +125,24 @@ namespace HydroGarden.TestConsole
             var state = await pump.GetPropertyAsync<ComponentState>("State");
             var timestamp = await pump.GetPropertyAsync<DateTime?>("Timestamp");
 
+            var metadata = pump.GetPropertyMetadata("FlowRate");
+
             Console.WriteLine($"State: {state}");
             Console.WriteLine($"Flow Rate Setting: {flowRate}%");
             Console.WriteLine($"Current Flow Rate: {currentFlowRate:F2}%");
             Console.WriteLine($"Running: {isRunning}");
             Console.WriteLine($"Last Update: {timestamp?.ToString() ?? "N/A"}");
+
+            // Display metadata information
+            if (metadata != null)
+            {
+                Console.WriteLine("--- Property Metadata ---");
+                Console.WriteLine($"Display Name: {metadata.DisplayName}");
+                Console.WriteLine($"Description: {metadata.Description}");
+                Console.WriteLine($"Editable: {metadata.IsEditable}");
+                Console.WriteLine($"Visible: {metadata.IsVisible}");
+            }
+
             Console.WriteLine("------------------");
         }
     }

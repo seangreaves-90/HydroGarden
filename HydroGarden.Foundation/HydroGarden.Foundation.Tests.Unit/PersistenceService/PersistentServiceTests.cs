@@ -42,7 +42,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 .Returns(ValueTask.CompletedTask);
 
             // Configure test PersistenceService with a short batch interval
-            _sut = new PersistenceService(_mockStore.Object, _mockEventBus.Object, _mockLogger.Object, 100, TimeSpan.FromMilliseconds(100))
+            _sut = new PersistenceService(_mockStore.Object, _mockEventBus.Object, _mockLogger.Object, TimeSpan.FromMilliseconds(100))
             {
                 IsBatchProcessingEnabled = false, // Disable automatic batch processing for tests
                 ForceTransactionCreation = true  // Ensure a transaction is created in tests
@@ -216,6 +216,48 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         #endregion
 
         #region Property Loading and Persistence
+
+        [Fact]
+        public async Task AddOrUpdateAsync_ShouldPersistMetadata()
+        {
+            // Arrange
+            var mockStore = new Mock<IStore>();
+            var mockEventBus = new Mock<IEventBus>();
+            var mockLogger = new Mock<IHydroGardenLogger>();
+
+            var persistenceService = new PersistenceService(mockStore.Object, mockEventBus.Object, mockLogger.Object);
+
+            var deviceId = Guid.NewGuid();
+            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, mockLogger.Object);
+
+            // Mock store returning no existing data
+            mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((IDictionary<string, object>?)null);
+            mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((IDictionary<string, IPropertyMetadata>?)null);
+
+            var expectedMetadata = new Dictionary<string, IPropertyMetadata>
+            {
+                ["FlowRate"] = new PropertyMetadata(true, true, "Flow Rate", "Pump flow rate in percentage")
+            };
+
+            // Act
+            await pump.SetPropertyAsync("FlowRate", 75, expectedMetadata["FlowRate"]);
+            await persistenceService.AddOrUpdateAsync(pump);
+
+            // Assert - Ensure metadata is saved
+            mockStore.Verify(s => s.SaveWithMetadataAsync(
+                    It.Is<Guid>(id => id == deviceId),
+                    It.IsAny<IDictionary<string, object>>(),
+                    It.Is<IDictionary<string, IPropertyMetadata>>(metadata =>
+                        metadata.Count > 0 && metadata.ContainsKey("FlowRate")),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+
+            // Verify the metadata was actually used
+            mockLogger.Verify(l =>
+                l.Log(It.Is<string>(msg => msg.Contains("Device") && msg.Contains("persisted with metadata"))));
+        }
 
         /// <summary>
         /// Tests that the service correctly handles loading metadata for stored properties.

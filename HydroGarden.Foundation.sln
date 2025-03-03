@@ -21,7 +21,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.Test
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestConsole", "HydroGarden.Foundation\TestConsole\TestConsole.csproj", "{8B2944AB-35A0-4C93-A7B1-51674FCF7EBF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HydroGarden.Foundation.Tests.Integration", "HydroGarden.Foundation\HydroGarden.Foundation.Tests.Integration\HydroGarden.Foundation.Tests.Integration.csproj", "{D098901A-EDE5-4622-BEFA-B4E6E363B942}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.Tests.Integration", "HydroGarden.Foundation\HydroGarden.Foundation.Tests.Integration\HydroGarden.Foundation.Tests.Integration.csproj", "{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,10 +49,10 @@ Global
 		{8B2944AB-35A0-4C93-A7B1-51674FCF7EBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B2944AB-35A0-4C93-A7B1-51674FCF7EBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B2944AB-35A0-4C93-A7B1-51674FCF7EBF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D098901A-EDE5-4622-BEFA-B4E6E363B942}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D098901A-EDE5-4622-BEFA-B4E6E363B942}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D098901A-EDE5-4622-BEFA-B4E6E363B942}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D098901A-EDE5-4622-BEFA-B4E6E363B942}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

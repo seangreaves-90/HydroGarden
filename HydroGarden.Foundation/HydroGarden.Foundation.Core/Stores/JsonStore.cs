@@ -138,21 +138,26 @@ namespace HydroGarden.Foundation.Core.Stores
             await _lock.WaitAsync(ct);
             try
             {
-                // Load existing store data or initialize a new store
                 var store = File.Exists(_filePath)
                     ? await LoadStoreAsync(ct)
                     : new Dictionary<string, ComponentStore>();
 
-                // Store properties and metadata
                 store[id.ToString()] = new ComponentStore
                 {
                     Properties = properties.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is Type type ? type.FullName! : kvp.Value),
-                    Metadata = metadata?.ToDictionary(kvp => kvp.Key, kvp => (IPropertyMetadata)new PropertyMetadata(
-                        kvp.Value.IsEditable,
-                        kvp.Value.IsVisible,
-                        kvp.Value.DisplayName,
-                        kvp.Value.Description
-                    )) ?? new Dictionary<string, IPropertyMetadata>()
+                    Metadata = metadata != null
+                        ? metadata.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => kvp.Value is PropertyMetadata prop
+                                ? (IPropertyMetadata)prop
+                                : new PropertyMetadata(
+                                    kvp.Value.IsEditable,
+                                    kvp.Value.IsVisible,
+                                    kvp.Value.DisplayName,
+                                    kvp.Value.Description
+                                )
+                        )
+                        : new Dictionary<string, IPropertyMetadata>()
                 };
 
                 await SaveStoreAsync(store, ct);
@@ -162,6 +167,8 @@ namespace HydroGarden.Foundation.Core.Stores
                 _lock.Release();
             }
         }
+
+
 
         /// <summary>
         /// Loads the entire store from a JSON file.

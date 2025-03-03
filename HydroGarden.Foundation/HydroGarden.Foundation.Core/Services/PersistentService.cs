@@ -1,9 +1,9 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Logging;
-using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -22,7 +22,6 @@ namespace HydroGarden.Foundation.Core.Services
         private readonly CancellationTokenSource _processingCts = new();
         private readonly Task _processingTask;
         private readonly SemaphoreSlim _transactionLock = new(1, 1);
-        private readonly int _maxCachedDevices;
         private readonly TimeSpan _batchInterval;
         private bool _isDisposed;
 
@@ -45,19 +44,18 @@ namespace HydroGarden.Foundation.Core.Services
         /// Initializes the PersistenceService.
         /// </summary>
         public PersistenceService(IStore store, IEventBus eventBus)
-            : this(store, eventBus, new HydroGardenLogger(), 1000, TimeSpan.FromSeconds(5))
+            : this(store, eventBus, new HydroGardenLogger(), TimeSpan.FromSeconds(5))
         {
         }
 
         /// <summary>
         /// Initializes the PersistenceService with configurable options.
         /// </summary>
-        public PersistenceService(IStore store, IEventBus eventBus, IHydroGardenLogger logger, int maxCachedDevices = 1000, TimeSpan? batchInterval = null)
+        public PersistenceService(IStore store, IEventBus eventBus, IHydroGardenLogger logger, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _maxCachedDevices = maxCachedDevices;
             _batchInterval = batchInterval ?? TimeSpan.FromSeconds(5);
             _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>();
             _eventChannel = Channel.CreateUnbounded<IHydroGardenPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
@@ -74,7 +72,9 @@ namespace HydroGarden.Foundation.Core.Services
                 throw new ArgumentNullException(nameof(component));
 
             component.SetEventHandler(this);
+
             bool containsDevice = _deviceProperties.ContainsKey(component.Id);
+
             if (!containsDevice)
             {
                 _logger.Log($"[INFO] Registering new device {component.Id}");
@@ -91,17 +91,35 @@ namespace HydroGarden.Foundation.Core.Services
             if (storedProperties != null)
             {
                 _deviceProperties[component.Id] = new Dictionary<string, object>(storedProperties);
+
+                // Ensure that metadata is loaded correctly
+                if (storedMetadata != null && storedMetadata.Count > 0)
+                {
+                    _logger.Log($"[INFO] Metadata loaded for device {component.Id}");
+                }
+                else
+                {
+                    _logger.Log($"[WARNING] No metadata found for device {component.Id}");
+                }
+
                 await component.LoadPropertiesAsync(storedProperties, storedMetadata);
                 _logger.Log($"[INFO] Properties loaded for device {component.Id}");
             }
             else
             {
                 var deviceProps = component.GetProperties();
+                var deviceMetadata = component.GetAllPropertyMetadata();
+
                 if (deviceProps.Count > 0)
                 {
                     _deviceProperties[component.Id] = new Dictionary<string, object>(deviceProps);
-                    await _store.SaveWithMetadataAsync(component.Id, deviceProps, component.GetAllPropertyMetadata(), ct);
-                    _logger.Log($"[INFO] Device {component.Id} persisted.");
+
+                    _logger.Log($"[DEBUG] Saving metadata: {deviceMetadata.Count} entries found.");
+
+                    // Ensure metadata is actually being saved
+                    await _store.SaveWithMetadataAsync(component.Id, deviceProps, deviceMetadata, ct);
+
+                    _logger.Log($"[INFO] Device {component.Id} persisted with metadata.");
                 }
                 else
                 {
@@ -111,7 +129,7 @@ namespace HydroGarden.Foundation.Core.Services
 
             if (!containsDevice)
             {
-                await component.InitializeAsync();
+                await component.InitializeAsync(ct);
             }
         }
 
@@ -263,16 +281,25 @@ namespace HydroGarden.Foundation.Core.Services
                             _deviceProperties[deviceId] = properties;
                         }
 
+                        var metadataDictionary = new Dictionary<string, IPropertyMetadata>();
+
                         foreach (var (propName, evt) in deviceEvents)
                         {
                             properties[propName] = evt.NewValue ?? new object();
+
+                            // Ensure metadata is retrieved and persisted
+                            if (evt.Metadata != null)
+                            {
+                                metadataDictionary[propName] = evt.Metadata;
+                            }
                         }
 
-                        await transaction.SaveAsync(deviceId, properties);
+                        // Save properties along with metadata
+                        await transaction.SaveWithMetadataAsync(deviceId, properties, metadataDictionary);
                     }
 
                     await transaction.CommitAsync();
-                    _logger.Log("[INFO] Event batch successfully persisted.");
+                    _logger.Log("[INFO] Event batch successfully persisted with metadata.");
                 }
                 finally
                 {
@@ -281,10 +308,11 @@ namespace HydroGarden.Foundation.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.Log(ex, "[ERROR] Failed to persist device events.");
-                throw; 
+                _logger.Log(ex, "[ERROR] Failed to persist device events with metadata.");
+                throw;
             }
         }
+
 
         /// <summary>
         /// Disposes the persistence service asynchronously.

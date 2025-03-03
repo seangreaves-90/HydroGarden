@@ -19,4 +19,8 @@
     <ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Events\Handlers\" />
+  </ItemGroup>
+
 </Project>
