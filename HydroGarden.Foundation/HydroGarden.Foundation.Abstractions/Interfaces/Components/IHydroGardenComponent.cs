@@ -66,6 +66,15 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         IPropertyMetadata? GetPropertyMetadata(string name);
 
         /// <summary>
+        /// Retrieves metadata for a specified property.
+        /// </summary>
+        /// <param name="name">The property name.</param>
+        /// <param name="isEditable">The property should be editable.</param>
+        /// <param name="isVisible">The property should be visible.</param>
+        /// <returns>The property metadata, or null if not found.</returns>
+        protected IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable, bool isVisible);
+
+        /// <summary>
         /// Retrieves all property values of the component.
         /// </summary>
         /// <returns>A dictionary containing property names and values.</returns>

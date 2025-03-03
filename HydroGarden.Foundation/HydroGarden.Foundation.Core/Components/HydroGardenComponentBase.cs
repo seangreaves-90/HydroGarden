@@ -81,7 +81,6 @@ namespace HydroGarden.Foundation.Core.Components
             }
         }
 
-        /// <inheritdoc/>
         public virtual async Task<bool> UpdatePropertyOptimisticAsync<T>(string name, Func<T?, T> updateFunc)
         {
             int attempts = 0;
@@ -116,6 +115,18 @@ namespace HydroGarden.Foundation.Core.Components
             return false;
         }
 
+        protected virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true) =>
+            name switch
+            {
+                "State" => new PropertyMetadata(false, true, "Component State", "The current state of the component"),
+                "Id" => new PropertyMetadata(false, true, "Component ID", "The unique identifier of the component"),
+                "Name" => new PropertyMetadata(true, true, "Component Name", "The name of the component"),
+                "AssemblyType" => new PropertyMetadata(false, true, "Component Type", "The assembly type of the component"),
+                _ => new PropertyMetadata(isEditable, isVisible, name, $"Property {name}")
+            };
+
+
+
         private void UpdateClassProperty(string propertyName, object value)
         {
             var type = GetType();
@@ -136,14 +147,43 @@ namespace HydroGarden.Foundation.Core.Components
         }
 
         /// <inheritdoc/>
-        public virtual Task<T?> GetPropertyAsync<T>(string name) =>
-            _properties.TryGetValue(name, out var value) && value is T typedValue
-                ? Task.FromResult<T?>(typedValue)
-                : Task.FromResult<T?>(default);
+        public virtual Task<T?> GetPropertyAsync<T>(string name)
+        {
+            if (_properties.TryGetValue(name, out var value))
+            {
+                _logger.Log($"[DEBUG] GetPropertyAsync: Found '{name}' = {value} (Type: {value?.GetType()})");
+
+                // Direct cast if possible
+                if (value is T typedValue)
+                {
+                    return Task.FromResult<T?>(typedValue);
+                }
+
+                // Attempt conversion if direct cast fails
+                try
+                {
+                    var convertedValue = (T)Convert.ChangeType(value, typeof(T))!;
+                    _logger.Log($"[INFO] Converted '{name}' from {value?.GetType()} to {typeof(T)}: {convertedValue}");
+                    return Task.FromResult<T?>(convertedValue);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Log($"[WARNING] Failed to convert '{name}' value '{value}' from {value?.GetType()} to {typeof(T)}: {ex.Message}");
+                }
+            }
+            else
+            {
+                _logger.Log($"[WARNING] Property '{name}' not found in _properties.");
+            }
+
+            return Task.FromResult<T?>(default);
+        }
+
+
 
         /// <inheritdoc/>
         public virtual IPropertyMetadata? GetPropertyMetadata(string name) =>
-            _propertyMetadata.TryGetValue(name, out var metadata) ? metadata : null;
+            _propertyMetadata.GetValueOrDefault(name);
 
         /// <inheritdoc/>
         public virtual IDictionary<string, object> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);

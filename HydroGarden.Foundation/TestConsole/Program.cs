@@ -54,9 +54,6 @@ namespace TestConsole
             Console.WriteLine($"Creating pump with ID: {pumpId}");
 
             using var pump = new PumpDevice(pumpId, "Test Pump", 100, 0, logger);
-            // Define property metadata
-            var metadata = new PropertyMetadata(true, true, "Sean", "Greaves");
-            await pump.SetPropertyAsync("Sean", 50, metadata);
             await persistenceService.AddOrUpdateAsync(pump);
 
 
@@ -64,7 +61,7 @@ namespace TestConsole
 
             // Set flow rate with metadata
             Console.WriteLine("\nSetting flow rate to 50%...");
-            metadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
+            var metadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
             await pump.SetPropertyAsync("FlowRate", 50, metadata);
             await DisplayPumpStatus(pump);
 

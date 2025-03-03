@@ -1,8 +1,6 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Common.Logging;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
@@ -11,60 +9,76 @@ namespace HydroGarden.Foundation.Core.Components.Devices
     /// </summary>
     public class PumpDevice : IoTDeviceBase
     {
-        private double _flowRate;
-        private bool _isRunning;
         private readonly Timer _monitorTimer;
-        private readonly double _maxFlowRate;
-        private readonly double _minFlowRate;
+
+        /// <summary>
+        /// Gets or sets the flow rate of the pump.
+        /// </summary>
+        public double FlowRate { get; private set; }
+
+        /// <summary>
+        /// Gets or sets whether the pump is running.
+        /// </summary>
+        public bool IsRunning { get; private set; }
+
+        /// <summary>
+        /// Gets the maximum flow rate of the pump.
+        /// </summary>
+        public double MaxFlowRate { get; }
+
+        /// <summary>
+        /// Gets the minimum flow rate of the pump.
+        /// </summary>
+        public double MinFlowRate { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PumpDevice"/> class.
         /// </summary>
-        /// <param name="id">The unique identifier of the pump.</param>
-        /// <param name="name">The name of the pump.</param>
-        /// <param name="maxFlowRate">The maximum flow rate of the pump.</param>
-        /// <param name="minFlowRate">The minimum flow rate of the pump.</param>
-        /// <param name="logger">Optional logger instance.</param>
         public PumpDevice(Guid id, string name, double maxFlowRate = 100, double minFlowRate = 0, IHydroGardenLogger? logger = null)
             : base(id, name, logger)
         {
-            _maxFlowRate = maxFlowRate;
-            _minFlowRate = minFlowRate;
+            MaxFlowRate = maxFlowRate;
+            MinFlowRate = minFlowRate;
             _monitorTimer = new Timer(OnMonitorTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
         /// <summary>
         /// Sets the flow rate of the pump asynchronously.
         /// </summary>
-        /// <param name="value">The desired flow rate.</param>
         public async Task SetFlowRateAsync(double value)
         {
-            if (value < _minFlowRate || value > _maxFlowRate)
-                throw new ArgumentOutOfRangeException(nameof(value), $"Flow rate must be between {_minFlowRate} and {_maxFlowRate}");
+            if (value < MinFlowRate || value > MaxFlowRate)
+                throw new ArgumentOutOfRangeException(nameof(value), $"Flow rate must be between {MinFlowRate} and {MaxFlowRate}");
 
-            _flowRate = value;
-            await SetPropertyAsync("FlowRate", _flowRate);
+            FlowRate = value;
+            await SetPropertyAsync("FlowRate", FlowRate, GetDefaultPropertyMetadata("FlowRate"));
         }
 
         /// <inheritdoc/>
         protected override async Task OnInitializeAsync(CancellationToken ct)
         {
-            _flowRate = 0;
-            _isRunning = false;
-            await SetPropertyAsync("FlowRate", _flowRate);
-            await SetPropertyAsync("IsRunning", _isRunning);
-            await SetPropertyAsync("MaxFlowRate", _maxFlowRate);
-            await SetPropertyAsync("MinFlowRate", _minFlowRate);
+            FlowRate = 0;
+            IsRunning = false;
+
+            // ✅ Set default properties with metadata
+            await SetPropertyAsync("FlowRate", FlowRate, GetDefaultPropertyMetadata("FlowRate"));
+            await SetPropertyAsync("IsRunning", IsRunning, GetDefaultPropertyMetadata("IsRunning"));
+            await SetPropertyAsync("MaxFlowRate", MaxFlowRate, GetDefaultPropertyMetadata("MaxFlowRate"));
+            await SetPropertyAsync("MinFlowRate", MinFlowRate, GetDefaultPropertyMetadata("MinFlowRate"));
+
+            // ✅ Virtual property as per request
+            await SetPropertyAsync("VirtualPropTest", "testProp", new PropertyMetadata(true, false, "Virtual Prop Test", "A test virtual property"));
+
             await base.OnInitializeAsync(ct);
         }
 
         /// <inheritdoc/>
         protected override async Task OnStartAsync(CancellationToken ct)
         {
-            _isRunning = true;
-            await SetPropertyAsync("IsRunning", _isRunning);
+            IsRunning = true;
+            await SetPropertyAsync("IsRunning", IsRunning, GetDefaultPropertyMetadata("IsRunning"));
             _monitorTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(1));
-            
+
             try
             {
                 while (!ct.IsCancellationRequested)
@@ -76,8 +90,8 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             finally
             {
                 _monitorTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                _isRunning = false;
-                await SetPropertyAsync("IsRunning", _isRunning);
+                IsRunning = false;
+                await SetPropertyAsync("IsRunning", IsRunning, GetDefaultPropertyMetadata("IsRunning"));
             }
         }
 
@@ -85,36 +99,36 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         protected override async Task OnStopAsync(CancellationToken ct)
         {
             _monitorTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            _isRunning = false;
-            await SetPropertyAsync("IsRunning", _isRunning);
+            IsRunning = false;
+            await SetPropertyAsync("IsRunning", IsRunning, GetDefaultPropertyMetadata("IsRunning"));
             await base.OnStopAsync(ct);
         }
 
         private async Task SimulatePumpOperationAsync(CancellationToken ct)
         {
-            double actualFlowRate = _flowRate;
-            if (_isRunning && _flowRate > 0)
+            double actualFlowRate = FlowRate;
+            if (IsRunning && FlowRate > 0)
             {
                 var random = new Random();
-                actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
+                actualFlowRate = FlowRate * (0.98 + 0.04 * random.NextDouble());
             }
-            await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
+            await SetPropertyAsync("CurrentFlowRate", actualFlowRate, GetDefaultPropertyMetadata("CurrentFlowRate"));
         }
 
         private async void OnMonitorTimer(object? state)
         {
             try
             {
-                if (_isRunning)
+                if (IsRunning)
                 {
-                    double actualFlowRate = _flowRate;
-                    if (_flowRate > 0)
+                    double actualFlowRate = FlowRate;
+                    if (FlowRate > 0)
                     {
                         var random = new Random();
-                        actualFlowRate = _flowRate * (0.98 + 0.04 * random.NextDouble());
+                        actualFlowRate = FlowRate * (0.98 + 0.04 * random.NextDouble());
                     }
-                    await SetPropertyAsync("CurrentFlowRate", actualFlowRate);
-                    await SetPropertyAsync("Timestamp", DateTime.UtcNow);
+                    await SetPropertyAsync("CurrentFlowRate", actualFlowRate, GetDefaultPropertyMetadata("CurrentFlowRate"));
+                    await SetPropertyAsync("Timestamp", DateTime.UtcNow, GetDefaultPropertyMetadata("Timestamp"));
                 }
             }
             catch (Exception ex)
@@ -122,6 +136,21 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 _logger.Log(ex, "Error updating pump properties");
             }
         }
+
+        /// <summary>
+        /// Returns the default metadata for a given property.
+        /// </summary>
+        private IPropertyMetadata GetDefaultPropertyMetadata(string propertyName, bool isEditable = true,bool isVisible = true) =>
+            propertyName switch
+            {
+                "FlowRate" => new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate"),
+                "IsRunning" => new PropertyMetadata(false, true, "Pump Running", "Indicates if the pump is running"),
+                "MaxFlowRate" => new PropertyMetadata(false, true, "Max Flow Rate", "The maximum possible flow rate"),
+                "MinFlowRate" => new PropertyMetadata(false, true, "Min Flow Rate", "The minimum possible flow rate"),
+                "CurrentFlowRate" => new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate"),
+                "Timestamp" => new PropertyMetadata(false, true, "Last Updated", "The last recorded update timestamp"),
+                _ => new PropertyMetadata(isEditable, isVisible, propertyName, $"Property {propertyName}")
+            };
 
         /// <inheritdoc/>
         public override void Dispose()
