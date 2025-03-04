@@ -6,6 +6,11 @@
     public interface IEventBus
     {
         /// <summary>
+        /// Sets the topology service for the event bus
+        /// </summary>
+        /// <param name="topologyService">The tology service</param>
+        void SetTopologyService(ITopologyService topologyService);
+        /// <summary>
         /// Subscribes to events with the given handler and options
         /// </summary>
         /// <param name="handler">The event handler</param>

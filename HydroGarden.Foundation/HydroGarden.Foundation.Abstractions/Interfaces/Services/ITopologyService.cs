@@ -1,7 +1,7 @@
 ﻿/// <summary>
 /// Service for managing component connections and topology
 /// </summary>
-public interface ITopologyService
+public interface ITopologyService : IAsyncDisposable
 {
     /// <summary>
     /// Gets all connections for the given source component

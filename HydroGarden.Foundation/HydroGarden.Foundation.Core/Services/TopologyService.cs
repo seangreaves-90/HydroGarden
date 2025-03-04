@@ -12,20 +12,27 @@ namespace HydroGarden.Foundation.Core.Services
     {
         private readonly IHydroGardenLogger _logger;
         private readonly IStore _store;
+        private readonly IPersistenceService _persistenceService;
         private readonly ConcurrentDictionary<Guid, ComponentConnection> _connections = new();
         private readonly ConcurrentDictionary<Guid, List<Guid>> _sourceToConnectionMap = new();
         private readonly ConcurrentDictionary<Guid, List<Guid>> _targetToConnectionMap = new();
         private readonly SemaphoreSlim _lock = new(1, 1);
+        private readonly ConditionEvaluator _conditionEvaluator;
+        private bool _isInitialized = false;
+        private bool _isDisposed = false;
 
         /// <summary>
         /// Creates a new topology service instance
         /// </summary>
         /// <param name="logger">Logger for recording events</param>
         /// <param name="store">Store for persisting connections</param>
-        public TopologyService(IHydroGardenLogger logger, IStore store)
+        /// <param name="persistenceService">Service for accessing component properties</param>
+        public TopologyService(IHydroGardenLogger logger, IStore store, IPersistenceService persistenceService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _store = store ?? throw new ArgumentNullException(nameof(store));
+            _persistenceService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
+            _conditionEvaluator = new ConditionEvaluator(_persistenceService);
         }
 
         /// <summary>
@@ -34,14 +41,20 @@ namespace HydroGarden.Foundation.Core.Services
         /// <param name="ct">Cancellation token</param>
         public async Task InitializeAsync(CancellationToken ct = default)
         {
+            if (_isInitialized)
+                return;
+
             await _lock.WaitAsync(ct);
 
             try
             {
                 _logger.Log("Initializing topology service");
 
+                // Use a fixed GUID for topology storage
+                var topologyStoreId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
                 // Load connections from storage
-                var connectionsData = await _store.LoadAsync(Guid.Parse("00000000-0000-0000-0000-000000000001"), ct);
+                var connectionsData = await _store.LoadAsync(topologyStoreId, ct);
                 if (connectionsData != null && connectionsData.TryGetValue("Connections", out var rawConnections) &&
                     rawConnections is List<ComponentConnection> connections)
                 {
@@ -56,6 +69,8 @@ namespace HydroGarden.Foundation.Core.Services
                 {
                     _logger.Log("No connections found in storage, starting with empty topology");
                 }
+
+                _isInitialized = true;
             }
             catch (Exception ex)
             {
@@ -71,6 +86,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <inheritdoc />
         public async Task<IReadOnlyList<IComponentConnection>> GetConnectionsForSourceAsync(Guid sourceId, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
             if (!_sourceToConnectionMap.TryGetValue(sourceId, out var connectionIds))
             {
                 return Array.Empty<IComponentConnection>();
@@ -80,8 +98,7 @@ namespace HydroGarden.Foundation.Core.Services
             foreach (var connectionId in connectionIds)
             {
                 if (_connections.TryGetValue(connectionId, out var connection) &&
-                    connection.IsEnabled &&
-                    await EvaluateConnectionConditionAsync(connection, ct))
+                    connection.IsEnabled)
                 {
                     result.Add(connection);
                 }
@@ -93,6 +110,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <inheritdoc />
         public async Task<IReadOnlyList<IComponentConnection>> GetConnectionsForTargetAsync(Guid targetId, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
             if (!_targetToConnectionMap.TryGetValue(targetId, out var connectionIds))
             {
                 return Array.Empty<IComponentConnection>();
@@ -102,8 +122,7 @@ namespace HydroGarden.Foundation.Core.Services
             foreach (var connectionId in connectionIds)
             {
                 if (_connections.TryGetValue(connectionId, out var connection) &&
-                    connection.IsEnabled &&
-                    await EvaluateConnectionConditionAsync(connection, ct))
+                    connection.IsEnabled)
                 {
                     result.Add(connection);
                 }
@@ -115,6 +134,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <inheritdoc />
         public async Task<IComponentConnection> CreateConnectionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));
 
@@ -178,6 +200,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <inheritdoc />
         public async Task<bool> UpdateConnectionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));
 
@@ -234,6 +259,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <inheritdoc />
         public async Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
             if (connectionId == Guid.Empty)
                 throw new ArgumentException("Connection ID must be specified", nameof(connectionId));
 
@@ -262,22 +290,30 @@ namespace HydroGarden.Foundation.Core.Services
         }
 
         /// <inheritdoc />
-        public Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default)
+        public async Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
+            if (!_isInitialized)
+                await InitializeAsync(ct);
+
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
+
             if (string.IsNullOrWhiteSpace(connection.Condition))
-                return Task.FromResult(true); // No condition means it passes
+                return true; // No condition means it passes
 
             try
             {
-                return Task.FromResult(true);
-                //// Parse the condition expression
-                //var conditionEvaluator = new ConditionEvaluator(_persistenceService);
-                //return conditionEvaluator.EvaluateAsync(connection.SourceId, connection.TargetId, connection.Condition, ct);
+                return await _conditionEvaluator.EvaluateAsync(
+                    connection.SourceId,
+                    connection.TargetId,
+                    connection.Condition,
+                    ct);
             }
             catch (Exception ex)
             {
+                // Make sure to log the exception
                 _logger.Log(ex, $"Error evaluating condition for connection {connection.ConnectionId}");
-                return Task.FromResult(false); // Fail closed on errors
+                return false; // Fail closed on errors
             }
         }
 
@@ -343,14 +379,14 @@ namespace HydroGarden.Foundation.Core.Services
                 // Get all connections
                 var connections = _connections.Values.ToList();
 
-                // Save to storage
+                // Save to storage using a fixed GUID for topology data
+                var topologyStoreId = Guid.Parse("00000000-0000-0000-0000-000000000001");
                 var properties = new Dictionary<string, object>
                 {
                     ["Connections"] = connections
                 };
 
-                // Use a special ID for the topology data
-                await _store.SaveAsync(Guid.Parse("00000000-0000-0000-0000-000000000001"), properties, ct);
+                await _store.SaveAsync(topologyStoreId, properties, ct);
 
                 _logger.Log($"Saved {connections.Count} connections to storage");
             }
@@ -359,6 +395,14 @@ namespace HydroGarden.Foundation.Core.Services
                 _logger.Log(ex, "Error saving connections to storage");
                 throw;
             }
+        }
+        public async ValueTask DisposeAsync()
+        {
+            if (_isDisposed) return;
+
+            await Task.Run(() => _lock.Dispose());
+            _isDisposed = true;
+            GC.SuppressFinalize(this);
         }
     }
 }

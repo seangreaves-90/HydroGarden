@@ -2,7 +2,7 @@
 
 namespace HydroGarden.Foundation.Abstractions.Interfaces.Services
 {
-    public interface IPersistenceService
+    public interface IPersistenceService : IAsyncDisposable
     {
         /// <summary>
         /// Registers or updates a IIoTDevice component in the persistence layer.

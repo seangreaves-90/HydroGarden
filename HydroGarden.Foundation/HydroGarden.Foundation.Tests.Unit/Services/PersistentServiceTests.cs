@@ -10,7 +10,7 @@ using HydroGarden.Foundation.Core.Stores;
 using Moq;
 using Xunit;
 
-namespace HydroGarden.Foundation.Tests.Unit.PersistenceService
+namespace HydroGarden.Foundation.Tests.Unit.Services
 {
     public class PersistenceServiceMetadataTests : IAsyncDisposable
     {
