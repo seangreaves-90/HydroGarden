@@ -1,0 +1,671 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>HydroGarden.Foundation.Common</name>
+    </assembly>
+    <members>
+        <member name="T:HydroGarden.Foundation.Common.Events.ComponentConnection">
+            <summary>
+            Implementation of a connection between components
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.ConnectionId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.SourceId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.TargetId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.ConnectionType">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.IsEnabled">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.Condition">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.ComponentConnection.Metadata">
+            <inheritdoc />
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.HydroGardenEventBase">
+            <summary>
+            Base class for all HydroGarden events
+            </summary>
+            <summary>
+            Base class for all HydroGarden events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.EventId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.SourceId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.Timestamp">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.DeviceId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.EventType">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.HydroGarden#Foundation#Abstractions#Interfaces#Events#IHydroGardenEvent#RoutingData">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.RoutingData">
+            <summary>
+            Gets the routing data for this event (may be null)
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.#ctor(System.Guid,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new event base with default routing
+            </summary>
+            <param name="deviceId">The device ID</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.HydroGardenEventBase.#ctor(System.Guid,System.Guid,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new event base with separate device and source IDs
+            </summary>
+            <param name="deviceId">The device ID</param>
+            <param name="sourceId">The source ID</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent">
+            <summary>
+            Enhanced implementation of property changed event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.PropertyName">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.PropertyType">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.OldValue">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.NewValue">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.Metadata">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.#ctor(System.Guid,System.String,System.Type,System.Object,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new property changed event with the device ID as the source ID
+            </summary>
+            <param name="deviceId">The device ID</param>
+            <param name="propertyName">Name of the changed property</param>
+            <param name="propertyType">Type of the property</param>
+            <param name="oldValue">Previous value of the property</param>
+            <param name="newValue">New value of the property</param>
+            <param name="metadata">Metadata for the property</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.HydroGardenPropertyChangedEvent.#ctor(System.Guid,System.Guid,System.String,System.Type,System.Object,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new property changed event with separate device and source IDs
+            </summary>
+            <param name="deviceId">The device ID</param>
+            <param name="sourceId">The source ID</param>
+            <param name="propertyName">Name of the changed property</param>
+            <param name="propertyType">Type of the property</param>
+            <param name="oldValue">Previous value of the property</param>
+            <param name="newValue">New value of the property</param>
+            <param name="metadata">Metadata for the property</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.LifecycleEvent">
+            <summary>
+            Event for device lifecycle changes
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.LifecycleEvent.State">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.LifecycleEvent.Details">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.LifecycleEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.LifecycleEvent.#ctor(System.Guid,HydroGarden.Foundation.Abstractions.Interfaces.Components.ComponentState,System.String,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new lifecycle event
+            </summary>
+            <param name="deviceId">The source device ID</param>
+            <param name="state">The new state of the component</param>
+            <param name="details">Optional details about the state change</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.CommandEvent">
+            <summary>
+            Event for device commands
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.CommandEvent.CommandName">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.CommandEvent.Parameters">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.CommandEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.CommandEvent.#ctor(System.Guid,System.String,System.Collections.Generic.IDictionary{System.String,System.Object},HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new command event
+            </summary>
+            <param name="deviceId">The source device ID</param>
+            <param name="commandName">The name of the command to execute</param>
+            <param name="parameters">Optional command parameters</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.TelemetryEvent">
+            <summary>
+            Event for device telemetry/sensor readings
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.TelemetryEvent.Readings">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.TelemetryEvent.Units">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.TelemetryEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.TelemetryEvent.#ctor(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,System.String},HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new telemetry event
+            </summary>
+            <param name="deviceId">The source device ID</param>
+            <param name="readings">The telemetry readings</param>
+            <param name="units">Optional units of measurement</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.AlertEvent">
+            <summary>
+            Event for alerts/notifications
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.AlertEvent.Severity">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.AlertEvent.Message">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.AlertEvent.AlertData">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.AlertEvent.IsAcknowledged">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.AlertEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.AlertEvent.#ctor(System.Guid,HydroGarden.Foundation.Abstractions.Interfaces.Events.AlertSeverity,System.String,System.Collections.Generic.IDictionary{System.String,System.Object},HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new alert event
+            </summary>
+            <param name="deviceId">The source device ID</param>
+            <param name="severity">The severity of the alert</param>
+            <param name="message">The alert message</param>
+            <param name="alertData">Optional additional data</param>
+            <param name="routingData">Optional routing data</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventBus">
+            <summary>
+            Implements a robust EventBus with support for:
+            - Event prioritization and parallel processing.
+            - Retry policies for failed event handling.
+            - Event transformation before delivery.
+            - Dead-letter queue for failed events.
+            - Dynamic runtime subscription management.
+            - Event correlation for tracking event chains.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventBus.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventStore,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRetryPolicy,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventTransformer,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Common.Events.EventBus"/> class.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventBus.Subscribe(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions)">
+            <summary>
+            Subscribes an event handler to the bus.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventBus.Unsubscribe(System.Guid)">
+            <summary>
+            Unsubscribes an event handler from the bus.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventBus.PublishAsync(System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Threading.CancellationToken)">
+            <summary>
+            Publishes an event to the event bus.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventBus.Dispose">
+            <summary>
+            Disposes the event bus, ensuring all resources are properly released.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventHandlerExtensions">
+            <summary>
+            Extension methods for the IHydroGardenEventHandler interface to support various event types.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles a standard HydroGarden event.
+            This method should be implemented by consumers to handle specific event types.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleLifecycleEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenLifecycleEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles a lifecycle event. Override this method to provide custom implementation.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleCommandEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenCommandEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles a command event. Override this method to provide custom implementation.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleTelemetryEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenTelemetryEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles a telemetry event. Override this method to provide custom implementation.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleAlertEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles an alert event. Override this method to provide custom implementation.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventHandlerExtensions.HandleGenericEventAsync(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles a generic event. Override this method to provide custom implementation.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventQueueItem">
+            <summary>
+            Represents an event item queued for processing.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventRoutingData">
+            <summary>
+            Contains routing information for events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventRoutingData.TargetIds">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventRoutingData.Persist">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventRoutingData.Priority">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventRoutingData.RequiresAcknowledgment">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventRoutingData.Timeout">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingData.#ctor">
+            <summary>
+            Creates a new instance of EventRoutingData with default values.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingData.#ctor(System.Guid[])">
+            <summary>
+            Creates a new instance of EventRoutingData with the specified target IDs.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingData.CreateBuilder">
+            <summary>
+            Creates a builder for fluent configuration of event routing data.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder">
+            <summary>
+            Builder class for fluent configuration of event routing data.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.WithTargets(System.Guid[])">
+            <summary>
+            Configures the specific target component IDs that should receive this event.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.WithPersistence(System.Boolean)">
+            <summary>
+            Configures whether the event should be persisted.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.WithPriority(HydroGarden.Foundation.Abstractions.Interfaces.Events.EventPriority)">
+            <summary>
+            Configures the priority of the event which affects the order of processing.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.AsCritical">
+            <summary>
+            Configures the event as critical priority.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.AsHighPriority">
+            <summary>
+            Configures the event as high priority.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.AsLowPriority">
+            <summary>
+            Configures the event as low priority.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.WithAcknowledgment(System.Boolean)">
+            <summary>
+            Configures whether the publisher requires acknowledgment of event delivery.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.WithTimeout(System.TimeSpan)">
+            <summary>
+            Configures the maximum time to wait for event processing to complete when
+            RequiresAcknowledgment is true.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventRoutingDataBuilder.Build">
+            <summary>
+            Builds and returns the configured event routing data.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventSubscription">
+            <summary>
+            Represents an event subscription
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscription.Id">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscription.Handler">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscription.Options">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscription.#ctor(System.Guid,HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions)">
+            <summary>
+            Creates a new event subscription
+            </summary>
+            <param name="id">Unique identifier</param>
+            <param name="handler">Event handler</param>
+            <param name="options">Subscription options</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions">
+            <summary>
+            Implementation of the subscription options that control which events a subscriber receives.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.EventTypes">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.SourceIds">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.Filter">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.IncludeConnectedSources">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.Synchronous">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.#ctor">
+            <summary>
+            Creates a new instance of EventSubscriptionOptions with default values.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType[])">
+            <summary>
+            Creates a new instance of EventSubscriptionOptions with specified event types.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptions.CreateBuilder">
+            <summary>
+            Creates a builder for fluent configuration of subscription options.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder">
+            <summary>
+            Builder class for fluent configuration of event subscription options.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.WithEventTypes(HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType[])">
+            <summary>
+            Configures the event types the subscription is interested in.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.WithSourceIds(System.Guid[])">
+            <summary>
+            Configures the source IDs the subscription is interested in.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.WithFilter(System.Func{HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Boolean})">
+            <summary>
+            Configures a custom filter function for additional filtering logic.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.WithConnectedSources(System.Boolean)">
+            <summary>
+            Configures whether to include events from connected sources.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.WithSynchronousHandling(System.Boolean)">
+            <summary>
+            Configures whether the handler should be called synchronously.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.EventSubscriptionOptionsBuilder.Build">
+            <summary>
+            Builds and returns the configured subscription options.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.RetryPolicies.ExponentialBackoffRetryPolicy">
+            <summary>
+            Implements an exponential backoff retry policy for failed event deliveries.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Events.RetryPolicies.ExponentialBackoffRetryPolicy.ShouldRetryAsync(HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Int32)">
+            <summary>
+            Determines whether an event should be retried based on the attempt count.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.Stores.DeadLetterEventStore">
+            <summary>
+            Stores failed events for later retrieval and reprocessing.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Events.Transforms.DefaultEventTransformer">
+            <summary>
+            Default implementation of event transformation. Can be extended to modify event data.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Logging.HydroGardenLogger">
+            <summary>
+            Provides logging functionality for HydroGarden components.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Logging.HydroGardenLogger.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Common.Logging.HydroGardenLogger"/> class.
+            </summary>
+            <param name="logDirectory">The directory where logs should be stored.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Logging.HydroGardenLogger.Log(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Logging.HydroGardenLogger.Log(System.Exception,System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.Logging.HydroGardenLogger.Log(System.Object,System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata">
+            <summary>
+            Represents metadata for a property in HydroGarden components.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata.IsEditable">
+            <summary>
+            Gets or sets a value indicating whether the property is editable.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata.IsVisible">
+            <summary>
+            Gets or sets a value indicating whether the property is visible.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata.DisplayName">
+            <summary>
+            Gets or sets the display name of the property.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata.Description">
+            <summary>
+            Gets or sets the description of the property.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata.#ctor(System.Boolean,System.Boolean,System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Common.PropertyMetadata.PropertyMetadata"/> class.
+            </summary>
+            <param name="isEditable">Indicates if the property is editable.</param>
+            <param name="isVisible">Indicates if the property is visible.</param>
+            <param name="displayName">The display name of the property.</param>
+            <param name="description">The description of the property.</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor">
+            <summary>
+            Processes event queues based on priority levels and manages event execution asynchronously.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger,System.Int32)">
+            <summary>
+            Initializes a new instance of the EventQueueProcessor class.
+            </summary>
+            <param name="logger">Logger instance for tracking events.</param>
+            <param name="maxConcurrentProcessing">Maximum concurrent tasks for processing each priority queue.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor.Enqueue(HydroGarden.Foundation.Common.Events.EventQueueItem)">
+            <summary>
+            Enqueues an event item into the appropriate priority queue.
+            </summary>
+            <param name="item">The event queue item to enqueue.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor.StartProcessingTasks">
+            <summary>
+            Starts background tasks to process event queues based on priority levels.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor.ProcessQueue(HydroGarden.Foundation.Abstractions.Interfaces.Events.EventPriority,System.Threading.CancellationToken)">
+            <summary>
+            Processes events in the queue for a specific priority level.
+            </summary>
+            <param name="priority">The event priority level.</param>
+            <param name="ct">Cancellation token for task management.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Common.QueueProcessor.EventQueueProcessor.Dispose">
+            <summary>
+            Disposes resources and stops event queue processing.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Common.Results.PublishResult">
+            <summary>
+            Result of an event publish operation
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.EventId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.HandlerCount">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.SuccessCount">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.IsComplete">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.TimedOut">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.Errors">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Common.Results.PublishResult.HandlerTasks">
+            <inheritdoc />
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent">
+            <summary>
+            Event fired when a property value changes on a component
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.DeviceId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.PropertyName">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.PropertyType">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.OldValue">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.NewValue">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.Metadata">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.EventId">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.Timestamp">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.EventType">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.RoutingData">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.HydroGarden#Foundation#Abstractions#Interfaces#Events#IHydroGardenEvent#RoutingData">
+            <inheritdoc />
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.SourceId">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.EventHandlers.HydroGardenPropertyChangedEvent.#ctor(System.Guid,System.Guid,System.String,System.Type,System.Object,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData)">
+            <summary>
+            Creates a new property changed event
+            </summary>
+            <param name="deviceId">The component that fired the event</param>
+            <param name="sourceId"></param>
+            <param name="propertyName">The name of the property that changed</param>
+            <param name="propertyType">The type of the property</param>
+            <param name="oldValue">The previous value</param>
+            <param name="newValue">The new value</param>
+            <param name="metadata">Metadata about the property</param>
+            <param name="routingData">Optional routing information</param>
+        </member>
+    </members>
+</doc>

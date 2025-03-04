@@ -1,0 +1,393 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>HydroGarden.Foundation.Core</name>
+    </assembly>
+    <members>
+        <member name="T:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase">
+            <summary>
+            Base class for IoT devices in the HydroGarden system.
+            Implements the <see cref="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice"/> interface and provides lifecycle management.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.#ctor(System.Guid,System.String,HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase"/> class.
+            </summary>
+            <param name="id">The unique identifier of the device.</param>
+            <param name="name">The name of the device.</param>
+            <param name="logger">Optional logger instance.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.InitializeAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.OnInitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs device-specific initialization logic.
+            Override this method to customize initialization behavior.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.StartAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.OnStartAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs device-specific startup logic.
+            Override this method to implement custom start behavior.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.StopAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.OnStopAsync(System.Threading.CancellationToken)">
+            <summary>
+            Performs device-specific stop logic.
+            Override this method to implement custom stop behavior.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.IoTDeviceBase.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Components.Devices.PumpDevice">
+            <summary>
+            Represents a pump device in the HydroGarden system.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.#ctor(System.Guid,System.String,System.Double,System.Double,HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Core.Components.Devices.PumpDevice"/> class.
+            </summary>
+            <param name="id">The unique identifier of the pump.</param>
+            <param name="name">The name of the pump.</param>
+            <param name="maxFlowRate">The maximum flow rate of the pump.</param>
+            <param name="minFlowRate">The minimum flow rate of the pump.</param>
+            <param name="logger">Optional logger instance.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.SetFlowRateAsync(System.Double)">
+            <summary>
+            Sets the flow rate of the pump asynchronously.
+            </summary>
+            <param name="value">The desired flow rate.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.OnInitializeAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.OnStartAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.OnStopAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.Devices.PumpDevice.Dispose">
+            <inheritdoc/>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase">
+            <summary>
+            Base class for all HydroGarden components, implementing common functionality such as property management and event handling.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.#ctor(System.Guid,System.String,HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase"/> class.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="name">The name of the component.</param>
+            <param name="logger">Optional logger instance.</param>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.Id">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.Name">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.AssemblyType">
+            <inheritdoc/>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.State">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.SetEventHandler(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.SetPropertyAsync(System.String,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.UpdatePropertyOptimisticAsync``1(System.String,System.Func{``0,``0})">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.GetPropertyAsync``1(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.GetPropertyMetadata(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.GetProperties">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.GetAllPropertyMetadata">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.LoadPropertiesAsync(System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata})">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.PublishPropertyChangeAsync(System.String,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata,System.Object)">
+            <summary>
+            Publishes a property change event to registered event handlers
+            </summary>
+            <param name="name">The name of the property that changed</param>
+            <param name="value">The new property value</param>
+            <param name="metadata">Metadata about the property</param>
+            <param name="oldValue">The previous property value (optional)</param>
+            <returns>A task representing the asynchronous operation</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Components.HydroGardenComponentBase.Dispose">
+            <inheritdoc/>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Serialization.ComponentPropertiesConverter">
+            <summary>
+            Custom JSON converter for serializing and deserializing HydroGarden components.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Serialization.ComponentPropertiesConverter.CanConvert(System.Type)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Serialization.ComponentPropertiesConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Serialization.ComponentPropertiesConverter.Write(System.Text.Json.Utf8JsonWriter,System.Object,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Serialization.PropertyMetadataConverter">
+            <summary>
+            Custom JSON converter for serializing and deserializing property metadata.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Serialization.PropertyMetadataConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Serialization.PropertyMetadataConverter.Write(System.Text.Json.Utf8JsonWriter,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata,System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Services.PersistenceService">
+            <summary>
+            The PersistenceService is responsible for managing device properties, persisting them to storage,
+            and propagating changes via the event bus.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Services.PersistenceService.IsBatchProcessingEnabled">
+            <summary>
+            Enables or disables batch processing of events.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Services.PersistenceService.ForceTransactionCreation">
+            <summary>
+            Forces transaction creation even when there are no pending events (for testing).
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Core.Services.PersistenceService.TestEvent">
+            <summary>
+            Stores a test event for validation in testing environments.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus)">
+            <summary>
+            Initializes the PersistenceService.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus,HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger,System.Int32,System.Nullable{System.TimeSpan})">
+            <summary>
+            Initializes the PersistenceService with configurable options.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.AddOrUpdateAsync``1(``0,System.Threading.CancellationToken)">
+            <summary>
+            Registers a new device or updates an existing device's properties.
+            Ensures component properties are loaded and stored efficiently.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.GetPropertyAsync``1(System.Guid,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves a stored property value for a given device.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.HandleEventAsync(System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles property change events from IoT devices.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.ProcessPendingEventsAsync">
+            <summary>
+            Manually triggers batch processing of pending events.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.ProcessEventsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Asynchronously processes queued events in batches.
+            This method continuously reads from the event channel and persists updates.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.PersistPendingEventsAsync(System.Collections.Generic.Dictionary{System.Guid,System.Collections.Generic.Dictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent}})">
+            <summary>
+            Persists batched property change events to the database.
+            </summary>
+            <param name="pendingEvents">A dictionary of device property updates.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.PersistenceService.DisposeAsync">
+            <summary>
+            Disposes the persistence service asynchronously.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Services.TopologyService">
+            <summary>
+            Implementation of the topology service for managing device connections
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.#ctor(HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger,HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore)">
+            <summary>
+            Creates a new topology service instance
+            </summary>
+            <param name="logger">Logger for recording events</param>
+            <param name="store">Store for persisting connections</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Initializes the topology service by loading connections from storage
+            </summary>
+            <param name="ct">Cancellation token</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.GetConnectionsForSourceAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.GetConnectionsForTargetAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.CreateConnectionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.UpdateConnectionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.DeleteConnectionAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Services.TopologyService.EvaluateConnectionConditionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Stores.JsonStore">
+            <summary>
+            JsonStore provides a persistent key-value store using JSON file storage.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.#ctor(System.String,HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger)">
+            <summary>
+            Initializes the JsonStore with a specified base path for storage and a logger.
+            </summary>
+            <param name="basePath">The directory where the store file will be saved.</param>
+            <param name="logger">Logger for capturing store-related logs.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Begins a new store transaction with thread safety.
+            </summary>
+            <param name="ct">Cancellation token for async operation.</param>
+            <returns>An instance of JsonStoreTransaction.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.LoadAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Loads the stored properties for a specific component.
+            </summary>
+            <param name="id">The component ID.</param>
+            <param name="ct">Cancellation token.</param>
+            <returns>Dictionary of properties if found, otherwise null.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.LoadMetadataAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Loads metadata associated with a specific component.
+            </summary>
+            <param name="id">The component ID.</param>
+            <param name="ct">Cancellation token.</param>
+            <returns>Dictionary of metadata if found, otherwise null.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.SaveAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Threading.CancellationToken)">
+            <summary>
+            Saves properties for a component without metadata.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.SaveWithMetadataAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata},System.Threading.CancellationToken)">
+            <summary>
+            Saves properties and metadata for a component.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.LoadStoreAsync(System.Threading.CancellationToken)">
+            <summary>
+            Loads the entire store from a JSON file.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.SaveStoreAsync(System.Collections.Generic.Dictionary{System.String,HydroGarden.Foundation.Core.Stores.JsonStore.ComponentStore},System.Threading.CancellationToken)">
+            <summary>
+            Saves the current store state to a JSON file.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.DeserializeComponentProperties(System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Deserializes stored JSON properties into a usable dictionary.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStore.DeserializeJsonElement(System.Text.Json.JsonElement)">
+            <summary>
+            Converts JsonElement to a strongly typed object.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Stores.JsonStore.ComponentStore">
+            <summary>
+            Represents a stored component with properties and metadata.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction">
+            <summary>
+            Represents a transaction for a JSON-based store.
+            Ensures atomic operations within the store and allows commit or rollback.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.#ctor(HydroGarden.Foundation.Core.Stores.JsonStore,System.Collections.Generic.Dictionary{System.String,HydroGarden.Foundation.Core.Stores.JsonStore.ComponentStore})">
+            <summary>
+            Initializes a new instance of the <see cref="T:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction"/> class.
+            </summary>
+            <param name="store">The JSON store associated with this transaction.</param>
+            <param name="currentState">The current state of the store.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.SaveAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Saves the provided properties in the working state using the given ID.
+            </summary>
+            <param name="id">The unique identifier for the component.</param>
+            <param name="properties">The properties to save.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.SaveWithMetadataAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata})">
+            <summary>
+            Saves the provided properties and metadata in the working state using the given ID.
+            </summary>
+            <param name="id">The unique identifier for the component.</param>
+            <param name="properties">The properties to save.</param>
+            <param name="metadata">Optional metadata associated with the properties.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.CommitAsync(System.Threading.CancellationToken)">
+            <summary>
+            Commits the transaction by persisting the working state to the store.
+            </summary>
+            <param name="ct">Cancellation token.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.RollbackAsync(System.Threading.CancellationToken)">
+            <summary>
+            Rolls back the transaction by marking it as rolled back.
+            Note: This does not revert the changes explicitly, but prevents committing them.
+            </summary>
+            <param name="ct">Cancellation token.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Core.Stores.JsonStoreTransaction.DisposeAsync">
+            <summary>
+            Disposes of the transaction, ensuring rollback if not committed.
+            </summary>
+        </member>
+    </members>
+</doc>
