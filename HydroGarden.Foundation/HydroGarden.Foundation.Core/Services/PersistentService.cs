@@ -286,6 +286,41 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
+        public async Task<List<(Guid Id, string Name, IDictionary<string, object> Properties, IDictionary<string, IPropertyMetadata> Metadata)>> GetAllStoredDevices()
+        {
+            var storedDevices = new List<(Guid Id, string Name, IDictionary<string, object>, IDictionary<string, IPropertyMetadata>)>();
+
+            foreach (var deviceId in _deviceProperties.Keys)
+            {
+                var properties = await LoadDevicePropertiesAsync(deviceId);
+                var metadata = await LoadDeviceMetadataAsync(deviceId);
+
+                if (properties != null && properties.TryGetValue("Name", out var nameObj) && nameObj is string name)
+                {
+                    storedDevices.Add((deviceId, name, properties, metadata ?? new Dictionary<string, IPropertyMetadata>()));
+                }
+            }
+
+            return storedDevices;
+        }
+
+        /// <summary>
+        /// Loads stored properties for a specific device ID.
+        /// </summary>
+        private async Task<IDictionary<string, object>> LoadDevicePropertiesAsync(Guid deviceId)
+        {
+            return await _store.LoadAsync(deviceId) ?? new Dictionary<string, object>();
+        }
+
+        /// <summary>
+        /// Loads stored metadata for a specific device ID.
+        /// </summary>
+        private async Task<IDictionary<string, IPropertyMetadata>> LoadDeviceMetadataAsync(Guid deviceId)
+        {
+            return await _store.LoadMetadataAsync(deviceId) ?? new Dictionary<string, IPropertyMetadata>();
+        }
+
+
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;

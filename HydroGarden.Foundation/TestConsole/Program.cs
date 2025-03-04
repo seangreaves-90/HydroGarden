@@ -8,6 +8,8 @@ using HydroGarden.Foundation.Core.Components.Devices;
 using HydroGarden.Foundation.Core.Services;
 using HydroGarden.Foundation.Core.Stores;
 using HydroGarden.Foundation.Common.PropertyMetadata;
+using System.Text.Json;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 
 namespace TestConsole
 {
@@ -15,7 +17,7 @@ namespace TestConsole
     {
         static async Task Main(string[] args)
         {
-            Console.WriteLine("🌱 HydroGarden Pump Device Test Console 🌱");
+            Console.WriteLine("🌱 HydroGarden Device Test Console 🌱");
             Console.WriteLine("=========================================");
 
             // Setup services
@@ -31,11 +33,11 @@ namespace TestConsole
 
             try
             {
-                await TestPumpDevice(logger, persistenceService);
+                await LoadOrCreateDevices(logger, persistenceService);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Test failed with error: {ex.Message}");
+                Console.WriteLine($"❌ Error: {ex.Message}");
                 Console.WriteLine(ex.StackTrace);
             }
             finally
@@ -47,27 +49,121 @@ namespace TestConsole
             Console.ReadKey();
         }
 
-        static async Task TestPumpDevice(HydroGardenLogger logger, PersistenceService persistenceService)
+        /// <summary>
+        /// Loads existing devices from the JSON store or creates a new one if no file exists.
+        /// </summary>
+        static async Task LoadOrCreateDevices(HydroGardenLogger logger, PersistenceService persistenceService)
         {
-            // Create pump device
+            Console.WriteLine("\n🔍 Checking for stored devices...");
+
+            var deviceDataPath = Path.Combine(Directory.GetCurrentDirectory(), "DeviceData", "ComponentProperties.json");
+            List<PumpDevice> devices = new();
+
+            if (File.Exists(deviceDataPath))
+            {
+                Console.WriteLine("📂 Found existing device data. Loading devices...");
+                devices = await LoadDevicesFromFile(deviceDataPath, logger);
+            }
+
+            if (devices.Count == 0)
+            {
+                Console.WriteLine("❌ No devices found. Creating a new pump device...");
+                var newPump = await CreateNewPumpDevice(logger, persistenceService);
+                devices.Add(newPump);
+            }
+
+            Console.WriteLine("\n📋 Available Devices:");
+            for (int i = 0; i < devices.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {devices[i].Name} (ID: {devices[i].Id})");
+            }
+
+            Console.Write("\nEnter the number of the device to test or 'N' to create a new one: ");
+            var input = Console.ReadLine();
+
+            if (input?.Trim().ToUpper() == "N")
+            {
+                var newPump = await CreateNewPumpDevice(logger, persistenceService);
+                await TestPumpDevice(newPump, persistenceService);
+            }
+            else if (int.TryParse(input, out int choice) && choice > 0 && choice <= devices.Count)
+            {
+                var selectedDevice = devices[choice - 1];
+                Console.WriteLine($"\n✅ Selected Device: {selectedDevice.Name}");
+                await TestPumpDevice(selectedDevice, persistenceService);
+            }
+            else
+            {
+                Console.WriteLine("❌ Invalid selection. Exiting...");
+            }
+        }
+
+        /// <summary>
+        /// Reads stored devices from the JSON file.
+        /// </summary>
+        static async Task<List<PumpDevice>> LoadDevicesFromFile(string filePath, HydroGardenLogger logger)
+        {
+            var devices = new List<PumpDevice>();
+
+            try
+            {
+                var json = await File.ReadAllTextAsync(filePath);
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("Devices", out var devicesElement) && devicesElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var deviceElement in devicesElement.EnumerateArray())
+                    {
+                        var id = Guid.Parse(deviceElement.GetProperty("Id").GetString() ?? Guid.NewGuid().ToString());
+                        var name = deviceElement.GetProperty("Properties").GetProperty("Name").GetString() ?? "Unknown Device";
+
+                        var properties = JsonSerializer.Deserialize<Dictionary<string, object>>(
+                            deviceElement.GetProperty("Properties").GetRawText()) ?? new();
+
+                        var metadata = JsonSerializer.Deserialize<Dictionary<string, IPropertyMetadata>>(
+                            deviceElement.GetProperty("Metadata").GetRawText()) ?? new();
+
+                        var pump = new PumpDevice(id, name, 100, 0, logger);
+                        await pump.LoadPropertiesAsync(properties, metadata);
+                        devices.Add(pump);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error loading devices: {ex.Message}");
+            }
+
+            return devices;
+        }
+
+        /// <summary>
+        /// Creates a new pump device, saves it, and returns it.
+        /// </summary>
+        static async Task<PumpDevice> CreateNewPumpDevice(HydroGardenLogger logger, PersistenceService persistenceService)
+        {
             var pumpId = Guid.NewGuid();
-            Console.WriteLine($"Creating pump with ID: {pumpId}");
-
-            using var pump = new PumpDevice(pumpId, "Test Pump", 100, 0, logger);
+            var pump = new PumpDevice(pumpId, "Test Pump", 100, 0, logger);
             await persistenceService.AddOrUpdateAsync(pump);
+            Console.WriteLine($"✅ New pump device created with ID: {pumpId}");
+            return pump;
+        }
 
-
+        /// <summary>
+        /// Runs tests on a selected pump device.
+        /// </summary>
+        static async Task TestPumpDevice(PumpDevice pump, PersistenceService persistenceService)
+        {
             await DisplayPumpStatus(pump);
 
-            // Set flow rate with metadata
-            Console.WriteLine("\nSetting flow rate to 50%...");
+            Console.WriteLine("\n🔄 Setting flow rate to 50%...");
             var metadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
             await pump.SetPropertyAsync("FlowRate", 50, metadata);
+            await persistenceService.AddOrUpdateAsync(pump);
             await DisplayPumpStatus(pump);
 
-            // Start the pump asynchronously
-            Console.WriteLine("\nStarting pump...");
-
+            Console.WriteLine("\n▶️ Starting pump...");
             using var pumpCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var pumpCompletionSource = new TaskCompletionSource<bool>();
 
@@ -80,68 +176,43 @@ namespace TestConsole
                 }
                 catch (OperationCanceledException)
                 {
-                    Console.WriteLine("Pump operation was canceled as expected");
+                    Console.WriteLine("⏹ Pump operation was canceled.");
                     pumpCompletionSource.TrySetResult(true);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error in pump operation: {ex.Message}");
+                    Console.WriteLine($"❌ Pump error: {ex.Message}");
                     pumpCompletionSource.TrySetException(ex);
                 }
             });
 
-            Console.WriteLine("Pump is running...");
             await Task.Delay(2000);
             await DisplayPumpStatus(pump);
 
-            // Adjust flow rate while running
-            Console.WriteLine("\nAdjusting flow rate to 75%...");
-            await pump.SetPropertyAsync("FlowRate", 75, metadata);
-            await Task.Delay(2000);
-            await DisplayPumpStatus(pump);
-
-            // Wait for user input to stop the pump manually
-            Console.WriteLine("\nPress any key to stop the pump...");
+            Console.WriteLine("\n⏹ Press any key to stop the pump...");
             Console.ReadKey(true);
 
-            Console.WriteLine("Stopping pump...");
+            Console.WriteLine("⏹ Stopping pump...");
             pumpCts.Cancel();
             await pump.StopAsync();
             await Task.WhenAny(pumpCompletionSource.Task, Task.Delay(3000));
 
             await DisplayPumpStatus(pump);
-            Console.WriteLine("Pump test completed successfully!");
+            await persistenceService.AddOrUpdateAsync(pump);
+            Console.WriteLine("✅ Pump test completed successfully!");
         }
 
+        /// <summary>
+        /// Displays the current status of a pump device.
+        /// </summary>
         static async Task DisplayPumpStatus(PumpDevice pump)
         {
-            Console.WriteLine("\n--- Pump Status ---");
-
-            var flowRate = await pump.GetPropertyAsync<double>("FlowRate");
-            var currentFlowRate = await pump.GetPropertyAsync<double>("CurrentFlowRate");
-            var isRunning = await pump.GetPropertyAsync<bool>("IsRunning");
-            var state = await pump.GetPropertyAsync<ComponentState>("State");
-            var timestamp = await pump.GetPropertyAsync<DateTime?>("Timestamp");
-
-            var metadata = pump.GetPropertyMetadata("FlowRate");
-
-            Console.WriteLine($"State: {state}");
-            Console.WriteLine($"Flow Rate Setting: {flowRate}%");
-            Console.WriteLine($"Current Flow Rate: {currentFlowRate:F2}%");
-            Console.WriteLine($"Running: {isRunning}");
-            Console.WriteLine($"Last Update: {timestamp?.ToString() ?? "N/A"}");
-
-            // Display metadata information
-            if (metadata != null)
-            {
-                Console.WriteLine("--- Property Metadata ---");
-                Console.WriteLine($"Display Name: {metadata.DisplayName}");
-                Console.WriteLine($"Description: {metadata.Description}");
-                Console.WriteLine($"Editable: {metadata.IsEditable}");
-                Console.WriteLine($"Visible: {metadata.IsVisible}");
-            }
-
-            Console.WriteLine("------------------");
+            Console.WriteLine("\n--- 🔍 Pump Status ---");
+            Console.WriteLine($"📌 State: {await pump.GetPropertyAsync<ComponentState>("State")}");
+            Console.WriteLine($"💧 Flow Rate: {await pump.GetPropertyAsync<double>("FlowRate")}%");
+            Console.WriteLine($"⚡ Current Flow: {await pump.GetPropertyAsync<double>("CurrentFlowRate")}%");
+            Console.WriteLine($"▶️ Running: {await pump.GetPropertyAsync<bool>("IsRunning")}");
+            Console.WriteLine("----------------------");
         }
     }
 }
