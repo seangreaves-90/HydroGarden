@@ -66,14 +66,18 @@ namespace HydroGarden.Foundation.Core.Components
             UpdateClassProperty(name, value);
             _properties[name] = value;
 
-            if (metadata != null)
+            // If no metadata provided, get the default for this property
+            if (metadata == null)
             {
-                _propertyMetadata[name] = new PropertyMetadata(metadata.IsEditable, metadata.IsVisible, metadata.DisplayName, metadata.Description);
+                metadata = ConstructDefaultPropertyMetadata(name);
             }
-            else if (!_propertyMetadata.ContainsKey(name))
-            {
-                _propertyMetadata[name] = new PropertyMetadata(true, true, name, $"Property {name}");
-            }
+
+            // Store the metadata
+            _propertyMetadata[name] = new PropertyMetadata(
+                metadata.IsEditable,
+                metadata.IsVisible,
+                metadata.DisplayName,
+                metadata.Description);
 
             if (!Equals(oldValue, value))
             {
@@ -122,15 +126,31 @@ namespace HydroGarden.Foundation.Core.Components
         /// <param name="isEditable">Indicates whether the property is editable.</param>
         /// <param name="isVisible">Indicates whether the property is visible.</param>
         /// <returns>The default <see cref="IPropertyMetadata"/> for the property.</returns>
-        public virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true) =>
-            name switch
+        public virtual IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true)
+        {
+            // Use a dictionary approach for well-known properties with predefined metadata
+            var knownPropertyDefaults = new Dictionary<string, (bool IsEditable, bool IsVisible, string DisplayName, string Description)>
             {
-                "State" => new PropertyMetadata(false, true, "Component State", "The current state of the component"),
-                "Id" => new PropertyMetadata(false, true, "Component ID", "The unique identifier of the component"),
-                "Name" => new PropertyMetadata(true, true, "Component Name", "The name of the component"),
-                "AssemblyType" => new PropertyMetadata(false, true, "Component Type", "The assembly type of the component"),
-                _ => new PropertyMetadata(isEditable, isVisible, name, $"Property {name}")
+                // Core component properties
+                { "State", (false, true, "Component State", "The current state of the component") },
+                { "Id", (false, true, "Component ID", "The unique identifier of the component") },
+                { "Name", (true, true, "Component Name", "The name of the component") },
+                { "AssemblyType", (false, true, "Component Type", "The assembly type of the component") }
             };
+
+            // If the property is in our known list, use those values
+            if (knownPropertyDefaults.TryGetValue(name, out var defaults))
+            {
+                return new PropertyMetadata(
+                    defaults.IsEditable,
+                    defaults.IsVisible,
+                    defaults.DisplayName,
+                    defaults.Description);
+            }
+
+            // Otherwise, use the provided default values
+            return new PropertyMetadata(isEditable, isVisible, name, $"Property {name}");
+        }
 
 
 

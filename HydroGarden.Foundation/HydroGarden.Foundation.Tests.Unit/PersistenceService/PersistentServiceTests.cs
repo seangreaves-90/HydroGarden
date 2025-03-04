@@ -225,6 +225,25 @@ namespace HydroGarden.Foundation.Tests.Unit.PersistenceService
         }
 
         [Fact]
+        public async Task State_PropertyMetadata_ShouldBeNonEditable()
+        {
+            // Arrange
+            var deviceId = Guid.NewGuid();
+            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+
+            // Act
+            await pump.InitializeAsync();
+
+            // Get the metadata for the State property
+            var stateMetadata = pump.GetPropertyMetadata("State");
+
+            // Assert
+            stateMetadata.Should().NotBeNull();
+            stateMetadata.IsEditable.Should().BeFalse("State property should not be editable");
+            stateMetadata.DisplayName.Should().Be("Device State");
+        }
+
+        [Fact]
         public async Task ProcessPendingEvents_ShouldPreserveAllMetadata_EvenForPropertiesNotUpdatedInCurrentBatch()
         {
             // Arrange
