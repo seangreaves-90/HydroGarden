@@ -107,36 +107,62 @@ namespace TestConsole
 
             try
             {
+                // Read the JSON file content
                 var json = await File.ReadAllTextAsync(filePath);
                 using var document = JsonDocument.Parse(json);
                 var root = document.RootElement;
 
+                // Ensure the JSON contains a "Devices" array
                 if (root.TryGetProperty("Devices", out var devicesElement) && devicesElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var deviceElement in devicesElement.EnumerateArray())
                     {
+                        // Extract device ID
                         var id = Guid.Parse(deviceElement.GetProperty("Id").GetString() ?? Guid.NewGuid().ToString());
+
+                        // Extract device name
                         var name = deviceElement.GetProperty("Properties").GetProperty("Name").GetString() ?? "Unknown Device";
 
+                        // Deserialize properties dictionary
                         var properties = JsonSerializer.Deserialize<Dictionary<string, object>>(
                             deviceElement.GetProperty("Properties").GetRawText()) ?? new();
 
-                        var metadata = JsonSerializer.Deserialize<Dictionary<string, IPropertyMetadata>>(
+                        // Deserialize metadata into Dictionary<string, PropertyMetadata>
+                        var metadata = JsonSerializer.Deserialize<Dictionary<string, PropertyMetadata>>(
                             deviceElement.GetProperty("Metadata").GetRawText()) ?? new();
 
+                        // 🔥 Convert Dictionary<string, PropertyMetadata> to IDictionary<string, IPropertyMetadata>
+                        IDictionary<string, IPropertyMetadata> convertedMetadata = metadata.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => (IPropertyMetadata)kvp.Value // ✅ Explicitly cast PropertyMetadata to IPropertyMetadata
+                        );
+
+                        // Create a new PumpDevice instance
                         var pump = new PumpDevice(id, name, 100, 0, logger);
-                        await pump.LoadPropertiesAsync(properties, metadata);
+
+                        // Load the stored properties and metadata into the pump device
+                        await pump.LoadPropertiesAsync(properties, convertedMetadata);
+
+                        // Add the pump device to the list
                         devices.Add(pump);
+
+                        Console.WriteLine($"✅ Loaded Device: {name} (ID: {id})");
                     }
+                }
+                else
+                {
+                    Console.WriteLine("❌ No 'Devices' array found in JSON.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error loading devices: {ex.Message}");
+                Console.WriteLine($"❌ Error loading devices from file: {ex.Message}");
             }
 
             return devices;
         }
+
+
 
         /// <summary>
         /// Creates a new pump device, saves it, and returns it.
