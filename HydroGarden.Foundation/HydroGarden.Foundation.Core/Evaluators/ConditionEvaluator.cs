@@ -69,58 +69,57 @@ namespace HydroGarden.Foundation.Core.Services
 
         private (string deviceId, string propertyName, string op, string value) ParseCondition(string condition)
         {
-            // Check if the condition is completely invalid
-            if (!ContainsAnyOperator(condition))
+            // Check for null or empty
+            if (string.IsNullOrWhiteSpace(condition))
             {
-                throw new ArgumentException($"Invalid condition format (missing operator): {condition}");
+                return (null, null, null, null);
             }
 
-            // Handle the simplest case: PropertyName [operator] Value
-            // Example: "Temperature > 25" or "source.Temperature > 25" or "target.IsActive == true"
+            // Try to parse the condition into deviceId.propertyName, operator, and value
+            string[] operators = { ">=", "<=", "==", "!=", ">", "<", "=" };
+            string foundOperator = null;
+            int operatorIndex = -1;
 
-            // Split by known operators
-            foreach (var op in new[] { "==", "!=", ">=", "<=", ">", "<" })
+            foreach (var op in operators)
             {
-                if (condition.Contains(op))
+                int index = condition.IndexOf(op);
+                if (index >= 0)
                 {
-                    var parts = condition.Split(new[] { op }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length == 2)
-                    {
-                        var leftPart = parts[0].Trim();
-                        var rightPart = parts[1].Trim();
-
-                        // Check if there's a device prefix (source./target.)
-                        string deviceId = "source"; // Default to source
-                        string propertyName;
-
-                        if (leftPart.StartsWith("source.", StringComparison.OrdinalIgnoreCase))
-                        {
-                            deviceId = "source";
-                            propertyName = leftPart.Substring(7).Trim(); // Remove "source."
-                        }
-                        else if (leftPart.StartsWith("target.", StringComparison.OrdinalIgnoreCase))
-                        {
-                            deviceId = "target";
-                            propertyName = leftPart.Substring(7).Trim(); // Remove "target."
-                        }
-                        else
-                        {
-                            // No device prefix, just a property name
-                            propertyName = leftPart;
-                        }
-
-                        // Remove quotes from string values
-                        if (rightPart.StartsWith("\"") && rightPart.EndsWith("\""))
-                        {
-                            rightPart = rightPart.Substring(1, rightPart.Length - 2);
-                        }
-
-                        return (deviceId, propertyName, op, rightPart);
-                    }
+                    // Found an operator
+                    foundOperator = op;
+                    operatorIndex = index;
+                    break;
                 }
             }
 
-            throw new ArgumentException($"Invalid condition format: {condition}");
+            // Handle case where no operator is found
+            if (foundOperator == null || operatorIndex <= 0)
+            {
+                return (null, null, null, null);
+            }
+
+            string leftSide = condition.Substring(0, operatorIndex).Trim();
+            string rightSide = condition.Substring(operatorIndex + foundOperator.Length).Trim();
+
+            // Handle quoted strings - remove the surrounding quotes
+            if (rightSide.StartsWith("\"") && rightSide.EndsWith("\"") && rightSide.Length >= 2)
+            {
+                rightSide = rightSide.Substring(1, rightSide.Length - 2);
+            }
+
+            // Parse the property reference to extract deviceId and propertyName
+            string deviceId = "source"; // Default to source if no prefix
+            string propertyName = leftSide;
+
+            // Check if the property reference includes a deviceId prefix
+            int dotIndex = leftSide.IndexOf('.');
+            if (dotIndex > 0)
+            {
+                deviceId = leftSide.Substring(0, dotIndex).Trim();
+                propertyName = leftSide.Substring(dotIndex + 1).Trim();
+            }
+
+            return (deviceId, propertyName, foundOperator, rightSide);
         }
 
         private bool ContainsAnyOperator(string condition)

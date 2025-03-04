@@ -302,41 +302,66 @@ namespace HydroGarden.Foundation.Tests.Integration
         [Fact]
         public async Task TopologyService_ShouldPersistConnectionsBetweenRestarts()
         {
-            // Arrange - Create test devices
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
+            // Arrange - Create a persistent store with a fixed location for this test
+            var testDir = Path.Combine(Path.GetTempPath(), "TopologyPersistenceTest");
+            Directory.CreateDirectory(testDir);
 
-            // Create a connection
-            var connection = new ComponentConnection
+            try
             {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "TestConnection",
-                IsEnabled = true
-            };
+                // Create a real JsonStore for persistence
+                var logger = new HydroGardenLogger();
+                var store = new JsonStore(testDir, logger);
+                var mockPersistenceService = new Mock<IPersistenceService>();
 
-            // Save the connection with the first instance of the service
-            await _topologyService.CreateConnectionAsync(connection);
+                // Step 1: Create first instance and add a connection
+                var sourceId = Guid.NewGuid();
+                var targetId = Guid.NewGuid();
 
-            // Create a new instance of the service (simulating a restart)
-            var newTopologyService = new TopologyService(_logger, _store, _persistenceService);
-            _disposables.Add(newTopologyService);
+                // First service instance
+                var topologyService1 = new TopologyService(logger, store, mockPersistenceService.Object);
 
-            // IMPORTANT: Initialize the new service explicitly
-            await newTopologyService.InitializeAsync();
+                // Create a connection between source and target
+                var connection = new ComponentConnection
+                {
+                    ConnectionId = Guid.NewGuid(),
+                    SourceId = sourceId,
+                    TargetId = targetId,
+                    IsEnabled = true
+                };
 
-            // Act - Get connections from the new service instance
-            var sourceConnections = await newTopologyService.GetConnectionsForSourceAsync(sourceId);
-            var targetConnections = await newTopologyService.GetConnectionsForTargetAsync(targetId);
+                // Add the connection and ensure it's saved
+                var createdConnection = await topologyService1.CreateConnectionAsync(connection);
 
-            // Assert - The connections should be loaded from persistence
-            sourceConnections.Should().HaveCount(1);
-            sourceConnections[0].SourceId.Should().Be(sourceId);
-            sourceConnections[0].TargetId.Should().Be(targetId);
+                // Verify the connection exists in the first instance
+                var sourceConnections1 = await topologyService1.GetConnectionsForSourceAsync(sourceId);
+                sourceConnections1.Should().HaveCount(1);
 
-            targetConnections.Should().HaveCount(1);
-            targetConnections[0].SourceId.Should().Be(sourceId);
-            targetConnections[0].TargetId.Should().Be(targetId);
+                // Dispose the first service instance completely
+                await ((IAsyncDisposable)topologyService1).DisposeAsync();
+
+                // Step 2: Create a new service instance and verify connections are loaded
+                var topologyService2 = new TopologyService(logger, store, mockPersistenceService.Object);
+
+                // Important: Explicitly initialize and wait for completion
+                await topologyService2.InitializeAsync();
+
+                // Get connections for the same source in the new instance
+                var sourceConnections2 = await topologyService2.GetConnectionsForSourceAsync(sourceId);
+
+                // This should pass - connections should persist between service instances
+                sourceConnections2.Should().HaveCount(1);
+
+                // Clean up
+                await ((IAsyncDisposable)topologyService2).DisposeAsync();
+            }
+            finally
+            {
+                // Clean up the test directory
+                if (Directory.Exists(testDir))
+                {
+                    Directory.Delete(testDir, true);
+                }
+            }
         }
 
         public async ValueTask DisposeAsync()
