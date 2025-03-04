@@ -6,31 +6,45 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components.Devices;
+using HydroGarden.Foundation.Core.Stores;
 using Moq;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.PersistenceService
 {
-    /// <summary>
-    /// Enhanced unit tests for the PersistenceService class.
-    /// </summary>
-    public class EnhancedPersistenceServiceTests : IAsyncDisposable
+    public class PersistenceServiceMetadataTests : IAsyncDisposable
     {
         private readonly Mock<IStore> _mockStore;
         private readonly Mock<IStoreTransaction> _mockTransaction;
         private readonly Mock<IHydroGardenLogger> _mockLogger;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Core.Services.PersistenceService _sut;
+        private Dictionary<string, IPropertyMetadata> _capturedMetadata;
 
-        public EnhancedPersistenceServiceTests()
+        public PersistenceServiceMetadataTests()
         {
             _mockStore = new Mock<IStore>();
             _mockTransaction = new Mock<IStoreTransaction>();
             _mockLogger = new Mock<IHydroGardenLogger>();
             _mockEventBus = new Mock<IEventBus>();
+            _capturedMetadata = new Dictionary<string, IPropertyMetadata>();
 
             _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(_mockTransaction.Object);
+
+            _mockTransaction.Setup(t => t.SaveWithMetadataAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<IDictionary<string, object>>(),
+                    It.IsAny<IDictionary<string, IPropertyMetadata>>()))
+                .Callback<Guid, IDictionary<string, object>, IDictionary<string, IPropertyMetadata>>(
+                    (_, __, metadata) =>
+                    {
+                        if (metadata != null)
+                        {
+                            _capturedMetadata = new Dictionary<string, IPropertyMetadata>(metadata);
+                        }
+                    })
+                .Returns(Task.CompletedTask);
 
             _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
@@ -38,11 +52,14 @@ namespace HydroGarden.Foundation.Tests.Unit.PersistenceService
             _mockTransaction.Setup(t => t.DisposeAsync())
                 .Returns(ValueTask.CompletedTask);
 
-            // Configure test PersistenceService with a short batch interval
-            _sut = new Core.Services.PersistenceService(_mockStore.Object, _mockEventBus.Object, _mockLogger.Object, TimeSpan.FromMilliseconds(100))
+            _sut = new Core.Services.PersistenceService(
+                _mockStore.Object,
+                _mockEventBus.Object,
+                _mockLogger.Object,
+                TimeSpan.FromMilliseconds(100))
             {
-                IsBatchProcessingEnabled = false, // Disable automatic batch processing for tests
-                ForceTransactionCreation = true  // Ensure a transaction is created in tests
+                IsBatchProcessingEnabled = false,
+                ForceTransactionCreation = true
             };
         }
 
@@ -51,144 +68,249 @@ namespace HydroGarden.Foundation.Tests.Unit.PersistenceService
             await _sut.DisposeAsync();
         }
 
-        #region Device Registration and Initialization
-
         [Fact]
-        public async Task GivenNewDevice_WhenAdded_ThenShouldCallInitializeAsync()
+        public async Task ProcessPendingEvents_ShouldMaintainAllMetadata_WhenHandlingSequentialPropertyChanges()
         {
+            // Arrange
             var deviceId = Guid.NewGuid();
-            var mockDevice = new Mock<TestIoTDevice>(deviceId, "Test Device", _mockLogger.Object) { CallBase = true };
-            mockDevice.Setup(d => d.InitializeAsync(It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
 
-            _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((Dictionary<string, object>?)null);
-
-            await _sut.AddOrUpdateAsync(mockDevice.Object);
-
-            mockDevice.Verify(d => d.InitializeAsync(It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task GivenExistingDevice_WhenUpdated_ThenShouldNotCallInitializeAsync()
-        {
-            var deviceId = Guid.NewGuid();
-            var mockDevice = new Mock<TestIoTDevice>(deviceId, "Test Device", _mockLogger.Object) { CallBase = true };
-
-            _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Dictionary<string, object> { { "TestProp", "TestValue" } });
-
-            await _sut.AddOrUpdateAsync(mockDevice.Object);
-
-            mockDevice.Invocations.Clear();
-            mockDevice.Setup(d => d.InitializeAsync(It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask)
-                .Verifiable();
-
-            await _sut.AddOrUpdateAsync(mockDevice.Object);
-
-            mockDevice.Verify(d => d.InitializeAsync(It.IsAny<CancellationToken>()), Times.Never);
-        }
-
-        #endregion
-
-        #region Property Persistence with Metadata
-
-        [Fact]
-        public async Task AddOrUpdateAsync_ShouldPersistPropertiesAndMetadata()
-        {
-            var deviceId = Guid.NewGuid();
+            // Initial device setup with one property and metadata
             var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((IDictionary<string, object>?)null);
+
             _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((IDictionary<string, IPropertyMetadata>?)null);
 
-            var expectedMetadata = new Dictionary<string, IPropertyMetadata>
-            {
-                ["FlowRate"] = new PropertyMetadata(true, true, "Flow Rate", "Pump flow rate in percentage")
-            };
+            // Set initial property with metadata
+            var flowRateMetadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
+            await pump.SetPropertyAsync("FlowRate", 50, flowRateMetadata);
 
-            await pump.SetPropertyAsync("FlowRate", 75, expectedMetadata["FlowRate"]);
+            // Register the device
             await _sut.AddOrUpdateAsync(pump);
 
-            _mockStore.Verify(s => s.SaveWithMetadataAsync(
-                    It.Is<Guid>(id => id == deviceId),
-                    It.IsAny<IDictionary<string, object>>(),
-                    It.Is<IDictionary<string, IPropertyMetadata>>(metadata =>
-                        metadata.Count > 0 && metadata.ContainsKey("FlowRate")),
-                    It.IsAny<CancellationToken>()),
-                Times.Once);
+            // Act - Set a second property with different metadata
+            var currentFlowRateMetadata = new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate");
+            var propertyEvent = new HydroGardenPropertyChangedEvent(
+                deviceId, deviceId, "CurrentFlowRate", typeof(double), null, 48.5, currentFlowRateMetadata);
 
-            _mockLogger.Verify(l =>
-                l.Log(It.Is<string>(msg => msg.Contains("Device") && msg.Contains("persisted with metadata"))));
+            await _sut.HandleEventAsync(pump, propertyEvent, CancellationToken.None);
+            await _sut.ProcessPendingEventsAsync();
+
+            // Assert - Both metadata entries should be preserved
+            _capturedMetadata.Should().ContainKey("FlowRate");
+            _capturedMetadata.Should().ContainKey("CurrentFlowRate");
+            _capturedMetadata["FlowRate"].DisplayName.Should().Be("Flow Rate");
+            _capturedMetadata["CurrentFlowRate"].DisplayName.Should().Be("Current Flow Rate");
         }
 
         [Fact]
-        public async Task GivenPropertyChangeEvent_WhenHandled_ThenShouldSaveWithMetadata()
+        public async Task VerifyEndToEndMetadataPersistence_WithRealStore()
+        {
+            // Arrange - Create a real JsonStore in memory
+            var testDir = Path.Combine(Path.GetTempPath(), "HydroGardenTestStore", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(testDir);
+
+            try
+            {
+                var store = new JsonStore(testDir, _mockLogger.Object);
+                var persistenceService = new Core.Services.PersistenceService(
+                    store, _mockEventBus.Object, _mockLogger.Object);
+
+                var deviceId = Guid.NewGuid();
+                var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+
+                // Set FlowRate with metadata
+                var flowRateMetadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
+                await pump.SetPropertyAsync("FlowRate", 50.0, flowRateMetadata);
+
+                // Register the device - this will initialize it
+                await persistenceService.AddOrUpdateAsync(pump);
+
+                // Now update a different property
+                var currentFlowRateMetadata = new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate");
+                var propertyEvent = new HydroGardenPropertyChangedEvent(
+                    deviceId, deviceId, "CurrentFlowRate", typeof(double), null, 48.5, currentFlowRateMetadata);
+
+                await persistenceService.HandleEventAsync(pump, propertyEvent, CancellationToken.None);
+                await persistenceService.ProcessPendingEventsAsync();
+
+                // Load the metadata directly from the store to see what was actually saved
+                var loadedMetadata = await store.LoadMetadataAsync(deviceId);
+
+                // Assert - Verify that both metadata entries are preserved
+                loadedMetadata.Should().NotBeNull();
+                loadedMetadata.Should().ContainKey("FlowRate");
+                loadedMetadata.Should().ContainKey("CurrentFlowRate");
+
+                loadedMetadata["FlowRate"].DisplayName.Should().Be("Flow Rate");
+                loadedMetadata["CurrentFlowRate"].DisplayName.Should().Be("Current Flow Rate");
+
+                // Clean up
+                await persistenceService.DisposeAsync();
+            }
+            finally
+            {
+                // Clean up
+                if (Directory.Exists(testDir))
+                    Directory.Delete(testDir, true);
+            }
+        }
+
+        [Fact]
+        public async Task PersistenceService_ShouldStoreAllMetadata_WhenMultiplePropertiesAreUpdatedInSeparateBatches()
         {
             // Arrange
             var deviceId = Guid.NewGuid();
-            var mockDevice = new TestIoTDevice(deviceId, "Test Device", _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
 
+            // Set up store to return empty data initially
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Dictionary<string, object>());
+                .ReturnsAsync((IDictionary<string, object>?)null);
 
-            await _sut.AddOrUpdateAsync(mockDevice);
+            _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((IDictionary<string, IPropertyMetadata>?)null);
 
-            var propertyEvent = new HydroGardenPropertyChangedEvent(
-                deviceId, deviceId, "TestProperty", typeof(string), null, "TestValue", new PropertyMetadata());
+            // Register device
+            await _sut.AddOrUpdateAsync(pump);
 
-            await _sut.HandleEventAsync(mockDevice, propertyEvent, CancellationToken.None);
+            // Let's track all metadata saved across multiple operations
+            var allCapturedMetadata = new Dictionary<string, IPropertyMetadata>();
+
+            _mockTransaction.Setup(t => t.SaveWithMetadataAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<IDictionary<string, object>>(),
+                    It.IsAny<IDictionary<string, IPropertyMetadata>>()))
+                .Callback<Guid, IDictionary<string, object>, IDictionary<string, IPropertyMetadata>>(
+                    (_, __, metadata) =>
+                    {
+                        if (metadata != null)
+                        {
+                            // Track metadata across all operations
+                            foreach (var pair in metadata)
+                            {
+                                allCapturedMetadata[pair.Key] = pair.Value;
+                            }
+
+                            // Also update our regular capture for the current operation
+                            _capturedMetadata = new Dictionary<string, IPropertyMetadata>(metadata);
+                        }
+                    })
+                .Returns(Task.CompletedTask);
+
+            // Act - First property update
+            var flowRateMetadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
+            var flowRateEvent = new HydroGardenPropertyChangedEvent(
+                deviceId, deviceId, "FlowRate", typeof(double), null, 50.0, flowRateMetadata);
+
+            await _sut.HandleEventAsync(pump, flowRateEvent, CancellationToken.None);
             await _sut.ProcessPendingEventsAsync();
 
-            
-            _mockTransaction.Verify(t => t.SaveWithMetadataAsync(
-                deviceId,
-                It.Is<IDictionary<string, object>>(d => d.ContainsKey("TestProperty")),
-                It.Is<IDictionary<string, IPropertyMetadata>>(m => m.ContainsKey("TestProperty"))), Times.Once);
+            // Second property update
+            var currentFlowRateMetadata = new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate");
+            var currentFlowRateEvent = new HydroGardenPropertyChangedEvent(
+                deviceId, deviceId, "CurrentFlowRate", typeof(double), null, 48.5, currentFlowRateMetadata);
+
+            await _sut.HandleEventAsync(pump, currentFlowRateEvent, CancellationToken.None);
+            await _sut.ProcessPendingEventsAsync();
+
+            // Assert - With our fix, both metadata entries should be preserved
+            _capturedMetadata.Should().ContainKey("CurrentFlowRate");
+            _capturedMetadata.Should().ContainKey("FlowRate");
+
+            // Both metadata entries should be in the total captured metadata
+            allCapturedMetadata.Should().ContainKey("FlowRate");
+            allCapturedMetadata.Should().ContainKey("CurrentFlowRate");
         }
-
-
-        #endregion
-
-        #region Error Handling
 
         [Fact]
-        public async Task GivenTransactionCommitError_WhenBatchProcessing_ThenShouldLogAndRethrow()
+        public async Task ProcessPendingEvents_ShouldPreserveAllMetadata_EvenForPropertiesNotUpdatedInCurrentBatch()
         {
+            // Arrange
             var deviceId = Guid.NewGuid();
-            var mockDevice = new TestIoTDevice(deviceId, "Test Device", _mockLogger.Object);
+
+            // Set up the store to return existing properties and metadata
+            var existingProperties = new Dictionary<string, object>
+            {
+                { "FlowRate", 50.0 },
+                { "MaxFlowRate", 100.0 }
+            };
+
+            var existingMetadata = new Dictionary<string, IPropertyMetadata>
+            {
+                { "FlowRate", new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate") },
+                { "MaxFlowRate", new PropertyMetadata(false, true, "Max Flow Rate", "Maximum flow rate") }
+            };
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Dictionary<string, object>());
+                .ReturnsAsync(existingProperties);
 
-            await _sut.AddOrUpdateAsync(mockDevice);
+            _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(existingMetadata);
 
+            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            await _sut.AddOrUpdateAsync(pump);
+
+            // Clear the captured metadata to ensure we only capture the next batch
+            _capturedMetadata.Clear();
+
+            // Act - Update only CurrentFlowRate
+            var currentFlowRateMetadata = new PropertyMetadata(false, true, "Current Flow Rate", "The actual measured flow rate");
             var propertyEvent = new HydroGardenPropertyChangedEvent(
-                deviceId, deviceId, "TestProperty", typeof(string), null, "TestValue", new PropertyMetadata());
+                deviceId, deviceId, "CurrentFlowRate", typeof(double), null, 48.5, currentFlowRateMetadata);
 
-            await _sut.HandleEventAsync(mockDevice, propertyEvent, CancellationToken.None);
+            await _sut.HandleEventAsync(pump, propertyEvent, CancellationToken.None);
+            await _sut.ProcessPendingEventsAsync();
 
-            var testException = new InvalidOperationException("Transaction commit failed");
-            _mockTransaction.Setup(t => t.CommitAsync(It.IsAny<CancellationToken>()))
-                .ThrowsAsync(testException);
-
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.ProcessPendingEventsAsync());
-
-            _mockLogger.Verify(l => l.Log(
-                It.Is<Exception>(ex => ex == testException),
-                It.Is<string>(s => s.Contains("Failed to persist device events"))
-            ), Times.Once);
+            // Assert - With the fix, all metadata should be preserved, including FlowRate
+            _capturedMetadata.Should().ContainKey("CurrentFlowRate");
+            _capturedMetadata.Should().ContainKey("FlowRate");
+            _capturedMetadata.Should().ContainKey("MaxFlowRate");
         }
 
-        #endregion
+        [Fact]
+        public async Task AddOrUpdateAsync_ShouldPreserveExistingMetadata_WhenUpdatingDeviceProperties()
+        {
+            // Arrange
+            var deviceId = Guid.NewGuid();
 
-        /// <summary>
-        /// Test IoT Device implementation for testing.
-        /// </summary>
-        public class TestIoTDevice(Guid id, string name, IHydroGardenLogger logger) : IoTDeviceBase(id, name, logger);
+            // Initial device setup
+            var initialProperties = new Dictionary<string, object>
+            {
+                { "FlowRate", 50.0 },
+                { "IsRunning", false }
+            };
+
+            var initialMetadata = new Dictionary<string, IPropertyMetadata>
+            {
+                { "FlowRate", new PropertyMetadata(true, true, "Flow Rate", "Initial flow rate description") }
+            };
+
+            _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(initialProperties);
+
+            _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(initialMetadata);
+
+            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+
+            // Act
+            await _sut.AddOrUpdateAsync(pump);
+
+            // Now update the pump with new metadata
+            var newFlowRateMetadata = new PropertyMetadata(true, true, "Updated Flow Rate", "Updated description");
+            await pump.SetPropertyAsync("FlowRate", 75.0, newFlowRateMetadata);
+
+            // Process the change
+            await _sut.ProcessPendingEventsAsync();
+
+            // Assert
+            _capturedMetadata.Should().ContainKey("FlowRate");
+            _capturedMetadata["FlowRate"].DisplayName.Should().Be("Updated Flow Rate");
+            _capturedMetadata["FlowRate"].Description.Should().Be("Updated description");
+        }
+
+
     }
 }

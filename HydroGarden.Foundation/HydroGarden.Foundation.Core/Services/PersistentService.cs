@@ -4,20 +4,19 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Logging;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace HydroGarden.Foundation.Core.Services
 {
-    /// <summary>
-    /// The PersistenceService is responsible for managing device properties, persisting them to storage,
-    /// and propagating changes via the event bus.
-    /// </summary>
     public class PersistenceService : IPersistenceService, IHydroGardenPropertyChangedEventHandler
     {
         private readonly IStore _store;
         private readonly IEventBus _eventBus;
         private readonly IHydroGardenLogger _logger;
         private readonly Dictionary<Guid, Dictionary<string, object>> _deviceProperties;
+        // Add a new field to track metadata for all devices
+        private readonly Dictionary<Guid, Dictionary<string, IPropertyMetadata>> _deviceMetadata;
         private readonly Channel<IHydroGardenPropertyChangedEvent> _eventChannel;
         private readonly CancellationTokenSource _processingCts = new();
         private readonly Task _processingTask;
@@ -25,32 +24,15 @@ namespace HydroGarden.Foundation.Core.Services
         private readonly TimeSpan _batchInterval;
         private bool _isDisposed;
 
-        /// <summary>
-        /// Enables or disables batch processing of events.
-        /// </summary>
         public bool IsBatchProcessingEnabled { get; set; } = true;
-
-        /// <summary>
-        /// Forces transaction creation even when there are no pending events (for testing).
-        /// </summary>
         public bool ForceTransactionCreation { get; set; } = false;
-
-        /// <summary>
-        /// Stores a test event for validation in testing environments.
-        /// </summary>
         public IHydroGardenPropertyChangedEvent? TestEvent { get; set; }
 
-        /// <summary>
-        /// Initializes the PersistenceService.
-        /// </summary>
         public PersistenceService(IStore store, IEventBus eventBus)
             : this(store, eventBus, new HydroGardenLogger(), TimeSpan.FromSeconds(5))
         {
         }
 
-        /// <summary>
-        /// Initializes the PersistenceService with configurable options.
-        /// </summary>
         public PersistenceService(IStore store, IEventBus eventBus, IHydroGardenLogger logger, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -58,27 +40,24 @@ namespace HydroGarden.Foundation.Core.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _batchInterval = batchInterval ?? TimeSpan.FromSeconds(5);
             _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>();
+            // Initialize the metadata dictionary
+            _deviceMetadata = new Dictionary<Guid, Dictionary<string, IPropertyMetadata>>();
             _eventChannel = Channel.CreateUnbounded<IHydroGardenPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
         }
 
-        /// <summary>
-        /// Registers a new device or updates an existing device's properties.
-        /// Ensures component properties are loaded and stored efficiently.
-        /// </summary>
         public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice
         {
             if (component == null)
                 throw new ArgumentNullException(nameof(component));
 
             component.SetEventHandler(this);
-
             bool containsDevice = _deviceProperties.ContainsKey(component.Id);
-
             if (!containsDevice)
             {
                 _logger.Log($"[INFO] Registering new device {component.Id}");
                 _deviceProperties[component.Id] = new Dictionary<string, object>();
+                _deviceMetadata[component.Id] = new Dictionary<string, IPropertyMetadata>();
             }
             else
             {
@@ -87,19 +66,21 @@ namespace HydroGarden.Foundation.Core.Services
 
             var storedProperties = await _store.LoadAsync(component.Id, ct);
             var storedMetadata = await _store.LoadMetadataAsync(component.Id, ct);
-
             if (storedProperties != null)
             {
                 _deviceProperties[component.Id] = new Dictionary<string, object>(storedProperties);
 
-                // Ensure that metadata is loaded correctly
+                // Load stored metadata into our tracking dictionary
                 if (storedMetadata != null && storedMetadata.Count > 0)
                 {
+                    _deviceMetadata[component.Id] = new Dictionary<string, IPropertyMetadata>(storedMetadata);
                     _logger.Log($"[INFO] Metadata loaded for device {component.Id}");
                 }
                 else
                 {
                     _logger.Log($"[WARNING] No metadata found for device {component.Id}");
+                    // Ensure we have a metadata dictionary even if none was loaded
+                    _deviceMetadata[component.Id] = new Dictionary<string, IPropertyMetadata>();
                 }
 
                 await component.LoadPropertiesAsync(storedProperties, storedMetadata);
@@ -109,16 +90,15 @@ namespace HydroGarden.Foundation.Core.Services
             {
                 var deviceProps = component.GetProperties();
                 var deviceMetadata = component.GetAllPropertyMetadata();
-
                 if (deviceProps.Count > 0)
                 {
                     _deviceProperties[component.Id] = new Dictionary<string, object>(deviceProps);
 
+                    // Store the initial metadata in our tracking dictionary
+                    _deviceMetadata[component.Id] = new Dictionary<string, IPropertyMetadata>(deviceMetadata);
+
                     _logger.Log($"[DEBUG] Saving metadata: {deviceMetadata.Count} entries found.");
-
-                    // Ensure metadata is actually being saved
                     await _store.SaveWithMetadataAsync(component.Id, deviceProps, deviceMetadata, ct);
-
                     _logger.Log($"[INFO] Device {component.Id} persisted with metadata.");
                 }
                 else
@@ -133,9 +113,6 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-        /// <summary>
-        /// Retrieves a stored property value for a given device.
-        /// </summary>
         public Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default)
         {
             if (_deviceProperties.TryGetValue(deviceId, out var properties) && properties.TryGetValue(propertyName, out var value))
@@ -145,15 +122,11 @@ namespace HydroGarden.Foundation.Core.Services
             return Task.FromResult(default(T?));
         }
 
-        /// <summary>
-        /// Handles property change events from IoT devices.
-        /// </summary>
         public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
         {
             if (evt is IHydroGardenPropertyChangedEvent propertyChangedEvent)
             {
                 _logger.Log($"[DEBUG] Handling property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
-
                 try
                 {
                     if (!_deviceProperties.TryGetValue(propertyChangedEvent.DeviceId, out var properties))
@@ -162,7 +135,21 @@ namespace HydroGarden.Foundation.Core.Services
                         _deviceProperties[propertyChangedEvent.DeviceId] = properties;
                     }
 
+                    // Also ensure we have a metadata dictionary for this device
+                    if (!_deviceMetadata.TryGetValue(propertyChangedEvent.DeviceId, out var metadata))
+                    {
+                        metadata = new Dictionary<string, IPropertyMetadata>();
+                        _deviceMetadata[propertyChangedEvent.DeviceId] = metadata;
+                    }
+
+                    // Update the property value
                     properties[propertyChangedEvent.PropertyName] = propertyChangedEvent.NewValue ?? new object();
+
+                    // Store the metadata from this event in our tracking dictionary
+                    if (propertyChangedEvent.Metadata != null)
+                    {
+                        metadata[propertyChangedEvent.PropertyName] = propertyChangedEvent.Metadata;
+                    }
 
                     await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
                     await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
@@ -170,7 +157,6 @@ namespace HydroGarden.Foundation.Core.Services
                 catch (Exception ex)
                 {
                     _logger.Log(ex, $"[ERROR] Failed to handle property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
-                    // Don't rethrow - we're explicitly testing error handling
                 }
             }
             else
@@ -179,14 +165,9 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-
-        /// <summary>
-        /// Manually triggers batch processing of pending events.
-        /// </summary>
         public async Task ProcessPendingEventsAsync()
         {
             var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
-
             while (_eventChannel.Reader.TryRead(out var evt))
             {
                 if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
@@ -208,10 +189,6 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-        /// <summary>
-        /// Asynchronously processes queued events in batches.
-        /// This method continuously reads from the event channel and persists updates.
-        /// </summary>
         private async Task ProcessEventsAsync(CancellationToken ct)
         {
             var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
@@ -222,8 +199,6 @@ namespace HydroGarden.Foundation.Core.Services
                 while (!ct.IsCancellationRequested)
                 {
                     bool hasEvents = false;
-
-                    // Process all queued events
                     while (_eventChannel.Reader.TryRead(out var evt))
                     {
                         hasEvents = true;
@@ -235,7 +210,6 @@ namespace HydroGarden.Foundation.Core.Services
                         deviceEvents[evt.PropertyName] = evt;
                     }
 
-                    // Either process events immediately or wait for the batch timer to expire
                     if (hasEvents || !await batchTimer.WaitForNextTickAsync(ct))
                     {
                         if (pendingEvents.Count > 0)
@@ -256,10 +230,6 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-        /// <summary>
-        /// Persists batched property change events to the database.
-        /// </summary>
-        /// <param name="pendingEvents">A dictionary of device property updates.</param>
         private async Task PersistPendingEventsAsync(Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>> pendingEvents)
         {
             if (pendingEvents.Count == 0) return;
@@ -270,7 +240,6 @@ namespace HydroGarden.Foundation.Core.Services
                 try
                 {
                     _logger.Log($"[INFO] Persisting {pendingEvents.Count} batched device events.");
-
                     await using var transaction = await _store.BeginTransactionAsync();
 
                     foreach (var (deviceId, deviceEvents) in pendingEvents)
@@ -281,21 +250,25 @@ namespace HydroGarden.Foundation.Core.Services
                             _deviceProperties[deviceId] = properties;
                         }
 
-                        var metadataDictionary = new Dictionary<string, IPropertyMetadata>();
+                        // Use our tracked metadata for the device to ensure we preserve all metadata
+                        if (!_deviceMetadata.TryGetValue(deviceId, out var allDeviceMetadata))
+                        {
+                            allDeviceMetadata = new Dictionary<string, IPropertyMetadata>();
+                            _deviceMetadata[deviceId] = allDeviceMetadata;
+                        }
 
+                        // Update properties and metadata from events
                         foreach (var (propName, evt) in deviceEvents)
                         {
                             properties[propName] = evt.NewValue ?? new object();
-
-                            // Ensure metadata is retrieved and persisted
                             if (evt.Metadata != null)
                             {
-                                metadataDictionary[propName] = evt.Metadata;
+                                allDeviceMetadata[propName] = evt.Metadata;
                             }
                         }
 
-                        // Save properties along with metadata
-                        await transaction.SaveWithMetadataAsync(deviceId, properties, metadataDictionary);
+                        // Send ALL metadata to the transaction
+                        await transaction.SaveWithMetadataAsync(deviceId, properties, allDeviceMetadata);
                     }
 
                     await transaction.CommitAsync();
@@ -313,30 +286,21 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-
-        /// <summary>
-        /// Disposes the persistence service asynchronously.
-        /// </summary>
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
-
             _isDisposed = true;
             _processingCts.Cancel();
-
             try
             {
                 await _processingTask;
             }
             catch (OperationCanceledException)
             {
-                // Ignore the cancellation exception
             }
-
             _processingCts.Dispose();
             _transactionLock.Dispose();
             GC.SuppressFinalize(this);
         }
-
     }
 }
