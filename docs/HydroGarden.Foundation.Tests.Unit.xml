@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>HydroGarden.Foundation.Tests.Unit</name>
+    </assembly>
+    <members>
+        <member name="T:HydroGarden.Foundation.Tests.Unit.Events.EventBusSubscriptionTests">
+            <summary>
+            Specialized test class that isolates the subscription behavior without
+            relying on complex asynchronous event processing.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests">
+            <summary>
+            Enhanced unit tests for the PersistenceService class.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenNewDevice_WhenAdded_ThenShouldCallInitializeAsync">
+            <summary>
+            Tests that the service correctly calls InitializeAsync when a new device is registered.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenExistingDevice_WhenUpdated_ThenShouldNotCallInitializeAsync">
+            <summary>
+            Tests that the service does not call InitializeAsync when an existing device is updated.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenLargeNumberOfEvents_WhenProcessed_ThenShouldHandleEfficiently">
+            <summary>
+            Tests that the service correctly handles a large number of property events.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenNullPropertyValue_WhenHandled_ThenShouldStoreDefaultObject">
+            <summary>
+            Tests that the service correctly handles null values in property events.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenNonExistentDeviceId_WhenPropertyQueried_ThenShouldReturnNull">
+            <summary>
+            Tests that the service correctly handles device IDs that don't exist.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenDeviceWithMetadata_WhenLoaded_ThenShouldPassMetadataToDevice">
+            <summary>
+            Tests that the service correctly handles loading metadata for stored properties.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenMultipleDevicePropertyChanges_WhenProcessed_ThenShouldBatchPerDevice">
+            <summary>
+            Tests that the service correctly persists property changes in batches.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenPropertyChangeEvent_WhenHandled_ThenShouldPublishToEventBus">
+            <summary>
+            Tests that the service correctly republishes property change events to the EventBus.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenExceptionInEventHandling_WhenPropertyChanged_ThenShouldLogErrorAndContinue">
+            <summary>
+            Tests that the service correctly handles exceptions during property event handling.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenTransactionCommitError_WhenBatchProcessing_ThenShouldLogAndRethrow">
+            <summary>
+            Tests that the service correctly handles transaction errors during batch processing.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenMultipleConcurrentBatches_WhenProcessing_ThenShouldUseLockForSynchronization">
+            <summary>
+            Tests that the service correctly acquires and releases transaction lock during batch processing.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenDisposal_WhenServiceDisposed_ThenShouldCleanupResources">
+            <summary>
+            Tests that the service correctly cleans up resources on dispose.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenStoredDeviceProperty_WhenQueried_ThenShouldReturnCorrectValue">
+            <summary>
+            Tests that the service correctly retrieves device properties.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenNonExistentProperty_WhenQueried_ThenShouldReturnDefault">
+            <summary>
+            Tests that the service returns default value for non-existent properties.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenPropertyTypeMismatch_WhenQueried_ThenShouldReturnDefault">
+            <summary>
+            Tests that the service handles type mismatches correctly.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.GivenPropertyUpdate_WhenHandledMultipleTimes_ThenShouldStoreLatestValue">
+            <summary>
+            Tests that the service correctly handles property events for updated values.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Tests.Unit.Services.EnhancedPersistenceServiceTests.TestIoTDevice">
+            <summary>
+            Test IoT Device implementation for testing.
+            </summary>
+        </member>
+    </members>
+</doc>

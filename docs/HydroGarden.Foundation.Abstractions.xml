@@ -1,0 +1,701 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>HydroGarden.Foundation.Abstractions</name>
+    </assembly>
+    <members>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.ComponentState">
+            <summary>
+            Defines the possible states of a HydroGarden component.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent">
+            <summary>
+            Represents a core component in the HydroGarden system.
+            Provides lifecycle management and property handling.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.Id">
+            <summary>
+            Gets the unique identifier of the component.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.Name">
+            <summary>
+            Gets the name of the component.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.AssemblyType">
+            <summary>
+            Gets the assembly type of the component.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.State">
+            <summary>
+            Gets the current state of the component.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.SetPropertyAsync(System.String,System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata)">
+            <summary>
+            Asynchronously sets a property value for the component.
+            </summary>
+            <param name="name">The property name.</param>
+            <param name="value">The property value.</param>
+            <param name="metadata">Optional metadata for the property.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.GetPropertyAsync``1(System.String)">
+            <summary>
+            Asynchronously retrieves a property value by name.
+            </summary>
+            <typeparam name="T">The expected type of the property value.</typeparam>
+            <param name="name">The property name.</param>
+            <returns>The property value if found; otherwise, null.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.GetPropertyMetadata(System.String)">
+            <summary>
+            Retrieves metadata for a specified property.
+            </summary>
+            <param name="name">The property name.</param>
+            <returns>The property metadata, or null if not found.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.GetProperties">
+            <summary>
+            Retrieves all property values of the component.
+            </summary>
+            <returns>A dictionary containing property names and values.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.GetAllPropertyMetadata">
+            <summary>
+            Retrieves metadata for all properties of the component.
+            </summary>
+            <returns>A dictionary containing property names and metadata.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.LoadPropertiesAsync(System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata})">
+            <summary>
+            Loads multiple properties into the component asynchronously.
+            </summary>
+            <param name="properties">A dictionary of property values.</param>
+            <param name="metadata">Optional dictionary of property metadata.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent.SetEventHandler(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler)">
+            <summary>
+            Assigns an event handler to the component.
+            </summary>
+            <param name="handler">The event handler to assign.</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice">
+            <summary>
+            Represents an IoT device within the HydroGarden system.
+            Inherits from <see cref="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.IHydroGardenComponent"/> for common component functionality.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice.InitializeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Initializes the IoT device asynchronously.
+            </summary>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task representing the asynchronous initialization process.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice.StartAsync(System.Threading.CancellationToken)">
+            <summary>
+            Starts the IoT device asynchronously.
+            </summary>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task representing the asynchronous start process.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice.StopAsync(System.Threading.CancellationToken)">
+            <summary>
+            Stops the IoT device asynchronously.
+            </summary>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task representing the asynchronous stop process.</returns>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus">
+            <summary>
+            Interface for the event bus service
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus.Subscribe(HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler,HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions)">
+            <summary>
+            Subscribes to events with the given handler and options
+            </summary>
+            <param name="handler">The event handler</param>
+            <param name="options">Options that control event filtering</param>
+            <returns>Subscription ID that can be used to unsubscribe</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus.Unsubscribe(System.Guid)">
+            <summary>
+            Unsubscribes from events using the given subscription ID
+            </summary>
+            <param name="subscriptionId">The subscription ID to unsubscribe</param>
+            <returns>True if the subscription was found and removed, false otherwise</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventBus.PublishAsync(System.Object,HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent,System.Threading.CancellationToken)">
+            <summary>
+            Publishes an event to all relevant subscribers
+            </summary>
+            <param name="sender">The object that raised the event</param>
+            <param name="evt">The event to publish</param>
+            <param name="ct">Cancellation token</param>
+            <returns>Result of the publish operation</returns>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData">
+            <summary>
+            Interface for event routing data
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData.TargetIds">
+            <summary>
+            Optional list of specific target component IDs
+            If empty, the event is routed based on topology
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData.Persist">
+            <summary>
+            Whether this event should be persisted
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData.Priority">
+            <summary>
+            Event priority - higher priority events are processed first
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData.RequiresAcknowledgment">
+            <summary>
+            Whether the event requires acknowledgment from handlers
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventRoutingData.Timeout">
+            <summary>
+            Maximum time to wait for all handlers to process the event
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventPriority">
+            <summary>
+            Priority levels for event processing
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscription.Id">
+            <summary>
+            Unique identifier for this subscription
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscription.Handler">
+            <summary>
+            The event handler for this subscription
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscription.Options">
+            <summary>
+            Options that control how events are routed to this subscription
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions.EventTypes">
+            <summary>
+            Optional filter for specific event types
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions.SourceIds">
+            <summary>
+            Optional filter for specific source components
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions.Filter">
+            <summary>
+            Custom filter predicate for fine-grained control
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions.IncludeConnectedSources">
+            <summary>
+            Whether to receive events from all connected components
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IEventSubscriptionOptions.Synchronous">
+            <summary>
+            Whether to handle events synchronously
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.AlertSeverity">
+            <summary>
+            Alert severity levels
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent">
+            <summary>
+            Interface for alert events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent.Severity">
+            <summary>
+            The severity of the alert
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent.Message">
+            <summary>
+            The alert message
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent.AlertData">
+            <summary>
+            Additional information about the alert
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenAlertEvent.IsAcknowledged">
+            <summary>
+            Whether the alert has been acknowledged
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenCommandEvent">
+            <summary>
+            Interface for command events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenCommandEvent.CommandName">
+            <summary>
+            The name of the command to execute
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenCommandEvent.Parameters">
+            <summary>
+            Optional parameters for the command
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent">
+            <summary>
+            Base interface for all HydroGarden events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.DeviceId">
+            <summary>
+            The source component that raised the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.EventId">
+            <summary>
+            Unique identifier for the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.Timestamp">
+            <summary>
+            The time when the event was created
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.SourceId">
+            <summary>
+            The source component that raised the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.EventType">
+            <summary>
+            The type of the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenEvent.RoutingData">
+            <summary>
+            Optional routing data - used to determine how this event should be processed
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType">
+            <summary>
+            Classification of event types in the system
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.PropertyChanged">
+            <summary>
+            Property value change on a component
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Lifecycle">
+            <summary>
+            Device lifecycle events (initialized, started, stopped)
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Command">
+            <summary>
+            Command events requesting action from a component
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Telemetry">
+            <summary>
+            Telemetry/sensor reading events
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Alert">
+            <summary>
+            Alert/notification events requiring attention
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.System">
+            <summary>
+            System status events
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Timer">
+            <summary>
+            Timer/scheduler events
+            </summary>
+        </member>
+        <member name="F:HydroGarden.Foundation.Abstractions.Interfaces.Events.EventType.Custom">
+            <summary>
+            Custom event types defined by device implementations
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenLifecycleEvent">
+            <summary>
+            Interface for lifecycle events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenLifecycleEvent.State">
+            <summary>
+            The new state of the component
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenLifecycleEvent.Details">
+            <summary>
+            Additional information about the lifecycle change
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenTelemetryEvent">
+            <summary>
+            Interface for telemetry events
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenTelemetryEvent.Readings">
+            <summary>
+            The telemetry readings in this event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.Events.IHydroGardenTelemetryEvent.Units">
+            <summary>
+            Units of measurement for each reading
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent">
+            <summary>
+            Represents an event triggered when a property of a HydroGarden component changes.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent.PropertyName">
+            <summary>
+            The name of the property that changed
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent.PropertyType">
+            <summary>
+            The type of the property
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent.OldValue">
+            <summary>
+            The previous value of the property
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent.NewValue">
+            <summary>
+            The new value of the property
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent.Metadata">
+            <summary>
+            Metadata associated with the property
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler">
+            <summary>
+            Defines an event handler that processes property change events in HydroGarden components.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEventHandler.HandleEventAsync(System.Object,HydroGarden.Foundation.Abstractions.Interfaces.IHydroGardenPropertyChangedEvent,System.Threading.CancellationToken)">
+            <summary>
+            Handles an event asynchronously when a property of a HydroGarden component changes.
+            </summary>
+            <param name="sender">The source object of the event.</param>
+            <param name="e">The event details containing property change information.</param>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task representing the asynchronous operation.</returns>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata">
+            <summary>
+            Defines metadata for properties in HydroGarden components.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata.IsEditable">
+            <summary>
+            Gets or sets a value indicating whether the property is editable.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata.IsVisible">
+            <summary>
+            Gets or sets a value indicating whether the property is visible.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata.DisplayName">
+            <summary>
+            Gets or sets the display name of the property.
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata.Description">
+            <summary>
+            Gets or sets the description of the property.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult">
+            <summary>
+            Result of an event publish operation
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.EventId">
+            <summary>
+            The ID of the published event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.HandlerCount">
+            <summary>
+            Number of handlers that were selected for this event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.SuccessCount">
+            <summary>
+            Number of handlers that successfully processed the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.IsComplete">
+            <summary>
+            Whether all handlers successfully processed the event
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.TimedOut">
+            <summary>
+            Whether the event processing timed out
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.Errors">
+            <summary>
+            List of errors that occurred during event processing
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.HasErrors">
+            <summary>
+            Whether any errors occurred during event processing
+            </summary>
+        </member>
+        <member name="P:HydroGarden.Foundation.Abstractions.Interfaces.IPublishResult.HandlerTasks">
+            <summary>
+            Tasks representing the asynchronous processing of the event by handlers.
+            Used for tracking completion status.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger">
+            <summary>
+            Provides logging functionality for HydroGarden components.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger.Log(System.String)">
+            <summary>
+            Logs a message.
+            </summary>
+            <param name="message">The message to log.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger.Log(System.Exception,System.String)">
+            <summary>
+            Logs an exception with an accompanying message.
+            </summary>
+            <param name="ex">The exception to log.</param>
+            <param name="message">The message describing the exception.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Logging.IHydroGardenLogger.Log(System.Object,System.String)">
+            <summary>
+            Logs an object with a description message.
+            </summary>
+            <param name="obj">The object to log.</param>
+            <param name="message">The message describing the object.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IPersistenceService.AddOrUpdateAsync``1(``0,System.Threading.CancellationToken)">
+            <summary>
+            Registers or updates a IIoTDevice component in the persistence layer.
+            Ensures component properties are loaded and stored efficiently.
+            </summary>
+            <typeparam name="T">The type of the IIoTDevice component (must implement <see cref="T:HydroGarden.Foundation.Abstractions.Interfaces.Components.IIoTDevice"/>).</typeparam>
+            <param name="component">The component to add or update.</param>
+            <param name="ct">Cancellation token for the operation.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IPersistenceService.ProcessPendingEventsAsync">
+            <summary>
+            Manually triggers batch processing of pending events (for testing or manual execution).
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IPersistenceService.GetPropertyAsync``1(System.Guid,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves a stored property value for a given device.
+            </summary>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore">
+            <summary>
+            Defines a storage interface for saving and retrieving component properties.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore.BeginTransactionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Begins a new transaction asynchronously.
+            </summary>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task representing the asynchronous transaction.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore.LoadAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Loads stored properties asynchronously.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task returning a dictionary of stored properties.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore.LoadMetadataAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Loads metadata associated with stored properties asynchronously.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="ct">An optional cancellation token.</param>
+            <returns>A task returning a dictionary of property metadata.</returns>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore.SaveAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Threading.CancellationToken)">
+            <summary>
+            Saves properties asynchronously.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="properties">The dictionary of properties to save.</param>
+            <param name="ct">An optional cancellation token.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStore.SaveWithMetadataAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata},System.Threading.CancellationToken)">
+            <summary>
+            Saves properties along with their metadata asynchronously.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="properties">The dictionary of properties to save.</param>
+            <param name="metadata">The dictionary of property metadata.</param>
+            <param name="ct">An optional cancellation token.</param>
+        </member>
+        <member name="T:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStoreTransaction">
+            <summary>
+            Defines a transaction interface for handling batch property storage operations.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStoreTransaction.SaveAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Saves properties within a transaction.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="properties">The properties to save.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStoreTransaction.SaveWithMetadataAsync(System.Guid,System.Collections.Generic.IDictionary{System.String,System.Object},System.Collections.Generic.IDictionary{System.String,HydroGarden.Foundation.Abstractions.Interfaces.IPropertyMetadata})">
+            <summary>
+            Saves properties with metadata within a transaction.
+            </summary>
+            <param name="id">The unique identifier of the component.</param>
+            <param name="properties">The properties to save.</param>
+            <param name="metadata">The metadata to save.</param>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStoreTransaction.CommitAsync(System.Threading.CancellationToken)">
+            <summary>
+            Commits the transaction asynchronously.
+            </summary>
+        </member>
+        <member name="M:HydroGarden.Foundation.Abstractions.Interfaces.Services.IStoreTransaction.RollbackAsync(System.Threading.CancellationToken)">
+            <summary>
+            Rolls back the transaction asynchronously.
+            </summary>
+        </member>
+        <member name="T:IComponentConnection">
+            <summary>
+            Represents a connection between two components
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.ConnectionId">
+            <summary>
+            Unique identifier for this connection
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.SourceId">
+            <summary>
+            The source component ID
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.TargetId">
+            <summary>
+            The target component ID
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.ConnectionType">
+            <summary>
+            The type of connection
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.IsEnabled">
+            <summary>
+            Whether the connection is enabled
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.Condition">
+            <summary>
+            Optional condition that determines when events can flow through this connection
+            </summary>
+        </member>
+        <member name="P:IComponentConnection.Metadata">
+            <summary>
+            Optional metadata for this connection
+            </summary>
+        </member>
+        <member name="T:ITopologyService">
+            <summary>
+            Service for managing component connections and topology
+            </summary>
+        </member>
+        <member name="M:ITopologyService.GetConnectionsForSourceAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Gets all connections for the given source component
+            </summary>
+            <param name="sourceId">The source component ID</param>
+            <param name="ct">Cancellation token</param>
+            <returns>List of connections from the source</returns>
+        </member>
+        <member name="M:ITopologyService.GetConnectionsForTargetAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Gets all connections for the given target component
+            </summary>
+            <param name="targetId">The target component ID</param>
+            <param name="ct">Cancellation token</param>
+            <returns>List of connections to the target</returns>
+        </member>
+        <member name="M:ITopologyService.CreateConnectionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <summary>
+            Creates a new connection between components
+            </summary>
+            <param name="connection">The connection to create</param>
+            <param name="ct">Cancellation token</param>
+            <returns>The created connection with assigned ID</returns>
+        </member>
+        <member name="M:ITopologyService.UpdateConnectionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <summary>
+            Updates an existing connection
+            </summary>
+            <param name="connection">The connection to update</param>
+            <param name="ct">Cancellation token</param>
+            <returns>True if the connection was updated, false if not found</returns>
+        </member>
+        <member name="M:ITopologyService.DeleteConnectionAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Deletes a connection by ID
+            </summary>
+            <param name="connectionId">The connection ID to delete</param>
+            <param name="ct">Cancellation token</param>
+            <returns>True if the connection was deleted, false if not found</returns>
+        </member>
+        <member name="M:ITopologyService.EvaluateConnectionConditionAsync(IComponentConnection,System.Threading.CancellationToken)">
+            <summary>
+            Evaluates whether a connection is active based on its condition
+            </summary>
+            <param name="connection">The connection to evaluate</param>
+            <param name="ct">Cancellation token</param>
+            <returns>True if the connection is active, false otherwise</returns>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="coverlet.collector" />
+		<PackageReference Include="FluentAssertions" />
+		<PackageReference Include="Moq" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" />
+		<PackageReference Include="xunit" />
+		<PackageReference Include="xunit.runner.visualstudio" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
+		<ProjectReference Include="..\HydroGarden.Foundation.Common\HydroGarden.Foundation.Common.csproj" />
+		<ProjectReference Include="..\HydroGarden.Foundation.Core\HydroGarden.Foundation.Core.csproj" />
+	</ItemGroup>
+
+</Project>

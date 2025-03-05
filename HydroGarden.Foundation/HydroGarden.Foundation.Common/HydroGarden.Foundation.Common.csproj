@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Result\**" />
+    <Compile Remove="Validation\**" />
+    <EmbeddedResource Remove="Result\**" />
+    <EmbeddedResource Remove="Validation\**" />
+    <None Remove="Result\**" />
+    <None Remove="Validation\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Events\Handlers\" />
+  </ItemGroup>
+
+</Project>
