@@ -18,7 +18,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
     /// </summary>
     public class EventBusComponentIntegrationTests : EventBusBaseTests
     {
-        private readonly Mock<IHydroGardenLogger> _loggerMock;
+        private readonly Mock<ILogger> _loggerMock;
         private readonly Mock<IEventStore> _eventStoreMock;
         private readonly Mock<IEventRetryPolicy> _retryPolicyMock;
         private readonly Mock<IEventTransformer> _transformerMock;
@@ -26,7 +26,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
 
         public EventBusComponentIntegrationTests()
         {
-            _loggerMock = new Mock<IHydroGardenLogger>();
+            _loggerMock = new Mock<ILogger>();
             _eventStoreMock = new Mock<IEventStore>();
             _retryPolicyMock = new Mock<IEventRetryPolicy>();
             _transformerMock = new Mock<IEventTransformer>();
@@ -49,13 +49,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var deviceId = Guid.NewGuid();
             var testDevice = new TestDevice(deviceId, "TestDevice");
 
-            var capturedEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var capturedEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => capturedEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -91,13 +91,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var deviceId = Guid.NewGuid();
             var testDevice = new TestDevice(deviceId, "TestDevice");
 
-            var capturedEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var capturedEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => capturedEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -143,23 +143,23 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var testDevice = new TestDevice(deviceId, "TestDevice");
 
             // Create two separate handlers
-            var handler1Events = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler1 = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var handler1Events = new List<IPropertyChangedEvent>();
+            var mockHandler1 = new Mock<IPropertyChangedEventHandler>();
             mockHandler1.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => handler1Events.Add(evt))
                 .Returns(Task.CompletedTask);
 
-            var handler2Events = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler2 = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var handler2Events = new List<IPropertyChangedEvent>();
+            var mockHandler2 = new Mock<IPropertyChangedEventHandler>();
             mockHandler2.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => handler2Events.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -174,7 +174,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var options2 = new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.PropertyChanged },
-                Filter = evt => evt is IHydroGardenPropertyChangedEvent propEvt &&
+                Filter = evt => evt is IPropertyChangedEvent propEvt &&
                                propEvt.PropertyName == "Value",
                 Synchronous = true
             };
@@ -209,13 +209,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var childDevice = new TestDevice(childId, "ChildDevice");
 
             // Set up event capture
-            var capturedEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var capturedEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => capturedEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -238,7 +238,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             {
                 EventTypes = new[] { EventType.PropertyChanged },
                 SourceIds = new[] { parentId },
-                Filter = evt => evt is IHydroGardenPropertyChangedEvent propEvt &&
+                Filter = evt => evt is IPropertyChangedEvent propEvt &&
                                propEvt.PropertyName == "Value",
                 Synchronous = true
             });
@@ -375,7 +375,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
         /// <summary>
         /// An event handler that relays events to the EventBus
         /// </summary>
-        private class EventRelayHandler : IHydroGardenPropertyChangedEventHandler
+        private class EventRelayHandler : IPropertyChangedEventHandler
         {
             private readonly IEventBus _eventBus;
 
@@ -384,9 +384,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 _eventBus = eventBus;
             }
 
-            public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+            public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
             {
-                if (evt is IHydroGardenPropertyChangedEvent e)
+                if (evt is IPropertyChangedEvent e)
                 {
                     await _eventBus.PublishAsync(sender, e, ct);
                 }
@@ -400,7 +400,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
         /// <summary>
         /// An event handler that demonstrates cascading changes between components
         /// </summary>
-        private class CascadingChangeHandler : IHydroGardenPropertyChangedEventHandler
+        private class CascadingChangeHandler : IPropertyChangedEventHandler
         {
             private readonly TestDevice _targetDevice;
 
@@ -409,9 +409,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 _targetDevice = targetDevice;
             }
 
-            public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+            public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
             {
-                if (evt is IHydroGardenPropertyChangedEvent e && e.PropertyName == "Value" && e.NewValue is int parentValue)
+                if (evt is IPropertyChangedEvent e && e.PropertyName == "Value" && e.NewValue is int parentValue)
                 {
                     // Child value is half of parent value
                     await _targetDevice.SetValueAsync(parentValue / 2);
@@ -423,7 +423,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 return ValueTask.CompletedTask;
             }
         }
-        public class LifecycleEventHandler : IHydroGardenPropertyChangedEventHandler
+        public class LifecycleEventHandler : IPropertyChangedEventHandler
         {
             private readonly List<ComponentState> _stateChanges;
             private readonly TaskCompletionSource<bool> _completionSource;
@@ -434,14 +434,14 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 _completionSource = completionSource;
             }
 
-            public Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+            public Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
             {
                 // This won't be called in our test
                 return Task.CompletedTask;
             }
 
             // Add this method to handle lifecycle events directly
-            public Task HandleLifecycleEventAsync(object sender, IHydroGardenLifecycleEvent evt, CancellationToken ct = default)
+            public Task HandleLifecycleEventAsync(object sender, ILifecycleEvent evt, CancellationToken ct = default)
             {
                 _stateChanges.Add(evt.State);
                 if (_stateChanges.Count >= 5)

@@ -34,7 +34,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         /// <summary>
         /// Initializes a new instance of the <see cref="PumpDevice"/> class.
         /// </summary>
-        public PumpDevice(Guid id, string name, double maxFlowRate = 100, double minFlowRate = 0, IHydroGardenLogger? logger = null)
+        public PumpDevice(Guid id, string name, double maxFlowRate = 100, double minFlowRate = 0, ILogger? logger = null)
             : base(id, name, logger)
         {
             MaxFlowRate = maxFlowRate;

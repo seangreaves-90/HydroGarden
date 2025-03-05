@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
     /// Represents a core component in the HydroGarden system.
     /// Provides lifecycle management and property handling.
     /// </summary>
-    public interface IHydroGardenComponent : IDisposable
+    public interface IComponent : IDisposable
     {
         /// <summary>
         /// Gets the unique identifier of the component.
@@ -97,6 +97,6 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// Assigns an event handler to the component.
         /// </summary>
         /// <param name="handler">The event handler to assign.</param>
-        void SetEventHandler(IHydroGardenPropertyChangedEventHandler handler);
+        void SetEventHandler(IPropertyChangedEventHandler handler);
     }
 }

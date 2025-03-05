@@ -12,7 +12,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
     public class EventQueueProcessor
     {
         private readonly ConcurrentDictionary<EventPriority, ConcurrentQueue<EventQueueItem>> _eventQueues;
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
         private readonly CancellationTokenSource _cancellationSource = new();
         private readonly List<Task> _processingTasks = new();
         private readonly int _maxConcurrentProcessingPerPriority;
@@ -22,7 +22,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
         /// </summary>
         /// <param name="logger">Logger instance for tracking events.</param>
         /// <param name="maxConcurrentProcessing">Maximum concurrent tasks for processing each priority queue.</param>
-        public EventQueueProcessor(IHydroGardenLogger logger, int maxConcurrentProcessing = 4)
+        public EventQueueProcessor(ILogger logger, int maxConcurrentProcessing = 4)
         {
             _eventQueues = new ConcurrentDictionary<EventPriority, ConcurrentQueue<EventQueueItem>>();
             _logger = logger;
@@ -75,7 +75,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
                 {
                     try
                     {
-                        if (queueItem.Event is IHydroGardenPropertyChangedEvent propChangedEvent)
+                        if (queueItem.Event is IPropertyChangedEvent propChangedEvent)
                         {
                             await queueItem.Subscription.Handler.HandleEventAsync(queueItem.Sender, propChangedEvent, ct);
                             queueItem.Result.SuccessCount++;

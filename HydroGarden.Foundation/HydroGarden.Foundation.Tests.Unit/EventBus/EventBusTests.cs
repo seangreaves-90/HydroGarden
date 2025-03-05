@@ -12,7 +12,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
     /// </summary>
     public abstract class EventBusBaseTests
     {
-        protected readonly Mock<IHydroGardenLogger> MockLogger;
+        protected readonly Mock<ILogger> MockLogger;
         protected readonly Mock<IEventStore> MockStore;
         protected readonly Mock<IEventRetryPolicy> MockRetryPolicy;
         protected readonly Mock<IEventTransformer> MockTransformer;
@@ -20,15 +20,15 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
         protected EventBusBaseTests()
         {
-            MockLogger = new Mock<IHydroGardenLogger>();
+            MockLogger = new Mock<ILogger>();
             MockStore = new Mock<IEventStore>();
             MockRetryPolicy = new Mock<IEventRetryPolicy>();
             MockTransformer = new Mock<IEventTransformer>();
             MockTopologyService = new Mock<ITopologyService>();
 
             // Set up transformer to return the same event by default (identity transform)
-            MockTransformer.Setup(t => t.Transform(It.IsAny<IHydroGardenEvent>()))
-                .Returns<IHydroGardenEvent>(e => e);
+            MockTransformer.Setup(t => t.Transform(It.IsAny<IEvent>()))
+                .Returns<IEvent>(e => e);
         }
 
         /// <summary>

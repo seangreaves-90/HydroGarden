@@ -10,12 +10,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Stores
     {
         private readonly string _testFilePath;
         private readonly JsonStore _jsonStore;
-        private readonly Mock<IHydroGardenLogger> _loggerMock;
+        private readonly Mock<ILogger> _loggerMock;
 
         public JsonStoreTests()
         {
             _testFilePath = Path.Combine(Path.GetTempPath(), "TestComponentProperties.json");
-            _loggerMock = new Mock<IHydroGardenLogger>();
+            _loggerMock = new Mock<ILogger>();
             _jsonStore = new JsonStore(Path.GetTempPath(), _loggerMock.Object);
         }
 

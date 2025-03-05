@@ -3,7 +3,7 @@
     /// <summary>
     /// Interface for telemetry events
     /// </summary>
-    public interface IHydroGardenTelemetryEvent : IHydroGardenEvent
+    public interface ITelemetryEvent : IEvent
     {
         /// <summary>
         /// The telemetry readings in this event
@@ -19,7 +19,7 @@
     /// <summary>
     /// Specialized handler for telemetry events
     /// </summary>
-    public interface IHydroGardenTelemetryEventHandler : IHydroGardenEventHandler 
+    public interface ITelemetryEventHandler : IEventHandler 
     { 
     
     }

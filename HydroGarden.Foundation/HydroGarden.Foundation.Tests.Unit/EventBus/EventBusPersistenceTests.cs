@@ -44,7 +44,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             var result = await eventBus.PublishAsync(this, persistableEvent, CancellationToken.None);
 
             // Assert - The event should be persisted
-            MockStore.Verify(s => s.PersistEventAsync(It.Is<IHydroGardenEvent>(
+            MockStore.Verify(s => s.PersistEventAsync(It.Is<IEvent>(
                 e => e.EventId == persistableEvent.EventId)),
                 Times.Once);
         }
@@ -75,7 +75,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             var result = await eventBus.PublishAsync(this, nonPersistableEvent, CancellationToken.None);
 
             // Assert - The event should not be persisted
-            MockStore.Verify(s => s.PersistEventAsync(It.IsAny<IHydroGardenEvent>()),
+            MockStore.Verify(s => s.PersistEventAsync(It.IsAny<IEvent>()),
                 Times.Never);
         }
 
@@ -88,10 +88,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             var sourceId = Guid.NewGuid();
 
             // Create a handler that throws an exception
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Throws(new InvalidOperationException("Test exception"));
 
@@ -120,7 +120,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
             // Assert - Failed events should be persisted for retry
             result.HasErrors.Should().BeTrue();
-            MockStore.Verify(s => s.PersistEventAsync(It.Is<IHydroGardenEvent>(
+            MockStore.Verify(s => s.PersistEventAsync(It.Is<IEvent>(
                 e => e.EventId == evt.EventId)),
                 Times.Once);
         }
@@ -143,7 +143,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
             // Set up retry policy to allow a retry
             MockRetryPolicy.Setup(r => r.ShouldRetryAsync(
-                It.Is<IHydroGardenEvent>(e => e.EventId == failedEvent.EventId),
+                It.Is<IEvent>(e => e.EventId == failedEvent.EventId),
                 It.Is<int>(i => i == 1)))
                 .ReturnsAsync(true);
 
@@ -156,13 +156,13 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
             // Assert - Retry policy should be consulted
             MockRetryPolicy.Verify(r => r.ShouldRetryAsync(
-                It.Is<IHydroGardenEvent>(e => e.EventId == failedEvent.EventId),
+                It.Is<IEvent>(e => e.EventId == failedEvent.EventId),
                 It.IsAny<int>()),
                 Times.Once);
 
             // Verify republishing of the event
             MockTransformer.Verify(t => t.Transform(
-                It.Is<IHydroGardenEvent>(e => e.EventId == failedEvent.EventId)),
+                It.Is<IEvent>(e => e.EventId == failedEvent.EventId)),
                 Times.Once);
         }
     }

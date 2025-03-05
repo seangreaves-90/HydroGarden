@@ -9,15 +9,15 @@ namespace HydroGarden.Foundation.Common.Events.Stores
     /// </summary>
     public class DeadLetterEventStore : IEventStore
     {
-        private readonly ConcurrentQueue<IHydroGardenEvent> _failedEvents = new();
+        private readonly ConcurrentQueue<IEvent> _failedEvents = new();
 
-        public Task PersistEventAsync(IHydroGardenEvent evt)
+        public Task PersistEventAsync(IEvent evt)
         {
             _failedEvents.Enqueue(evt);
             return Task.CompletedTask;
         }
 
-        public Task<IHydroGardenEvent?> RetrieveFailedEventAsync()
+        public Task<IEvent?> RetrieveFailedEventAsync()
         {
             return Task.FromResult(_failedEvents.TryDequeue(out var evt) ? evt : null);
         }

@@ -31,9 +31,9 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             };
 
             // Should never be called because we're filtering by event type
-            var mockHandler = new Mock<IHydroGardenEventHandler>();
+            var mockHandler = new Mock<IEventHandler>();
 
-            // Subscribe using a handler for IHydroGardenEvent instead of IHydroGardenPropertyChangedEvent
+            // Subscribe using a handler for IEvent instead of IPropertyChangedEvent
             eventBus.Subscribe(mockHandler.Object, options);
 
             // Create a property changed event (not a command)
@@ -53,7 +53,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.HandlerCount.Should().Be(0);
             mockHandler.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Never);
         }
@@ -75,7 +75,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             };
 
             // Should never be called because we're filtering by source ID
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             eventBus.Subscribe(mockHandler.Object, options);
 
             // Create an event from a different source
@@ -95,7 +95,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.HandlerCount.Should().Be(0);
             mockHandler.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Never);
         }
@@ -107,8 +107,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             using var eventBus = CreateTestEventBus();
 
             // Custom filter to only accept events with property name "AcceptedProperty"
-            Func<IHydroGardenEvent, bool> customFilter = evt =>
-                evt is IHydroGardenPropertyChangedEvent propEvent &&
+            Func<IEvent, bool> customFilter = evt =>
+                evt is IPropertyChangedEvent propEvent &&
                 propEvent.PropertyName == "AcceptedProperty";
 
             var options = new EventSubscriptionOptions
@@ -118,10 +118,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
                 Synchronous = true
             };
 
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -144,7 +144,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.HandlerCount.Should().Be(0);
             mockHandler.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Never);
         }
@@ -168,10 +168,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
                 Synchronous = true
             };
 
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -195,7 +195,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.SuccessCount.Should().Be(1);
             mockHandler.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -215,10 +215,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
                 Synchronous = true
             };
 
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -252,7 +252,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
 
             mockHandler.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -265,10 +265,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             var sourceId = Guid.NewGuid();
 
             // Create first handler and subscription
-            var mockHandler1 = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler1 = new Mock<IPropertyChangedEventHandler>();
             mockHandler1.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -280,17 +280,17 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             };
 
             // Create second handler and subscription with different filter
-            var mockHandler2 = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler2 = new Mock<IPropertyChangedEventHandler>();
             mockHandler2.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
             var options2 = new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.PropertyChanged },
-                Filter = evt => evt is IHydroGardenPropertyChangedEvent propEvt &&
+                Filter = evt => evt is IPropertyChangedEvent propEvt &&
                                 propEvt.PropertyName == "TestProperty",
                 Synchronous = true
             };
@@ -317,12 +317,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.SuccessCount.Should().Be(2);
             mockHandler1.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
             mockHandler2.Verify(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -335,10 +335,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             var sourceId = Guid.NewGuid();
 
             // Create a handler that throws an exception
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
                 .Throws(new InvalidOperationException("Test exception"));
 
@@ -373,7 +373,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             result.Errors[0].Message.Should().Be("Test exception");
 
             // Verify store got called to persist the failed event
-            MockStore.Verify(s => s.PersistEventAsync(It.IsAny<IHydroGardenEvent>()), Times.Once);
+            MockStore.Verify(s => s.PersistEventAsync(It.IsAny<IEvent>()), Times.Once);
         }
 
         #endregion

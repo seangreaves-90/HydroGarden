@@ -13,27 +13,27 @@ namespace HydroGarden.Foundation.Core.Components
     /// <summary>
     /// Base class for all HydroGarden components, implementing common functionality such as property management and event handling.
     /// </summary>
-    public abstract class HydroGardenComponentBase : IHydroGardenComponent
+    public abstract class ComponentBase : IComponent
     {
         private readonly ConcurrentDictionary<string, object> _properties = new();
         private readonly ConcurrentDictionary<string, PropertyMetadata> _propertyMetadata = new();
-        protected readonly IHydroGardenLogger _logger;
-        protected IHydroGardenPropertyChangedEventHandler? _eventHandler;
+        protected readonly ILogger _logger;
+        protected IPropertyChangedEventHandler? _eventHandler;
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HydroGardenComponentBase"/> class.
+        /// Initializes a new instance of the <see cref="ComponentBase"/> class.
         /// </summary>
         /// <param name="id">The unique identifier of the component.</param>
         /// <param name="name">The name of the component.</param>
         /// <param name="logger">Optional logger instance.</param>
-        protected HydroGardenComponentBase(Guid id, string name, IHydroGardenLogger? logger = null)
+        protected ComponentBase(Guid id, string name, ILogger? logger = null)
         {
             Id = id;
             Name = name;
             AssemblyType = GetType().FullName ?? "UnknownType";
-            _logger = logger ?? new HydroGardenLogger();
+            _logger = logger ?? new Logger();
         }
 
         /// <inheritdoc/>
@@ -57,7 +57,7 @@ namespace HydroGarden.Foundation.Core.Components
         }
 
         /// <inheritdoc/>
-        public void SetEventHandler(IHydroGardenPropertyChangedEventHandler handler) => _eventHandler = handler;
+        public void SetEventHandler(IPropertyChangedEventHandler handler) => _eventHandler = handler;
 
         /// <inheritdoc/>
         public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)

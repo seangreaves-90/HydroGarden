@@ -12,7 +12,7 @@ namespace HydroGarden.Foundation.Core.Serialization
         private readonly HashSet<object> _seenObjects = new();
 
         /// <inheritdoc/>
-        public override bool CanConvert(Type typeToConvert) => typeof(HydroGardenComponentBase).IsAssignableFrom(typeToConvert);
+        public override bool CanConvert(Type typeToConvert) => typeof(ComponentBase).IsAssignableFrom(typeToConvert);
 
         /// <inheritdoc/>
         public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -31,10 +31,10 @@ namespace HydroGarden.Foundation.Core.Serialization
                     throw new JsonException("Invalid component type string");
 
                 Type? componentType = Type.GetType(typeName);
-                if (componentType == null || !typeof(HydroGardenComponentBase).IsAssignableFrom(componentType))
+                if (componentType == null || !typeof(ComponentBase).IsAssignableFrom(componentType))
                     throw new JsonException($"Unknown or invalid component type: {typeName}");
 
-                var component = (HydroGardenComponentBase?)Activator.CreateInstance(componentType, Guid.NewGuid(), "Restored Component");
+                var component = (ComponentBase?)Activator.CreateInstance(componentType, Guid.NewGuid(), "Restored Component");
                 if (component == null)
                     throw new JsonException($"Failed to create instance of {typeName}");
 

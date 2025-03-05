@@ -16,7 +16,7 @@
         /// <param name="handler">The event handler</param>
         /// <param name="options">Options that control event filtering</param>
         /// <returns>Subscription ID that can be used to unsubscribe</returns>
-        Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IHydroGardenEventHandler;
+        Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IEventHandler;
 
         /// <summary>
         /// Unsubscribes from events using the given subscription ID
@@ -32,22 +32,22 @@
         /// <param name="evt">The event to publish</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Result of the publish operation</returns>
-        Task<IPublishResult> PublishAsync(object sender, IHydroGardenEvent evt, CancellationToken ct = default);
+        Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default);
     }
 
     public interface IEventStore
     {
-        Task PersistEventAsync(IHydroGardenEvent evt);
-        Task<IHydroGardenEvent?> RetrieveFailedEventAsync();
+        Task PersistEventAsync(IEvent evt);
+        Task<IEvent?> RetrieveFailedEventAsync();
     }
 
     public interface IEventRetryPolicy
     {
-        Task<bool> ShouldRetryAsync(IHydroGardenEvent evt, int attemptCount);
+        Task<bool> ShouldRetryAsync(IEvent evt, int attemptCount);
     }
 
     public interface IEventTransformer
     {
-        IHydroGardenEvent Transform(IHydroGardenEvent evt);
+        IEvent Transform(IEvent evt);
     }
 }

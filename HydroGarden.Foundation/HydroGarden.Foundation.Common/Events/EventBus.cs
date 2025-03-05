@@ -22,7 +22,7 @@ namespace HydroGarden.Foundation.Common.Events
     public class EventBus : IEventBus, IDisposable
     {
         private ITopologyService? _topologyService;
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
         private readonly IEventStore _eventStore;
         private readonly IEventRetryPolicy _retryPolicy;
         private readonly IEventTransformer _transformer;
@@ -35,7 +35,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Initializes a new instance of the <see cref="EventBus"/> class.
         /// </summary>
         public EventBus(
-            IHydroGardenLogger logger,
+            ILogger logger,
             IEventStore eventStore,
             IEventRetryPolicy retryPolicy,
             IEventTransformer transformer,
@@ -61,7 +61,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Subscribes an event handler to the bus.
         /// </summary>
-        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IHydroGardenEventHandler
+        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IEventHandler
         {
             if (handler == null) throw new ArgumentNullException(nameof(handler));
 
@@ -105,7 +105,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Publishes an event to the event bus.
         /// </summary>
-        public async Task<IPublishResult> PublishAsync(object sender, IHydroGardenEvent evt, CancellationToken ct = default)
+        public async Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default)
         {
             if (sender == null) throw new ArgumentNullException(nameof(sender));
             if (evt == null) throw new ArgumentNullException(nameof(evt));
@@ -139,7 +139,7 @@ namespace HydroGarden.Foundation.Common.Events
                 {
                     try
                     {
-                        if (transformedEvent is IHydroGardenPropertyChangedEvent propChangedEvent)
+                        if (transformedEvent is IPropertyChangedEvent propChangedEvent)
                         {
                             await subscription.Handler.HandleEventAsync(sender, propChangedEvent, ct);
                             result.SuccessCount++;
@@ -186,7 +186,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// and topology relationships.
         /// </summary>
         private async Task<List<IEventSubscription>> GetMatchingSubscriptionsAsync(
-            IHydroGardenEvent evt,
+            IEvent evt,
             CancellationToken ct = default)
         {
             var matchingSubs = new List<IEventSubscription>();

@@ -10,7 +10,7 @@ namespace HydroGarden.Foundation.Core.Services
     /// </summary>
     public class TopologyService : ITopologyService
     {
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
         private readonly IStore _store;
         private readonly IPersistenceService _persistenceService;
         private readonly ConcurrentDictionary<Guid, ComponentConnection> _connections = new();
@@ -26,8 +26,7 @@ namespace HydroGarden.Foundation.Core.Services
         /// </summary>
         /// <param name="logger">Logger for recording events</param>
         /// <param name="store">Store for persisting connections</param>
-        /// <param name="persistenceService">Service for accessing component properties</param>
-        public TopologyService(IHydroGardenLogger logger, IStore store, IPersistenceService persistenceService)
+        public TopologyService(ILogger logger, IStore store)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _store = store ?? throw new ArgumentNullException(nameof(store));

@@ -14,9 +14,9 @@ namespace HydroGarden.Foundation.Core.Stores
         private readonly string _filePath;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly JsonSerializerOptions _serializerOptions;
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
 
-        public JsonStore(string basePath, IHydroGardenLogger logger)
+        public JsonStore(string basePath, ILogger logger)
         {
             string fullPath = Path.GetFullPath(basePath);
             _filePath = Path.Combine(fullPath, "ComponentProperties.json");
@@ -34,7 +34,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 }
             };
 
-            _logger = logger ?? new HydroGardenLogger();
+            _logger = logger ?? new Logger();
             _logger.Log($"JsonStore initialized with file path: {_filePath}");
         }
 

@@ -16,7 +16,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
     {
         private readonly Mock<IStore> _mockStore;
         private readonly Mock<IStoreTransaction> _mockTransaction;
-        private readonly Mock<IHydroGardenLogger> _mockLogger;
+        private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Core.Services.PersistenceService _sut;
         private Dictionary<string, IPropertyMetadata> _capturedMetadata;
@@ -25,7 +25,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         {
             _mockStore = new Mock<IStore>();
             _mockTransaction = new Mock<IStoreTransaction>();
-            _mockLogger = new Mock<IHydroGardenLogger>();
+            _mockLogger = new Mock<ILogger>();
             _mockEventBus = new Mock<IEventBus>();
             _capturedMetadata = new Dictionary<string, IPropertyMetadata>();
 

@@ -21,7 +21,7 @@ namespace TestConsole
             Console.WriteLine("=========================================");
 
             // Setup services
-            var logger = new HydroGardenLogger();
+            var logger = new Logger();
             var storePath = Path.Combine(Directory.GetCurrentDirectory(), "DeviceData");
             var store = new JsonStore(storePath, logger);
             var eventBus = new EventBus(
@@ -52,7 +52,7 @@ namespace TestConsole
         /// <summary>
         /// Loads existing devices from the JSON store or creates a new one if no file exists.
         /// </summary>
-        static async Task LoadOrCreateDevices(HydroGardenLogger logger, PersistenceService persistenceService)
+        static async Task LoadOrCreateDevices(Logger logger, PersistenceService persistenceService)
         {
             Console.WriteLine("\n🔍 Checking for stored devices...");
 
@@ -101,7 +101,7 @@ namespace TestConsole
         /// <summary>
         /// Reads stored devices from the JSON file.
         /// </summary>
-        static async Task<List<PumpDevice>> LoadDevicesFromFile(string filePath, HydroGardenLogger logger)
+        static async Task<List<PumpDevice>> LoadDevicesFromFile(string filePath, Logger logger)
         {
             var devices = new List<PumpDevice>();
 
@@ -167,7 +167,7 @@ namespace TestConsole
         /// <summary>
         /// Creates a new pump device, saves it, and returns it.
         /// </summary>
-        static async Task<PumpDevice> CreateNewPumpDevice(HydroGardenLogger logger, PersistenceService persistenceService)
+        static async Task<PumpDevice> CreateNewPumpDevice(Logger logger, PersistenceService persistenceService)
         {
             var pumpId = Guid.NewGuid();
             var pump = new PumpDevice(pumpId, "Test Pump", 100, 0, logger);

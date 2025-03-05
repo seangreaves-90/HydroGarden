@@ -10,8 +10,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
 {
     public class PumpDeviceTests
     {
-        private readonly Mock<IHydroGardenLogger> _mockLogger;
-        private readonly Mock<IHydroGardenPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<ILogger> _mockLogger;
+        private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly double _maxFlowRate;
@@ -20,8 +20,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
 
         public PumpDeviceTests()
         {
-            _mockLogger = new Mock<IHydroGardenLogger>();
-            _mockEventHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            _mockLogger = new Mock<ILogger>();
+            _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
             _testId = Guid.NewGuid();
             _testName = "Test Pump";
             _maxFlowRate = 100.0;
@@ -33,7 +33,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                    It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
         }
@@ -107,7 +107,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                    It.Is<IPropertyChangedEvent>(evt =>
                         evt.PropertyName == "IsRunning" &&
                         evt.NewValue != null &&
                         (bool)evt.NewValue == true),
@@ -148,11 +148,11 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                    It.Is<IPropertyChangedEvent>(evt =>
                         evt.PropertyName == "CurrentFlowRate" &&
                         evt.NewValue != null),
                     It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => capturedFlowRate = evt.NewValue as double? ?? 0.0)
                 .Returns(Task.CompletedTask);
 
@@ -235,7 +235,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                    It.Is<IPropertyChangedEvent>(evt =>
                         evt.PropertyName == "CurrentFlowRate"),
                     It.IsAny<CancellationToken>()))
                 .Callback(() => currentFlowRateEvents++)
@@ -268,7 +268,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                    It.Is<IPropertyChangedEvent>(evt =>
                         evt.PropertyName == "CurrentFlowRate"),
                     It.IsAny<CancellationToken>()))
                 .Callback(() => Interlocked.Increment(ref currentFlowRateEvents))
@@ -303,11 +303,11 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                    It.Is<IPropertyChangedEvent>(evt =>
                         evt.PropertyName == "CurrentFlowRate" &&
                         evt.NewValue != null),
                     It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => eventCompletion.TrySetResult((double)(evt.NewValue ?? 0.0)))
                 .Returns(Task.CompletedTask);
 

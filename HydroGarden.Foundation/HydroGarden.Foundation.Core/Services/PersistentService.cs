@@ -9,15 +9,15 @@ using System.Threading.Channels;
 
 namespace HydroGarden.Foundation.Core.Services
 {
-    public class PersistenceService : IPersistenceService, IHydroGardenPropertyChangedEventHandler
+    public class PersistenceService : IPersistenceService, IPropertyChangedEventHandler
     {
         private readonly IStore _store;
         private readonly IEventBus _eventBus;
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
         private readonly Dictionary<Guid, Dictionary<string, object>> _deviceProperties;
         // Add a new field to track metadata for all devices
         private readonly Dictionary<Guid, Dictionary<string, IPropertyMetadata>> _deviceMetadata;
-        private readonly Channel<IHydroGardenPropertyChangedEvent> _eventChannel;
+        private readonly Channel<IPropertyChangedEvent> _eventChannel;
         private readonly CancellationTokenSource _processingCts = new();
         private readonly Task _processingTask;
         private readonly SemaphoreSlim _transactionLock = new(1, 1);
@@ -26,14 +26,14 @@ namespace HydroGarden.Foundation.Core.Services
 
         public bool IsBatchProcessingEnabled { get; set; } = true;
         public bool ForceTransactionCreation { get; set; } = false;
-        public IHydroGardenPropertyChangedEvent? TestEvent { get; set; }
+        public IPropertyChangedEvent? TestEvent { get; set; }
 
         public PersistenceService(IStore store, IEventBus eventBus)
-            : this(store, eventBus, new HydroGardenLogger(), TimeSpan.FromSeconds(5))
+            : this(store, eventBus, new Logger(), TimeSpan.FromSeconds(5))
         {
         }
 
-        public PersistenceService(IStore store, IEventBus eventBus, IHydroGardenLogger logger, TimeSpan? batchInterval = null)
+        public PersistenceService(IStore store, IEventBus eventBus, ILogger logger, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -42,7 +42,7 @@ namespace HydroGarden.Foundation.Core.Services
             _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>();
             // Initialize the metadata dictionary
             _deviceMetadata = new Dictionary<Guid, Dictionary<string, IPropertyMetadata>>();
-            _eventChannel = Channel.CreateUnbounded<IHydroGardenPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
+            _eventChannel = Channel.CreateUnbounded<IPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
         }
 
@@ -122,9 +122,9 @@ namespace HydroGarden.Foundation.Core.Services
             return Task.FromResult(default(T?));
         }
 
-        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
         {
-            if (evt is IHydroGardenPropertyChangedEvent propertyChangedEvent)
+            if (evt is IPropertyChangedEvent propertyChangedEvent)
             {
                 _logger.Log($"[DEBUG] Handling property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
                 try
@@ -167,12 +167,12 @@ namespace HydroGarden.Foundation.Core.Services
 
         public async Task ProcessPendingEventsAsync()
         {
-            var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
+            var pendingEvents = new Dictionary<Guid, Dictionary<string, IPropertyChangedEvent>>();
             while (_eventChannel.Reader.TryRead(out var evt))
             {
                 if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
                 {
-                    deviceEvents = new Dictionary<string, IHydroGardenPropertyChangedEvent>();
+                    deviceEvents = new Dictionary<string, IPropertyChangedEvent>();
                     pendingEvents[evt.DeviceId] = deviceEvents;
                 }
                 deviceEvents[evt.PropertyName] = evt;
@@ -191,7 +191,7 @@ namespace HydroGarden.Foundation.Core.Services
 
         private async Task ProcessEventsAsync(CancellationToken ct)
         {
-            var pendingEvents = new Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>>();
+            var pendingEvents = new Dictionary<Guid, Dictionary<string, IPropertyChangedEvent>>();
             var batchTimer = new PeriodicTimer(_batchInterval);
 
             try
@@ -204,7 +204,7 @@ namespace HydroGarden.Foundation.Core.Services
                         hasEvents = true;
                         if (!pendingEvents.TryGetValue(evt.DeviceId, out var deviceEvents))
                         {
-                            deviceEvents = new Dictionary<string, IHydroGardenPropertyChangedEvent>();
+                            deviceEvents = new Dictionary<string, IPropertyChangedEvent>();
                             pendingEvents[evt.DeviceId] = deviceEvents;
                         }
                         deviceEvents[evt.PropertyName] = evt;
@@ -230,7 +230,7 @@ namespace HydroGarden.Foundation.Core.Services
             }
         }
 
-        private async Task PersistPendingEventsAsync(Dictionary<Guid, Dictionary<string, IHydroGardenPropertyChangedEvent>> pendingEvents)
+        private async Task PersistPendingEventsAsync(Dictionary<Guid, Dictionary<string, IPropertyChangedEvent>> pendingEvents)
         {
             if (pendingEvents.Count == 0) return;
 

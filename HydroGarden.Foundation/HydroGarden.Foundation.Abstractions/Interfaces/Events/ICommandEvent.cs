@@ -3,7 +3,7 @@
     /// <summary>
     /// Interface for command events
     /// </summary>
-    public interface IHydroGardenCommandEvent : IHydroGardenEvent
+    public interface ICommandEvent : IEvent
     {
         /// <summary>
         /// The name of the command to execute
@@ -19,7 +19,7 @@
     /// <summary>
     /// Specialized handler for command events
     /// </summary>
-    public interface IHydroGardenCommandEventHandler : IHydroGardenEventHandler
+    public interface ICommandEventHandler : IEventHandler
     {
     }
 }

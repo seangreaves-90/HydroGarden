@@ -19,7 +19,7 @@ namespace HydroGarden.Foundation.Common.Events.RetryPolicies
         /// <summary>
         /// Determines whether an event should be retried based on the attempt count.
         /// </summary>
-        public async Task<bool> ShouldRetryAsync(IHydroGardenEvent evt, int attemptCount)
+        public async Task<bool> ShouldRetryAsync(IEvent evt, int attemptCount)
         {
             if (attemptCount >= _maxAttempts) return false;
             await Task.Delay((int)Math.Pow(2, attemptCount) * _baseDelay.Milliseconds);

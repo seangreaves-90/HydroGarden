@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
     /// Base interface for all HydroGarden events
     /// </summary>
-    public interface IHydroGardenEvent
+    public interface IEvent
     {
         /// <summary>
         /// The source component that raised the event
@@ -45,8 +39,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Generic handler interface for HydroGarden events
     /// </summary>
-    /// <typeparam name="T">The type of event to handle, must implement IHydroGardenEvent</typeparam>
-    public interface IHydroGardenEventHandler : IAsyncDisposable
+    public interface IEventHandler : IAsyncDisposable
     {
         /// <summary>
         /// Handles a HydroGarden event of type T
@@ -55,7 +48,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <param name="evt">The event to handle</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>A task representing the asynchronous operation</returns>
-        Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent;
+        Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent;
     }
 
     /// <summary>

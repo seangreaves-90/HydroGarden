@@ -7,16 +7,16 @@ namespace HydroGarden.Foundation.Common.Logging
     /// <summary>
     /// Provides logging functionality for HydroGarden components.
     /// </summary>
-    public class HydroGardenLogger : IHydroGardenLogger
+    public class Logger : ILogger
     {
         private readonly string _logDirectory;
         private readonly object _syncLock = new();
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HydroGardenLogger"/> class.
+        /// Initializes a new instance of the <see cref="Logger"/> class.
         /// </summary>
         /// <param name="logDirectory">The directory where logs should be stored.</param>
-        public HydroGardenLogger(string logDirectory = "")
+        public Logger(string logDirectory = "")
         {
             _logDirectory = string.IsNullOrWhiteSpace(logDirectory)
                 ? Environment.CurrentDirectory
@@ -80,7 +80,7 @@ namespace HydroGarden.Foundation.Common.Logging
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[ERROR] Failed to write log: {ex.Message}");
-                    break; // Stop retrying if an unexpected error occurs
+                    break; 
                 }
             }
         }

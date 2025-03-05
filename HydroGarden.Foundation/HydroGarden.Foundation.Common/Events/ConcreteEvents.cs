@@ -11,7 +11,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Base class for all HydroGarden events
     /// </summary>
-    public abstract class HydroGardenEventBase : IHydroGardenEvent
+    public abstract class HydroGardenEventBase : IEvent
     {
         /// <inheritdoc />
         public Guid EventId { get; }
@@ -33,7 +33,7 @@ namespace HydroGarden.Foundation.Common.Events
 
         /// <inheritdoc />
         // Explicit implementation to ensure we never return null from the interface
-        IEventRoutingData IHydroGardenEvent.RoutingData => _routingData ?? new EventRoutingData();
+        IEventRoutingData IEvent.RoutingData => _routingData ?? new EventRoutingData();
 
         /// <summary>
         /// Gets the routing data for this event (may be null)
@@ -69,7 +69,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Enhanced implementation of property changed event
     /// </summary>
-    public class HydroGardenPropertyChangedEvent : HydroGardenEventBase, IHydroGardenPropertyChangedEvent
+    public class HydroGardenPropertyChangedEvent : HydroGardenEventBase, IPropertyChangedEvent
     {
         /// <inheritdoc />
         public string PropertyName { get; }
@@ -149,7 +149,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device lifecycle changes
     /// </summary>
-    public class HydroGardenLifecycleChangedEvent : IHydroGardenLifecycleEventHandler
+    public class HydroGardenLifecycleChangedEvent : ILifecycleEventHandler
     {
         private readonly List<ComponentState> _stateChanges;
         private readonly TaskCompletionSource<bool> _completionSource;
@@ -166,10 +166,10 @@ namespace HydroGarden.Foundation.Common.Events
             _completionSource = completionSource ?? throw new ArgumentNullException(nameof(completionSource));
         }
 
-        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IHydroGardenEvent
+        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
         {
             // Handle property changed events that represent state changes
-            if (evt is IHydroGardenPropertyChangedEvent propEvt &&
+            if (evt is IPropertyChangedEvent propEvt &&
                 propEvt.PropertyName == "State" &&
                 propEvt.NewValue is ComponentState state)
             {
@@ -182,7 +182,7 @@ namespace HydroGarden.Foundation.Common.Events
                 }
             }
             // Handle lifecycle events directly
-            else if (evt is IHydroGardenLifecycleEvent lifecycleEvt)
+            else if (evt is ILifecycleEvent lifecycleEvt)
             {
                 _stateChanges.Add(lifecycleEvt.State);
 
@@ -204,7 +204,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device commands
     /// </summary>
-    public class CommandEvent : HydroGardenEventBase, IHydroGardenCommandEvent
+    public class CommandEvent : HydroGardenEventBase, ICommandEvent
     {
         /// <inheritdoc />
         public string CommandName { get; }
@@ -237,7 +237,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device telemetry/sensor readings
     /// </summary>
-    public class TelemetryEvent : HydroGardenEventBase, IHydroGardenTelemetryEvent
+    public class TelemetryEvent : HydroGardenEventBase, ITelemetryEvent
     {
         /// <inheritdoc />
         public IDictionary<string, object> Readings { get; }
@@ -270,7 +270,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for alerts/notifications
     /// </summary>
-    public class AlertEvent : HydroGardenEventBase, IHydroGardenAlertEvent
+    public class AlertEvent : HydroGardenEventBase, IAlertEvent
     {
         /// <inheritdoc />
         public AlertSeverity Severity { get; }

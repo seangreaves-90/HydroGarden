@@ -5,7 +5,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Interface for lifecycle events
     /// </summary>
-    public interface IHydroGardenLifecycleEvent : IHydroGardenEvent
+    public interface ILifecycleEvent : IEvent
     {
         /// <summary>
         /// The new state of the component
@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Specialized handler for lifecycle events
     /// </summary>
-    public interface IHydroGardenLifecycleEventHandler : IHydroGardenEventHandler
+    public interface ILifecycleEventHandler : IEventHandler
     {
     }
 }

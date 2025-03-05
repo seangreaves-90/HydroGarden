@@ -14,7 +14,7 @@ namespace HydroGarden.Foundation.Common.Events
         public Guid[] SourceIds { get; set; } = Array.Empty<Guid>();
 
         /// <inheritdoc/>
-        public Func<IHydroGardenEvent, bool>? Filter { get; set; }
+        public Func<IEvent, bool>? Filter { get; set; }
 
         /// <inheritdoc/>
         public bool IncludeConnectedSources { get; set; }
@@ -74,7 +74,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Configures a custom filter function for additional filtering logic.
         /// </summary>
-        public EventSubscriptionOptionsBuilder WithFilter(Func<IHydroGardenEvent, bool> filter)
+        public EventSubscriptionOptionsBuilder WithFilter(Func<IEvent, bool> filter)
         {
             _options.Filter = filter;
             return this;

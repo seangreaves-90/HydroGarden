@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             public bool StartCalled { get; private set; }
             public bool StopCalled { get; private set; }
 
-            public TestIoTDevice(Guid id, string name, IHydroGardenLogger logger)
+            public TestIoTDevice(Guid id, string name, ILogger logger)
                 : base(id, name, logger)
             {
             }
@@ -44,16 +44,16 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             }
         }
 
-        private readonly Mock<IHydroGardenLogger> _mockLogger;
-        private readonly Mock<IHydroGardenPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<ILogger> _mockLogger;
+        private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestIoTDevice _sut;
 
         public IoTDeviceBaseTests()
         {
-            _mockLogger = new Mock<IHydroGardenLogger>();
-            _mockEventHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            _mockLogger = new Mock<ILogger>();
+            _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
             _testId = Guid.NewGuid();
             _testName = "Test IoT Device";
             _sut = new TestIoTDevice(_testId, _testName, _mockLogger.Object);
@@ -63,7 +63,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                    It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
         }

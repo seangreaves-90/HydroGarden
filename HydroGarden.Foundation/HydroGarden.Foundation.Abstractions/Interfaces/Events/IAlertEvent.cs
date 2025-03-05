@@ -14,7 +14,7 @@
     /// <summary>
     /// Interface for alert events
     /// </summary>
-    public interface IHydroGardenAlertEvent : IHydroGardenEvent
+    public interface IAlertEvent : IEvent
     {
         /// <summary>
         /// The severity of the alert
@@ -40,7 +40,7 @@
     /// <summary>
     /// Specialized handler for alert events
     /// </summary>
-    public interface IHydroGardenAlertEventHandler : IHydroGardenEventHandler
+    public interface IAlertEventHandler : IEventHandler
     {
     }
 }

@@ -15,7 +15,7 @@
         /// <summary>
         /// Custom filter predicate for fine-grained control
         /// </summary>
-        public Func<IHydroGardenEvent, bool>? Filter { get; set; }
+        public Func<IEvent, bool>? Filter { get; set; }
 
         /// <summary>
         /// Whether to receive events from all connected components

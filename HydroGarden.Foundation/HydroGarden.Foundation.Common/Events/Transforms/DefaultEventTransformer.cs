@@ -7,7 +7,7 @@ namespace HydroGarden.Foundation.Common.Events.Transforms
     /// </summary>
     public class DefaultEventTransformer : IEventTransformer
     {
-        public IHydroGardenEvent Transform(IHydroGardenEvent evt)
+        public IEvent Transform(IEvent evt)
         {
             return evt; // No transformation, but extendable for logging/enrichment
         }

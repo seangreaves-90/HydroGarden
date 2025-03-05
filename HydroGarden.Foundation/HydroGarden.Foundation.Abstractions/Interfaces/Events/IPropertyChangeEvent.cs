@@ -3,7 +3,7 @@
     /// <summary>
     /// Represents an event triggered when a property of a HydroGarden component changes.
     /// </summary>
-    public interface IHydroGardenPropertyChangedEvent : IHydroGardenEvent
+    public interface IPropertyChangedEvent : IEvent
     {
         /// <summary>
         /// The name of the property that changed
@@ -34,7 +34,7 @@
     /// <summary>
     /// Defines an event handler that processes property change events in HydroGarden components.
     /// </summary>
-    public interface IHydroGardenPropertyChangedEventHandler : IHydroGardenEventHandler 
+    public interface IPropertyChangedEventHandler : IEventHandler 
     {
     }
 }

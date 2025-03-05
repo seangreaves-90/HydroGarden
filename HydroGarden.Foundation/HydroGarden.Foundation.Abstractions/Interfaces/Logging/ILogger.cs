@@ -3,7 +3,7 @@
     /// <summary>
     /// Provides logging functionality for HydroGarden components.
     /// </summary>
-    public interface IHydroGardenLogger
+    public interface ILogger
     {
         /// <summary>
         /// Logs a message.

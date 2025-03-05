@@ -13,24 +13,24 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
 {
     public class HydroGardenComponentBaseTests
     {
-        private class TestComponent : HydroGardenComponentBase
+        private class TestComponent : ComponentBase
         {
-            public TestComponent(Guid id, string name, IHydroGardenLogger logger)
+            public TestComponent(Guid id, string name, ILogger logger)
                 : base(id, name, logger)
             {
             }
         }
 
-        private readonly Mock<IHydroGardenLogger> _mockLogger;
-        private readonly Mock<IHydroGardenPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<ILogger> _mockLogger;
+        private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestComponent _sut;
 
         public HydroGardenComponentBaseTests()
         {
-            _mockLogger = new Mock<IHydroGardenLogger>();
-            _mockEventHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            _mockLogger = new Mock<ILogger>();
+            _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
             _testId = Guid.NewGuid();
             _testName = "Test Component";
             _sut = new TestComponent(_testId, _testName, _mockLogger.Object);
@@ -85,7 +85,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                    It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -93,7 +93,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
 
             _mockEventHandler.Verify(e => e.HandleEventAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                It.Is<IPropertyChangedEvent>(evt =>
                     evt.DeviceId == _testId &&
                     evt.PropertyName == propertyName &&
                     (evt.NewValue != null ? evt.NewValue.ToString() : string.Empty) == propertyValue), // ✅ Single expression
@@ -111,7 +111,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                    It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -125,7 +125,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
 
             _mockEventHandler.Verify(e => e.HandleEventAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                It.Is<IPropertyChangedEvent>(evt =>
                     evt.DeviceId == _testId &&
                     evt.PropertyName == propertyName &&
                     evt.OldValue is int && (int)evt.OldValue == 5 &&
@@ -142,7 +142,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             _mockEventHandler
                 .Setup(e => e.HandleEventAsync(
                     It.IsAny<object>(),
-                    It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                    It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
@@ -156,7 +156,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
 
             _mockEventHandler.Verify(e => e.HandleEventAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IHydroGardenPropertyChangedEvent>(evt =>
+                It.Is<IPropertyChangedEvent>(evt =>
                     evt.DeviceId == _testId &&
                     evt.PropertyName == propertyName &&
                     evt.NewValue is string && (string)evt.NewValue == "New Value"),
