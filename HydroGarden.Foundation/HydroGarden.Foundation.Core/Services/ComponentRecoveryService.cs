@@ -1,6 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Logging;
 using System.Collections.Concurrent;
@@ -17,6 +18,7 @@ namespace HydroGarden.Foundation.Core.Services
         private readonly Logger _logger;
         private readonly IErrorMonitor _errorMonitor;
         private readonly ConcurrentDictionary<Guid, RecoveryState> _deviceRecoveryStates;
+        private readonly IEnumerable<IRecoveryStrategy> _recoveryStrategies;
 
         private class RecoveryState
         {
@@ -31,11 +33,12 @@ namespace HydroGarden.Foundation.Core.Services
         public ComponentRecoveryService(
             IPersistenceService persistenceService,
             Logger logger,
-            IErrorMonitor errorMonitor)
+            IErrorMonitor errorMonitor, IEnumerable<IRecoveryStrategy> recoveryStrategies)
         {
             _persistenceService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _errorMonitor = errorMonitor ?? throw new ArgumentNullException(nameof(errorMonitor));
+            _recoveryStrategies = recoveryStrategies;
             _deviceRecoveryStates = new ConcurrentDictionary<Guid, RecoveryState>();
         }
 

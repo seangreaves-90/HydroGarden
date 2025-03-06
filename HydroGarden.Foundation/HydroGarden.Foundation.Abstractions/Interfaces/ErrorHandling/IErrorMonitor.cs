@@ -37,5 +37,21 @@
             bool successful,
             CancellationToken ct = default);
 
+        // Add correlation tracking capabilities
+        Task<IReadOnlyList<IApplicationError>> GetErrorsByCorrelationIdAsync(
+            Guid correlationId, CancellationToken ct = default);
+
+        // Add error filtering capabilities
+        Task<IReadOnlyList<IApplicationError>> GetErrorsByCodeAsync(
+            string errorCode, DateTimeOffset since, CancellationToken ct = default);
+
+        // Add error subscription
+        Task<Guid> SubscribeToErrorsAsync(
+            Func<IApplicationError, Task> handler,
+            Func<IApplicationError, bool>? filter = null,
+            CancellationToken ct = default);
+
+        Task UnsubscribeFromErrorsAsync(Guid subscriptionId, CancellationToken ct = default);
+
     }
 }

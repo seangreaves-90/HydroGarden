@@ -28,7 +28,9 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         public IDictionary<string, object> Context { get; }
         public DateTimeOffset Timestamp { get; }
         public Exception? Exception { get; }
-
+        public Guid CorrelationId { get; }
+        public ErrorSource Source { get; }
+        public bool IsTransient { get; }
         /// <summary>
         /// Records the recovery attempt for this error
         /// </summary>

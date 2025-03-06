@@ -74,13 +74,14 @@ namespace HydroGarden.Foundation.Core.Services
                 }
 
                 var error = new ComponentError(
-                    deviceId,
-                    errorCode,
-                    alertEvent.Message,
-                    MapAlertSeverityToErrorSeverity(alertEvent.Severity),
-                    alertEvent.AlertData,
-                    null // No exception available from alert event
-                );
+                                        deviceId,
+                                        errorCode,
+                                        alertEvent.Message,
+                                        MapAlertSeverityToErrorSeverity(alertEvent.Severity),
+                                        true,
+                                        ErrorSource.Communication,
+                                        true
+                                              );
 
                 // Report the error to the base handler
                 await ReportErrorAsync(error, ct);
@@ -108,7 +109,7 @@ namespace HydroGarden.Foundation.Core.Services
 
         #region Helper Methods
 
-      
+
         private bool IsUnrecoverableError(string? errorCode)
         {
             return errorCode is "HARDWARE_FAILURE" or

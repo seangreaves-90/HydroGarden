@@ -114,8 +114,10 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 error.ErrorCode,
                 error.Message,
                 error.Severity,
-                error.Severity < ErrorSeverity.Critical, // Only critical errors are non-recoverable by default
-                error.Context,
+                error.Severity < ErrorSeverity.Critical, 
+                ErrorSource.Communication,
+                true,
+                null,
                 error.Exception);
 
             // Report through the error monitor
@@ -156,16 +158,20 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         public async Task<bool> TryRecoverAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Error)
-                return true; // Already in good state
+                return true; 
 
             if (_consecutiveRecoveryFailures >= _maxRecoveryAttempts)
             {
                 await ReportErrorAsync(new ComponentError(
-                    Id,
-                    "RECOVERY_LIMIT_EXCEEDED",
-                    $"Device recovery failed after {_maxRecoveryAttempts} attempts",
-                    ErrorSeverity.Critical,
-                    false), // Not recoverable
+                        Id,
+                        "RECOVERY_LIMIT_EXCEEDED",
+                        $"Device recovery failed after {_maxRecoveryAttempts} attempts",
+                        ErrorSeverity.Critical,
+                        false, // Not recoverable
+                        ErrorSource.Device, // Add the missing 'source' parameter
+                        false, // Add the missing 'isTransient' parameter
+                        null, // Add the missing 'context' parameter
+                        null), // Add the missing 'exception' parameter
                     ct);
 
                 return false;
@@ -204,6 +210,8 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     $"Exception during recovery attempt: {ex.Message}",
                     ErrorSeverity.Error,
                     true, // Still recoverable
+                    ErrorSource.Communication,
+                    true,
                     null,
                     ex), ct);
 

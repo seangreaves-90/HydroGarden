@@ -32,7 +32,7 @@
         /// <param name="evt">The event to publish</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Result of the publish operation</returns>
-        Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default);
+        Task<IPublishResult?> PublishAsync(object sender, IEvent evt, CancellationToken ct = default);
     }
 
     public interface IEventStore

@@ -34,6 +34,9 @@ namespace HydroGarden.Foundation.Common.Extensions
                         errorCode,
                         errorMessage,
                         ErrorSeverity.Error,
+                        true,
+                        errorSource,
+                        false,
                         context,
                         ex),
                     ct);
@@ -69,6 +72,9 @@ namespace HydroGarden.Foundation.Common.Extensions
                         errorCode,
                         errorMessage,
                         ErrorSeverity.Error,
+                        true,
+                        errorSource,
+                        false,
                         context,
                         ex),
                     ct);
@@ -96,6 +102,9 @@ namespace HydroGarden.Foundation.Common.Extensions
                     errorCode,
                     errorMessage,
                     severity,
+                    true,
+                    errorSource,
+                    false,
                     context,
                     exception),
                 ct);

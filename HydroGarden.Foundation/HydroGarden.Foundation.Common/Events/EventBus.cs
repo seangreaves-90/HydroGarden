@@ -110,7 +110,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Publishes an event to the event bus.
         /// </summary>
-        public async Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default)
+        public async Task<IPublishResult?> PublishAsync(object sender, IEvent evt, CancellationToken ct = default)
         {
             return await this.ExecuteWithErrorHandlingAsync(
                 _errorMonitor,
@@ -176,7 +176,7 @@ namespace HydroGarden.Foundation.Common.Events
                 {
                     ["EventType"] = evt.EventType.ToString(),
                     ["SourceId"] = evt.SourceId
-                });
+                }, ct: ct);
         }
 
         /// <summary>
