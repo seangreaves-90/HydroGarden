@@ -154,7 +154,7 @@ namespace HydroGarden.Foundation.Core.Services
                     await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
                     await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
                 }
-                catch (Exception ex)
+                catch (Exception? ex)
                 {
                     _logger.Log(ex, $"[ERROR] Failed to handle property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
                 }
@@ -224,7 +224,7 @@ namespace HydroGarden.Foundation.Core.Services
             {
                 _logger.Log("[INFO] Event processing loop canceled.");
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, "[ERROR] Error occurred while processing events.");
             }
@@ -279,7 +279,7 @@ namespace HydroGarden.Foundation.Core.Services
                     _transactionLock.Release();
                 }
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, "[ERROR] Failed to persist device events with metadata.");
                 throw;

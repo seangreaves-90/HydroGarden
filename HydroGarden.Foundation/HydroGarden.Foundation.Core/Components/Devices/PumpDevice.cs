@@ -157,9 +157,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     await SetPropertyAsync("Timestamp", DateTime.UtcNow, GetDefaultPropertyMetadata("Timestamp"));
                 }
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
-                _logger.Log(ex, "Error updating pump properties");
+                Logger.Log(ex, "Error updating pump properties");
             }
         }
 

@@ -10,11 +10,10 @@ using HydroGarden.Foundation.Common.ErrorHandling;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
-    public abstract class IoTDeviceBase(Guid id, string name, ILogger? logger = null)
-        : ComponentBase(id, name, logger), IIoTDevice
+    public abstract class IoTDeviceBase(Guid id, string name, IErrorMonitor errorMonitor, ILogger? logger = null) : ComponentBase(id, name, errorMonitor, logger), IIoTDevice
     {
         private readonly CancellationTokenSource _executionCts = new();
-        private readonly ConcurrentQueue<IComponentError> _recentErrors = new();
+        private readonly ConcurrentQueue<IApplicationError> _recentErrors = new();
         private readonly int _maxErrorsToTrack = 10;
         private int _consecutiveRecoveryFailures;
         private readonly int _maxRecoveryAttempts = 3;
@@ -38,9 +37,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 // Use ConstructDefaultPropertyMetadata again
                 await SetPropertyAsync(nameof(State), ComponentState.Ready, stateMetadata);
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
-                _logger.Log(ex, "Failed to initialize device");
+                Logger.Log(ex, "Failed to initialize device");
 
                 // Use ConstructDefaultPropertyMetadata here too
                 await SetPropertyAsync(nameof(State), ComponentState.Error,
@@ -112,7 +111,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         #endregion
 
         #region Error Handling
-        public async Task ReportErrorAsync(IComponentError error, CancellationToken ct = default)
+        public async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
             // Add to recent errors, maintaining max size
             _recentErrors.Enqueue(error);
@@ -120,7 +119,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             // Log the error
             if (error.Exception != null)
-                _logger.Log(error.Exception, $"[{error.Severity}] {error.ErrorCode}: {error.Message}");
+                Logger.Log(error.Exception, $"[{error.Severity}] {error.ErrorCode}: {error.Message}");
 
             // Update state based on severity
             if (error.Severity >= ErrorSeverity.Error)
@@ -145,9 +144,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 metadata);
 
             // If we have an event handler, publish the event
-            if (_eventHandler != null)
+            if (PropertyChangedEventHandler != null)
             {
-                await _eventHandler.HandleEventAsync(this, alertEvent, ct);
+                await PropertyChangedEventHandler.HandleEventAsync(this, alertEvent, ct);
             }
         }
 
@@ -169,7 +168,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             try
             {
-                _logger.Log($"Attempting recovery for device {Id} ({Name})");
+                Logger.Log($"Attempting recovery for device {Id} ({Name})");
 
                 // First, try to stop any running operations
                 if (State == ComponentState.Running)
@@ -184,7 +183,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     await SetPropertyAsync(nameof(State), ComponentState.Ready,
                         ConstructDefaultPropertyMetadata(nameof(State)));
 
-                    _logger.Log($"Recovery successful for device {Id} ({Name})");
+                    Logger.Log($"Recovery successful for device {Id} ({Name})");
                     return true;
                 }
 

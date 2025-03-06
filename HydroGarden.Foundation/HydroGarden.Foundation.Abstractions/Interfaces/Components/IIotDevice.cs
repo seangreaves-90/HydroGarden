@@ -35,7 +35,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// <param name="error">Propagated component error details</param>
         /// <param name="ct">An optional cancellation token.</param>
         /// <returns>A task representing the asynchronous error reporting.</returns>
-        Task ReportErrorAsync(IComponentError error, CancellationToken ct = default);
+        Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
 
        /// <summary>
        /// Tries to recover the IoT device asynchronously.

@@ -26,7 +26,7 @@ namespace HydroGarden.Foundation.Core.Services
         /// </summary>
         /// <param name="logger">Logger for recording events</param>
         /// <param name="store">Store for persisting connections</param>
-        public TopologyService(ILogger logger, IStore store)
+        public TopologyService(ILogger logger, IStore store, IPersistenceService persistenceService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -71,7 +71,7 @@ namespace HydroGarden.Foundation.Core.Services
 
                 _isInitialized = true;
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, "Error initializing topology service");
                 throw;
@@ -308,7 +308,7 @@ namespace HydroGarden.Foundation.Core.Services
                     connection.Condition,
                     ct);
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 // Make sure to log the exception
                 _logger.Log(ex, $"Error evaluating condition for connection {connection.ConnectionId}");
@@ -389,7 +389,7 @@ namespace HydroGarden.Foundation.Core.Services
 
                 _logger.Log($"Saved {connections.Count} connections to storage");
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, "Error saving connections to storage");
                 throw;

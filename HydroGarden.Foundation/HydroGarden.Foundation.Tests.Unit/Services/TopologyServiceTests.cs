@@ -10,7 +10,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 {
     public class TopologyServiceTests
     {
-        private readonly Mock<IHydroGardenLogger> _mockLogger;
+        private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IStore> _mockStore;
         private readonly Mock<IPersistenceService> _mockPersistenceService;
         private readonly TopologyService _topologyService;
@@ -18,7 +18,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 
         public TopologyServiceTests()
         {
-            _mockLogger = new Mock<IHydroGardenLogger>();
+            _mockLogger = new Mock<ILogger>();
             _mockStore = new Mock<IStore>();
             _mockPersistenceService = new Mock<IPersistenceService>();
 

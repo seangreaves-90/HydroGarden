@@ -16,7 +16,7 @@
         /// </summary>
         /// <param name="ex">The exception to log.</param>
         /// <param name="message">The message describing the exception.</param>
-        void Log(Exception ex, string message);
+        void Log(Exception? ex, string message);
 
         /// <summary>
         /// Logs an object with a description message.

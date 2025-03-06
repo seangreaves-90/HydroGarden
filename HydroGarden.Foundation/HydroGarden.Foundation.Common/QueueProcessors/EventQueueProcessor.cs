@@ -81,7 +81,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
                             queueItem.Result.SuccessCount++;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception? ex)
                     {
                         _logger.Log(ex, $"[EventQueueProcessor] Error processing event {queueItem.Event.EventId}");
                         queueItem.Result.Errors.Add(ex);

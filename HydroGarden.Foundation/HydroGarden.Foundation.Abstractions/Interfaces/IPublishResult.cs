@@ -33,7 +33,7 @@
         /// <summary>
         /// List of errors that occurred during event processing
         /// </summary>
-        public List<Exception> Errors { get; set; }
+        public List<Exception?> Errors { get; set; }
 
         /// <summary>
         /// Whether any errors occurred during event processing

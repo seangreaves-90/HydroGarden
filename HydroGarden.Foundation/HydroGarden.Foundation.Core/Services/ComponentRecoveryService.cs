@@ -103,7 +103,7 @@ namespace HydroGarden.Foundation.Core.Services
                 _logger.Log($"Successfully recovered device {deviceId}");
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, $"Error recovering device {deviceId}");
                 return false;

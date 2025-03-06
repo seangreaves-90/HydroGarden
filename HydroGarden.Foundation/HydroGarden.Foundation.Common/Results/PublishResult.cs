@@ -25,7 +25,7 @@ namespace HydroGarden.Foundation.Common.Results
         public bool TimedOut { get; set; }
 
         /// <inheritdoc />
-        public List<Exception> Errors { get; set; } = new();
+        public List<Exception?> Errors { get; set; } = new();
 
         
         public bool HasErrors => Errors.Count > 0;

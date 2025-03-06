@@ -7,6 +7,8 @@ using System.Reflection;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Common.Extensions;
 
 namespace HydroGarden.Foundation.Core.Components
 {
@@ -16,9 +18,10 @@ namespace HydroGarden.Foundation.Core.Components
     public abstract class ComponentBase : IComponent
     {
         private readonly ConcurrentDictionary<string, object> _properties = new();
-        private readonly ConcurrentDictionary<string, PropertyMetadata> _propertyMetadata = new();
-        protected readonly ILogger _logger;
-        protected IPropertyChangedEventHandler? _eventHandler;
+        private readonly ConcurrentDictionary<string, IPropertyMetadata> _propertyMetadata = new();
+        protected readonly ILogger Logger;
+        protected readonly IErrorMonitor ErrorMonitor;
+        protected IPropertyChangedEventHandler? PropertyChangedEventHandler;
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
 
@@ -27,13 +30,15 @@ namespace HydroGarden.Foundation.Core.Components
         /// </summary>
         /// <param name="id">The unique identifier of the component.</param>
         /// <param name="name">The name of the component.</param>
+        /// <param name="errorMonitor">The errorMonitor component.</param>
         /// <param name="logger">Optional logger instance.</param>
-        protected ComponentBase(Guid id, string name, ILogger? logger = null)
+        protected ComponentBase(Guid id, string name, IErrorMonitor errorMonitor, ILogger? logger = null)
         {
             Id = id;
             Name = name;
             AssemblyType = GetType().FullName ?? "UnknownType";
-            _logger = logger ?? new Logger();
+            Logger = logger ?? new Logger();
+            ErrorMonitor = errorMonitor;
         }
 
         /// <inheritdoc/>
@@ -57,32 +62,45 @@ namespace HydroGarden.Foundation.Core.Components
         }
 
         /// <inheritdoc/>
-        public void SetEventHandler(IPropertyChangedEventHandler handler) => _eventHandler = handler;
+        public void SetEventHandler(IPropertyChangedEventHandler handler) => PropertyChangedEventHandler = handler;
 
         /// <inheritdoc/>
         public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)
         {
-            var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
-            UpdateClassProperty(name, value);
-            _properties[name] = value;
+            await this.ExecuteWithErrorHandlingAsync(
+                ErrorMonitor,
+                async () =>
+                {
+                    var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
+                    UpdateClassProperty(name, value);
+                    _properties[name] = value;
 
-            // If no metadata provided, get the default for this property
-            if (metadata == null)
-            {
-                metadata = ConstructDefaultPropertyMetadata(name);
-            }
+                    if (metadata == null)
+                    {
+                        metadata = ConstructDefaultPropertyMetadata(name);
+                    }
 
-            // Store the metadata
-            _propertyMetadata[name] = new PropertyMetadata(
-                metadata.IsEditable,
-                metadata.IsVisible,
-                metadata.DisplayName,
-                metadata.Description);
+                    _propertyMetadata[name] = new PropertyMetadata(
+                        metadata.IsEditable,
+                        metadata.IsVisible,
+                        metadata.DisplayName,
+                        metadata.Description);
 
-            if (!Equals(oldValue, value))
-            {
-                await PublishPropertyChangeAsync(name, value, _propertyMetadata[name], oldValue);
-            }
+                    if (!Equals(oldValue, value))
+                    {
+                        await PublishPropertyChangeAsync(name, value, _propertyMetadata[name], oldValue);
+                    }
+
+                    return true;
+                },
+                "PROPERTY_UPDATE_FAILED",
+                $"Failed to update property '{name}'",
+                ErrorSource.Device,
+                new Dictionary<string, object>
+                {
+                    ["PropertyName"] = name,
+                    ["PropertyType"] = value?.GetType().Name ?? "null"
+                });
         }
 
         public virtual async Task<bool> UpdatePropertyOptimisticAsync<T>(string name, Func<T?, T> updateFunc)
@@ -115,7 +133,7 @@ namespace HydroGarden.Foundation.Core.Components
                 await Task.Delay(TimeSpan.FromMilliseconds(10 * attempts));
             }
 
-            _logger.Log($"Failed to update property {name} after {MaxOptimisticRetries} attempts due to concurrent modifications.");
+            Logger.Log($"Failed to update property {name} after {MaxOptimisticRetries} attempts due to concurrent modifications.");
             return false;
         }
 
@@ -179,7 +197,7 @@ namespace HydroGarden.Foundation.Core.Components
         {
             if (_properties.TryGetValue(name, out var value))
             {
-                _logger.Log($"[DEBUG] GetPropertyAsync: Found '{name}' = {value} (Type: {value?.GetType()})");
+                Logger.Log($"[DEBUG] GetPropertyAsync: Found '{name}' = {value} (Type: {value?.GetType()})");
 
                 // Direct cast if possible
                 if (value is T typedValue)
@@ -191,17 +209,17 @@ namespace HydroGarden.Foundation.Core.Components
                 try
                 {
                     var convertedValue = (T)Convert.ChangeType(value, typeof(T))!;
-                    _logger.Log($"[INFO] Converted '{name}' from {value?.GetType()} to {typeof(T)}: {convertedValue}");
+                    Logger.Log($"[INFO] Converted '{name}' from {value?.GetType()} to {typeof(T)}: {convertedValue}");
                     return Task.FromResult<T?>(convertedValue);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"[WARNING] Failed to convert '{name}' value '{value}' from {value?.GetType()} to {typeof(T)}: {ex.Message}");
+                    Logger.Log($"[WARNING] Failed to convert '{name}' value '{value}' from {value?.GetType()} to {typeof(T)}: {ex.Message}");
                 }
             }
             else
             {
-                _logger.Log($"[WARNING] Property '{name}' not found in _properties.");
+                Logger.Log($"[WARNING] Property '{name}' not found in _properties.");
             }
 
             return Task.FromResult<T?>(default);
@@ -252,9 +270,9 @@ namespace HydroGarden.Foundation.Core.Components
         /// <returns>A task representing the asynchronous operation</returns>
         protected async Task PublishPropertyChangeAsync(string name, object? value, IPropertyMetadata metadata, object? oldValue = null)
         {
-            if (_eventHandler == null)
+            if (PropertyChangedEventHandler == null)
             {
-                _logger.Log($"No event handler registered for component {Id}");
+                Logger.Log($"No event handler registered for component {Id}");
                 return;
             }
 
@@ -270,7 +288,7 @@ namespace HydroGarden.Foundation.Core.Components
                                                 // routingData is left as null
             );
 
-            await _eventHandler.HandleEventAsync(this, evt);
+            await PropertyChangedEventHandler.HandleEventAsync(this, evt);
         }
 
         /// <inheritdoc/>

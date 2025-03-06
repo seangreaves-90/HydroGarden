@@ -19,7 +19,7 @@ namespace HydroGarden.Foundation.Tests.Integration
 {
     public class TopologyServiceEventBusIntegrationTests : IAsyncDisposable
     {
-        private readonly IHydroGardenLogger _logger;
+        private readonly ILogger _logger;
         private readonly IStore _store;
         private readonly IEventBus _eventBus;
         private readonly ITopologyService _topologyService;
@@ -34,7 +34,7 @@ namespace HydroGarden.Foundation.Tests.Integration
             Directory.CreateDirectory(_testDirectory);
 
             // Setup real components
-            _logger = new HydroGardenLogger();
+            _logger = new Logger();
             _store = new JsonStore(_testDirectory, _logger);
 
             _eventBus = new Common.Events.EventBus(
@@ -76,13 +76,13 @@ namespace HydroGarden.Foundation.Tests.Integration
             await _topologyService.CreateConnectionAsync(connection);
 
             // Setup a mock handler to capture events
-            var targetEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var targetEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => targetEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -145,13 +145,13 @@ namespace HydroGarden.Foundation.Tests.Integration
             await _topologyService.CreateConnectionAsync(connection);
 
             // Setup a mock handler to capture events
-            var targetEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var targetEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => targetEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -235,13 +235,13 @@ namespace HydroGarden.Foundation.Tests.Integration
             await _topologyService.CreateConnectionAsync(connection);
 
             // Setup a mock handler to capture events
-            var targetEvents = new List<IHydroGardenPropertyChangedEvent>();
-            var mockHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
+            var targetEvents = new List<IPropertyChangedEvent>();
+            var mockHandler = new Mock<IPropertyChangedEventHandler>();
             mockHandler.Setup(h => h.HandleEventAsync(
                 It.IsAny<object>(),
-                It.IsAny<IHydroGardenPropertyChangedEvent>(),
+                It.IsAny<IPropertyChangedEvent>(),
                 It.IsAny<CancellationToken>()))
-                .Callback<object, IHydroGardenPropertyChangedEvent, CancellationToken>(
+                .Callback<object, IPropertyChangedEvent, CancellationToken>(
                     (_, evt, __) => targetEvents.Add(evt))
                 .Returns(Task.CompletedTask);
 
@@ -309,7 +309,7 @@ namespace HydroGarden.Foundation.Tests.Integration
             try
             {
                 // Create a real JsonStore for persistence
-                var logger = new HydroGardenLogger();
+                var logger = new Logger();
                 var store = new JsonStore(testDir, logger);
                 var mockPersistenceService = new Mock<IPersistenceService>();
 

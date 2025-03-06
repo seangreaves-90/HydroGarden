@@ -151,7 +151,7 @@ namespace HydroGarden.Foundation.Common.Events
                             result.SuccessCount++;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception? ex)
                     {
                         _logger.Log(ex, $"[EventBus] Error in synchronous handler for event {transformedEvent.EventId}");
                         result.Errors.Add(ex);
@@ -171,7 +171,7 @@ namespace HydroGarden.Foundation.Common.Events
                     });
                 }
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, $"[EventBus] Event {evt.EventId} failed.");
                 result.Errors.Add(ex);

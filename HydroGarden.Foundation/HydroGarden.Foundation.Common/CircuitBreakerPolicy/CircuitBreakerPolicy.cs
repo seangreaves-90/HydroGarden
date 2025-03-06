@@ -38,14 +38,14 @@ namespace HydroGarden.Foundation.Common.CircuitBreakerPolicy
                 Reset();
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 RecordFailure(ex);
                 throw;
             }
         }
 
-        private void RecordFailure(Exception ex)
+        private void RecordFailure(Exception? ex)
         {
             _lastFailureTime = DateTimeOffset.UtcNow;
             _failureCount++;

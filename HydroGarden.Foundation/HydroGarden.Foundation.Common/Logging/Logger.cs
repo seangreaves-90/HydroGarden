@@ -32,7 +32,7 @@ namespace HydroGarden.Foundation.Common.Logging
         }
 
         /// <inheritdoc/>
-        public void Log(Exception ex, string message)
+        public void Log(Exception? ex, string message)
         {
             var logMessage = new StringBuilder();
             logMessage.AppendLine($"[{DateTimeOffset.UtcNow:O}] [ERROR] {message}");

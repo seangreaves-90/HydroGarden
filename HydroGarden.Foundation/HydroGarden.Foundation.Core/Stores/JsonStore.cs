@@ -162,7 +162,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 string json = await File.ReadAllTextAsync(_filePath, ct);
                 return JsonSerializer.Deserialize<JsonStoreStructure>(json, _serializerOptions) ?? new JsonStoreStructure();
             }
-            catch (JsonException ex)
+            catch (JsonException? ex)
             {
                 _logger.Log(ex, "Error parsing JSON file.");
                 throw;
@@ -178,7 +178,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 await File.WriteAllTextAsync(tempFile, json, ct);
                 File.Move(tempFile, _filePath, true);
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, "Error saving store to file.");
                 if (File.Exists(tempFile)) File.Delete(tempFile);
