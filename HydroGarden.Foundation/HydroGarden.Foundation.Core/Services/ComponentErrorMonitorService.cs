@@ -1,218 +1,361 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Abstractions.Interfaces.Components;
-using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Events;
-using HydroGarden.Foundation.Common.ErrorHandling;
-using Microsoft.Extensions.Hosting;
+﻿
 using System.Collections.Concurrent;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Foundation.Common.ErrorHandling;
+using HydroGarden.Foundation.Common.Extensions;
 
 namespace HydroGarden.Foundation.Core.Services
 {
-    public class ComponentErrorMonitoringService(
-                                                    ILogger logger,
-                                                    IEventBus eventBus,
-                                                    IServiceProvider serviceProvider)
-                                                    : ErrorMonitorBase(logger), IHostedService, IEventHandler
+    /// <summary>
+    /// Monitors and manages component errors throughout the system.
+    /// </summary>
+    /// <remarks>
+    /// Creates a new component error monitor.
+    /// </remarks>
+    public class ComponentErrorMonitorService(ILogger logger, int maxErrorQueueSize = 1000) : IErrorMonitor, IDisposable
     {
-        private readonly IEventBus _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        private Guid _subscriptionId;
-        private readonly ConcurrentDictionary<Guid, ComponentErrorInfo> _deviceErrorStats = new();
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly int _maxErrorQueueSize = maxErrorQueueSize;
+        private readonly ConcurrentQueue<IApplicationError> _errorQueue = new();
+        private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<string, ComponentError>> _deviceErrors = new();
+        private readonly ConcurrentDictionary<string, int> _errorStatistics = new();
+        private readonly ConcurrentDictionary<Guid, List<IApplicationError>> _errorsByCorrelation = new();
+        private readonly ConcurrentDictionary<Guid, Func<IApplicationError, Task>> _subscriptions = new();
+        private readonly ConcurrentDictionary<Guid, Func<IApplicationError, bool>> _subscriptionFilters = new();
+        private readonly SemaphoreSlim _statisticsLock = new(1, 1);
+        private bool _isDisposed;
 
-        #region Component Error Info
-        private class ComponentErrorInfo
+        /// <summary>
+        /// Reports an error to the error monitor.
+        /// </summary>
+        public async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            public int ErrorCount { get; set; }
-            public DateTimeOffset LastErrorTime { get; set; }
-            public int RecoveryAttempts { get; set; }
-            public DateTimeOffset LastRecoveryTime { get; set; }
-            public List<AlertSeverity> RecentSeverities { get; } = [];
+            if (error == null)
+                throw new ArgumentNullException(nameof(error));
+
+            await this.ExecuteWithErrorHandlingAsync(
+                this,
+                async () =>
+                {
+                    // Log the error
+                    _logger.Log(error.Exception,
+                        $"[{error.Severity}] [{error.ErrorCode}] {error.Message} - DeviceId: {error.DeviceId}");
+
+                    // Add to error queue
+                    _errorQueue.Enqueue(error);
+
+                    // Ensure queue doesn't exceed max size
+                    while (_errorQueue.Count > _maxErrorQueueSize && _errorQueue.TryDequeue(out _)) { }
+
+                    // Track error by device and code if it's a ComponentError
+                    if (error is ComponentError componentError && error.ErrorCode != null)
+                    {
+                        TrackComponentError(componentError);
+
+                        // Update statistics
+                        await _statisticsLock.WaitAsync(ct);
+                        try
+                        {
+                            _errorStatistics.AddOrUpdate(
+                                error.ErrorCode,
+                                1,
+                                (_, count) => count + 1);
+                        }
+                        finally
+                        {
+                            _statisticsLock.Release();
+                        }
+
+                        // Track by correlation ID for related errors
+                        if (!_errorsByCorrelation.TryGetValue(error.CorrelationId, out var correlatedErrors))
+                        {
+                            correlatedErrors = new List<IApplicationError>();
+                            _errorsByCorrelation[error.CorrelationId] = correlatedErrors;
+                        }
+
+                        lock (correlatedErrors)
+                        {
+                            correlatedErrors.Add(error);
+                        }
+                    }
+
+                    // Notify subscribers
+                    foreach (var (subscriptionId, handler) in _subscriptions)
+                    {
+                        if (_subscriptionFilters.TryGetValue(subscriptionId, out var filter) &&
+                            (filter(error)))
+                        {
+                            try
+                            {
+                                await handler(error);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.Log(ex, $"Error notifying subscriber {subscriptionId} about error {error.ErrorCode}");
+                            }
+                        }
+                    }
+
+                    return Task.CompletedTask;
+                },
+                "ERROR_MONITOR_FAILED",
+                $"Failed to process error {error.ErrorCode}",
+                ErrorSource.Service, ct: ct);
         }
 
-
-        #endregion
-
-        #region Service Methods
-        public Task StartAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Gets the most recent errors.
+        /// </summary>
+        public Task<IReadOnlyList<IApplicationError>> GetRecentErrorsAsync(int count = 10, CancellationToken ct = default)
         {
-            var options = new EventSubscriptionOptions
+            var result = _errorQueue.TakeLast(Math.Min(count, _errorQueue.Count)).ToList();
+            return Task.FromResult<IReadOnlyList<IApplicationError>>(result);
+        }
+
+        /// <summary>
+        /// Checks if there are active errors above the specified severity.
+        /// </summary>
+        public Task<bool> HasActiveErrorsAsync(ErrorSeverity minimumSeverity = ErrorSeverity.Error, CancellationToken ct = default)
+        {
+            return Task.FromResult(_errorQueue.Any(e => e.Severity >= minimumSeverity));
+        }
+
+        /// <summary>
+        /// Gets all active errors for a specific device.
+        /// </summary>
+        public Task<IReadOnlyList<IApplicationError>> GetActiveErrorsForDeviceAsync(
+            Guid deviceId,
+            CancellationToken ct = default)
+        {
+            if (_deviceErrors.TryGetValue(deviceId, out var deviceErrorMap))
             {
-                EventTypes = new[] { EventType.Alert },
-                Synchronous = false
-            };
-            _subscriptionId = _eventBus.Subscribe(this, options);
-            Logger.Log("Component error monitoring service started");
+                return Task.FromResult<IReadOnlyList<IApplicationError>>(
+                    deviceErrorMap.Values.Cast<IApplicationError>().ToList().AsReadOnly());
+            }
+
+            return Task.FromResult<IReadOnlyList<IApplicationError>>(
+                new List<IApplicationError>().AsReadOnly());
+        }
+
+        /// <summary>
+        /// Marks an error as handled.
+        /// </summary>
+        public Task MarkErrorHandledAsync(
+            Guid deviceId,
+            string errorCode,
+            CancellationToken ct = default)
+        {
+            if (_deviceErrors.TryGetValue(deviceId, out var deviceErrorMap))
+            {
+                deviceErrorMap.TryRemove(errorCode, out _);
+
+                if (deviceErrorMap.IsEmpty)
+                {
+                    _deviceErrors.TryRemove(deviceId, out _);
+                }
+            }
+
             return Task.CompletedTask;
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Gets error statistics since a specific time.
+        /// </summary>
+        public Task<IDictionary<string, int>> GetErrorStatisticsAsync(
+            DateTimeOffset since,
+            CancellationToken ct = default)
         {
-            _eventBus.Unsubscribe(_subscriptionId);
-            Logger.Log("Component error monitoring service stopped");
-            return Task.CompletedTask;
+            var filteredErrors = _errorQueue.Where(e => e.Timestamp >= since);
+
+            var statistics = new Dictionary<string, int>();
+
+            foreach (var errorCode in filteredErrors
+                .Where(e => e.ErrorCode != null)
+                .Select(e => e.ErrorCode!)
+                .Distinct())
+            {
+                statistics[errorCode] = filteredErrors.Count(e => e.ErrorCode == errorCode);
+            }
+
+            return Task.FromResult<IDictionary<string, int>>(statistics);
         }
 
-        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default)
-            where T : IEvent
+        /// <summary>
+        /// Registers a recovery attempt for an error.
+        /// </summary>
+        public Task RegisterRecoveryAttemptAsync(
+            Guid deviceId,
+            string errorCode,
+            bool successful,
+            CancellationToken ct = default)
         {
-            if (evt is IAlertEvent alertEvent)
+            if (_deviceErrors.TryGetValue(deviceId, out var deviceErrorMap) &&
+                deviceErrorMap.TryGetValue(errorCode, out var error))
             {
-                var deviceId = alertEvent.DeviceId;
-                var errorInfo = _deviceErrorStats.GetOrAdd(deviceId, _ => new ComponentErrorInfo());
-                errorInfo.ErrorCount++;
-                errorInfo.LastErrorTime = DateTimeOffset.UtcNow;
-                errorInfo.RecentSeverities.Add(alertEvent.Severity);
-
-                // Create a ComponentError from the alert event
-                string? errorCode = "UNKNOWN_ERROR";
-                if (alertEvent.AlertData != null &&
-                    alertEvent.AlertData.TryGetValue("ErrorCode", out var codeObj))
+                if (successful)
                 {
-                    errorCode = codeObj.ToString();
-                }
+                    deviceErrorMap.TryRemove(errorCode, out _);
 
-                var error = new ComponentError(
-                                        deviceId,
-                                        errorCode,
-                                        alertEvent.Message,
-                                        MapAlertSeverityToErrorSeverity(alertEvent.Severity),
-                                        true,
-                                        ErrorSource.Communication,
-                                        true
-                                              );
-
-                // Report the error to the base handler
-                await ReportErrorAsync(error, ct);
-
-                if (alertEvent.Severity >= AlertSeverity.Error)
-                {
-                    Logger.Log($"Device {deviceId} reported alert: {alertEvent.Message}");
-
-                    if (!IsUnrecoverableError(errorCode) && ShouldAttemptRecovery(errorInfo))
+                    if (deviceErrorMap.IsEmpty)
                     {
-                        await AttemptDeviceRecoveryAsync(deviceId, ct);
-                        errorInfo.RecoveryAttempts++;
-                        errorInfo.LastRecoveryTime = DateTimeOffset.UtcNow;
-                    }
-                    else
-                    {
-                        Logger.Log($"Skipping recovery for device {deviceId}: Unrecoverable error or too many attempts");
+                        _deviceErrors.TryRemove(deviceId, out _);
                     }
 
-                    await PersistErrorAsync(alertEvent, ct);
-                }
-            }
-        }
-        #endregion
-
-        #region Helper Methods
-
-
-        private bool IsUnrecoverableError(string? errorCode)
-        {
-            return errorCode is "HARDWARE_FAILURE" or
-                              "RECOVERY_LIMIT_EXCEEDED" or
-                              "CONFIGURATION_INVALID";
-        }
-
-        private bool ShouldAttemptRecovery(ComponentErrorInfo errorInfo)
-        {
-            if (errorInfo.RecoveryAttempts >= 3 &&
-                (DateTimeOffset.UtcNow - errorInfo.LastRecoveryTime) < TimeSpan.FromMinutes(15))
-            {
-                return false;
-            }
-
-            if ((DateTimeOffset.UtcNow - errorInfo.LastRecoveryTime) > TimeSpan.FromHours(1))
-            {
-                errorInfo.RecoveryAttempts = 0;
-            }
-
-            return true;
-        }
-
-        private async Task AttemptDeviceRecoveryAsync(Guid deviceId, CancellationToken ct)
-        {
-            try
-            {
-                Logger.Log($"Attempting recovery for device {deviceId}");
-
-                var persistenceService = _serviceProvider.GetService(typeof(IPersistenceService)) as IPersistenceService;
-                if (persistenceService == null)
-                {
-                    Logger.Log($"Cannot recover device {deviceId}: PersistenceService not available");
-                    return;
-                }
-
-                var deviceProperty = await persistenceService.GetPropertyAsync<IIoTDevice>(deviceId, "Device", ct);
-                if (deviceProperty is IIoTDevice device)
-                {
-                    bool success = await device.TryRecoverAsync(ct);
-                    Logger.Log(success
-                        ? $"Successfully recovered device {deviceId}"
-                        : $"Failed to recover device {deviceId}");
+                    _logger.Log($"Successful recovery for device {deviceId}, error {errorCode}");
                 }
                 else
                 {
-                    if (_serviceProvider.GetService(typeof(IComponentRecoveryService)) is IComponentRecoveryService recoveryService)
-                    {
-                        bool success = await recoveryService.RecoverDeviceAsync(deviceId, ct);
-                        Logger.Log(success
-                            ? $"Successfully recovered device {deviceId} via recovery service"
-                            : $"Failed to recover device {deviceId} via recovery service");
-                    }
-                    else
-                    {
-                        Logger.Log($"No recovery service available for device {deviceId}");
-                    }
+                    error.RecordRecoveryAttempt();
+                    _logger.Log($"Failed recovery attempt for device {deviceId}, error {errorCode} " +
+                               $"(attempt {error.RecoveryAttemptCount})");
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Log(ex, $"Error occurred while attempting recovery for device {deviceId}");
-            }
+
+            return Task.CompletedTask;
         }
 
-        private Task PersistErrorAsync(IAlertEvent alertEvent, CancellationToken ct)
+        /// <summary>
+        /// Gets errors by correlation ID.
+        /// </summary>
+        public Task<IReadOnlyList<IApplicationError>> GetErrorsByCorrelationIdAsync(
+            Guid correlationId, CancellationToken ct = default)
         {
-            try
+            if (_errorsByCorrelation.TryGetValue(correlationId, out var errors))
             {
-                var errorDetails = new Dictionary<string, object>
-                {
-                    ["DeviceId"] = alertEvent.DeviceId,
-                    ["Timestamp"] = alertEvent.Timestamp,
-                    ["Severity"] = alertEvent.Severity,
-                    ["Message"] = alertEvent.Message,
-                    ["Data"] = alertEvent.AlertData ?? new Dictionary<string, object>()
-                };
+                return Task.FromResult<IReadOnlyList<IApplicationError>>(errors.AsReadOnly());
+            }
 
-                Logger.Log(errorDetails, "Error details for analysis");
-                return Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log(ex, "Failed to persist error data");
-                return Task.CompletedTask;
-            }
+            return Task.FromResult<IReadOnlyList<IApplicationError>>(
+                new List<IApplicationError>().AsReadOnly());
         }
 
+        /// <summary>
+        /// Gets errors by error code.
+        /// </summary>
+        public Task<IReadOnlyList<IApplicationError>> GetErrorsByCodeAsync(
+            string errorCode, DateTimeOffset since, CancellationToken ct = default)
+        {
+            var result = _errorQueue
+                .Where(e => e.ErrorCode == errorCode && e.Timestamp >= since)
+                .ToList();
+
+            return Task.FromResult<IReadOnlyList<IApplicationError>>(result.AsReadOnly());
+        }
+
+        /// <summary>
+        /// Subscribes to error notifications.
+        /// </summary>
+        public Task<Guid> SubscribeToErrorsAsync(
+            Func<IApplicationError, Task> handler,
+            Func<IApplicationError, bool>? filter = null,
+            CancellationToken ct = default)
+        {
+            var subscriptionId = Guid.NewGuid();
+            _subscriptions[subscriptionId] = handler ?? throw new ArgumentNullException(nameof(handler));
+
+            if (filter != null)
+            {
+                _subscriptionFilters[subscriptionId] = filter;
+            }
+
+            _logger.Log($"New error subscription registered with ID {subscriptionId}");
+            return Task.FromResult(subscriptionId);
+        }
+
+        /// <summary>
+        /// Unsubscribes from error notifications.
+        /// </summary>
+        public Task UnsubscribeFromErrorsAsync(Guid subscriptionId, CancellationToken ct = default)
+        {
+            _subscriptions.TryRemove(subscriptionId, out _);
+            _subscriptionFilters.TryRemove(subscriptionId, out _);
+
+            _logger.Log($"Subscription {subscriptionId} removed");
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Tracks a component error by device ID and error code.
+        /// </summary>
+        private void TrackComponentError(ComponentError error)
+        {
+            if (string.IsNullOrEmpty(error.ErrorCode))
+                return;
+
+            var deviceErrorMap = _deviceErrors.GetOrAdd(
+                error.DeviceId,
+                _ => new ConcurrentDictionary<string, ComponentError>());
+
+            deviceErrorMap[error.ErrorCode] = error;
+        }
+
+        /// <summary>
+        /// Reports an exception directly.
+        /// </summary>
+        public Task ReportExceptionAsync(
+            object source,
+            Exception exception,
+            string errorCode,
+            string errorMessage,
+            ErrorSeverity severity = ErrorSeverity.Error,
+            ErrorSource errorSource = ErrorSource.Unknown,
+            IDictionary<string, object>? additionalContext = null,
+            CancellationToken ct = default)
+        {
+            var context = additionalContext ?? new Dictionary<string, object>();
+
+            if (source is IApplicationError)
+            {
+                // Prevent potential infinite recursion if reporting an error from the error monitor
+                _logger.Log(exception, $"[CRITICAL] Error in error monitor: {errorMessage}");
+                return Task.CompletedTask;
+            }
+
+            // Add source context
+            var sourceType = source.GetType();
+            context["SourceType"] = sourceType.FullName ?? "UnknownType";
+
+            // Create the error
+            var error = new ComponentError(
+                Guid.Empty, // No device ID for general exceptions
+                errorCode,
+                errorMessage,
+                severity,
+                severity < ErrorSeverity.Critical,
+                errorSource,
+                severity < ErrorSeverity.Error,
+                context,
+                exception);
+
+            return ReportErrorAsync(error, ct);
+        }
+
+        /// <summary>
+        /// Analyzes error patterns for reporting.
+        /// </summary>
         public Dictionary<string, int> AnalyzeErrorPatterns()
         {
             var results = new Dictionary<string, int>();
 
-            foreach (var deviceStats in _deviceErrorStats)
+            // Add error frequency by code
+            foreach (var (errorCode, count) in _errorStatistics)
             {
-                var deviceId = deviceStats.Key;
-                var errorInfo = deviceStats.Value;
+                results[$"ErrorCode_{errorCode}"] = count;
+            }
 
-                results[$"Device_{deviceId}_ErrorCount"] = errorInfo.ErrorCount;
-                results[$"Device_{deviceId}_RecoveryAttempts"] = errorInfo.RecoveryAttempts;
+            // Add error count by device
+            foreach (var (deviceId, errorMap) in _deviceErrors)
+            {
+                results[$"Device_{deviceId}_ErrorCount"] = errorMap.Count;
 
-                foreach (var severity in Enum.GetValues<AlertSeverity>())
+                // Count by severity
+                var severityCounts = errorMap.Values
+                    .GroupBy(e => e.Severity)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                foreach (var (severity, count) in severityCounts)
                 {
-                    int count = errorInfo.RecentSeverities.Count(s => s == severity);
                     results[$"Device_{deviceId}_{severity}Count"] = count;
                 }
             }
@@ -220,23 +363,24 @@ namespace HydroGarden.Foundation.Core.Services
             return results;
         }
 
-        private static ErrorSeverity MapAlertSeverityToErrorSeverity(AlertSeverity severity)
+        /// <summary>
+        /// Disposes the error monitor.
+        /// </summary>
+        public void Dispose()
         {
-            return severity switch
-            {
-                AlertSeverity.Info => ErrorSeverity.Warning,
-                AlertSeverity.Warning => ErrorSeverity.Warning,
-                AlertSeverity.Error => ErrorSeverity.Error,
-                AlertSeverity.Critical => ErrorSeverity.Critical,
-                _ => ErrorSeverity.Warning
-            };
-        }
+            if (_isDisposed)
+                return;
 
-        #endregion
+            _statisticsLock.Dispose();
+            _errorQueue.Clear();
+            _deviceErrors.Clear();
+            _errorStatistics.Clear();
+            _errorsByCorrelation.Clear();
+            _subscriptions.Clear();
+            _subscriptionFilters.Clear();
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
+            _isDisposed = true;
+            GC.SuppressFinalize(this);
         }
     }
 }

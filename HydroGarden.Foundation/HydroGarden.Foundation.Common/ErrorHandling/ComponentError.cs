@@ -1,5 +1,8 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Common.ErrorHandling.Constants;
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
 
 namespace HydroGarden.Foundation.Common.ErrorHandling
 {
@@ -88,7 +91,6 @@ namespace HydroGarden.Foundation.Common.ErrorHandling
                 exception);
         }
 
-
         /// <summary>
         /// Creates a transient error that can be retried.
         /// </summary>
@@ -153,8 +155,8 @@ namespace HydroGarden.Foundation.Common.ErrorHandling
                 Context["DeviceId"] = DeviceId.ToString();
 
             // Add source component info
-            if (!string.IsNullOrEmpty(ErrorCode))
-                Context.TryAdd("ErrorCode", ErrorCode);
+            if (!string.IsNullOrEmpty(ErrorCode) && !Context.ContainsKey("ErrorCode"))
+                Context["ErrorCode"] = ErrorCode;
 
             // Add error category for classification
             Context["ErrorCategory"] = Category.ToString();

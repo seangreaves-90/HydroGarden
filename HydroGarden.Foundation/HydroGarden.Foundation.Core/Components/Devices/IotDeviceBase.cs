@@ -1,29 +1,54 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿
+using System.Collections.Concurrent;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Common.Events;
-using HydroGarden.Foundation.Common.PropertyMetadata;
-using System.Collections.Concurrent;
 using HydroGarden.Foundation.Common.ErrorHandling;
+using HydroGarden.Foundation.Common.ErrorHandling.Constants;
+using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.Extensions;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
-    public abstract class IoTDeviceBase(Guid id, string name, IErrorMonitor errorMonitor, ILogger? logger = null)
-        : ComponentBase(id, name, errorMonitor, logger), IIoTDevice
+    /// <summary>
+    /// Enhanced base class for IoT devices with improved error handling and recovery.
+    /// </summary>
+    public abstract class IoTDeviceBase : ComponentBase, IIoTDevice
     {
         private readonly CancellationTokenSource _executionCts = new();
         private int _consecutiveRecoveryFailures;
-        private readonly int _maxRecoveryAttempts = 3;
+        private readonly int _maxRecoveryAttempts;
         private readonly SemaphoreSlim _recoverySemaphore = new(1, 1);
         private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRecoveryAttempts = new();
+        private readonly RecoveryOrchestrator? _recoveryOrchestrator;
+
+        /// <summary>
+        /// Creates a new IoT device base with enhanced error handling.
+        /// </summary>
+        protected IoTDeviceBase(
+            Guid id,
+            string name,
+            IErrorMonitor errorMonitor,
+            ILogger? logger = null,
+            RecoveryOrchestrator? recoveryOrchestrator = null,
+            int maxRecoveryAttempts = 3)
+            : base(id, name, errorMonitor, logger)
+        {
+            _maxRecoveryAttempts = maxRecoveryAttempts;
+            _recoveryOrchestrator = recoveryOrchestrator;
+        }
 
         #region Device Operations
+
+        /// <summary>
+        /// Initializes the device.
+        /// </summary>
         public virtual async Task InitializeAsync(CancellationToken ct = default)
         {
-            if (State != ComponentState.Created)
+            if (State != ComponentState.Created && State != ComponentState.Error)
                 throw new InvalidOperationException($"Cannot initialize device in state {State}");
 
             await this.ExecuteWithErrorHandlingAsync(
@@ -39,108 +64,140 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     await OnInitializeAsync(ct);
 
                     await SetPropertyAsync(nameof(State), ComponentState.Ready, stateMetadata);
+                    Logger.Log($"Device {Id} ({Name}) initialized successfully");
                 },
-                "DEVICE_INIT_FAILED",
-                $"Failed to initialize device {Id}",
-                ErrorSource.Device, ct: ct);
+                ErrorCodes.Device.INITIALIZATION_FAILED,
+                $"Failed to initialize device {Id} ({Name})",
+                ErrorSource.Device,
+                ErrorContextBuilder.Create()
+                    .WithSource(this)
+                    .WithOperation("Initialize")
+                    .WithLocation()
+                    .Build(), ct: ct);
         }
 
+        /// <summary>
+        /// Override to implement device-specific initialization.
+        /// </summary>
         protected virtual Task OnInitializeAsync(CancellationToken ct) => Task.CompletedTask;
 
+        /// <summary>
+        /// Starts the device.
+        /// </summary>
         public virtual async Task StartAsync(CancellationToken ct = default)
         {
-            if (State != ComponentState.Ready)
+            if (State != ComponentState.Ready && State != ComponentState.Error)
                 throw new InvalidOperationException($"Cannot start device in state {State}");
 
-            // Use ConstructDefaultPropertyMetadata
-            await SetPropertyAsync(nameof(State), ComponentState.Running,
-                ConstructDefaultPropertyMetadata(nameof(State)));
+            await this.ExecuteWithErrorHandlingAsync(
+                ErrorMonitor,
+                async () =>
+                {
+                    await SetPropertyAsync(nameof(State), ComponentState.Running,
+                        ConstructDefaultPropertyMetadata(nameof(State)));
 
-            try
-            {
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _executionCts.Token);
-                await OnStartAsync(linkedCts.Token);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-            }
-            catch (Exception)
-            {
-                // Use ConstructDefaultPropertyMetadata
-                await SetPropertyAsync(nameof(State), ComponentState.Error,
-                    ConstructDefaultPropertyMetadata(nameof(State)));
-                throw;
-            }
+                    // Execute device-specific start logic
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _executionCts.Token);
+                    await OnStartAsync(linkedCts.Token);
+
+                    Logger.Log($"Device {Id} ({Name}) started successfully");
+                },
+                ErrorCodes.Device.STATE_TRANSITION_FAILED,
+                $"Failed to start device {Id} ({Name})",
+                ErrorSource.Device,
+                ErrorContextBuilder.Create()
+                    .WithSource(this)
+                    .WithOperation("Start")
+                    .WithLocation()
+                    .Build(), ct: ct);
         }
 
+        /// <summary>
+        /// Override to implement device-specific start behavior.
+        /// </summary>
         protected virtual Task OnStartAsync(CancellationToken ct) => Task.CompletedTask;
 
+        /// <summary>
+        /// Stops the device.
+        /// </summary>
         public virtual async Task StopAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Running)
                 return;
 
-            // Use ConstructDefaultPropertyMetadata
-            await SetPropertyAsync(nameof(State), ComponentState.Stopping,
-                ConstructDefaultPropertyMetadata(nameof(State)));
+            await this.ExecuteWithErrorHandlingAsync(
+                ErrorMonitor,
+                async () =>
+                {
+                    await SetPropertyAsync(nameof(State), ComponentState.Stopping,
+                        ConstructDefaultPropertyMetadata(nameof(State)));
 
-            await _executionCts.CancelAsync();
-            try
-            {
-                await OnStopAsync(ct);
+                    await _executionCts.CancelAsync();
 
-                // Use ConstructDefaultPropertyMetadata
-                await SetPropertyAsync(nameof(State), ComponentState.Ready,
-                    ConstructDefaultPropertyMetadata(nameof(State)));
-            }
-            catch (Exception)
-            {
-                // Use ConstructDefaultPropertyMetadata
-                await SetPropertyAsync(nameof(State), ComponentState.Error,
-                    ConstructDefaultPropertyMetadata(nameof(State)));
-                throw;
-            }
+                    await OnStopAsync(ct);
+
+                    await SetPropertyAsync(nameof(State), ComponentState.Ready,
+                        ConstructDefaultPropertyMetadata(nameof(State)));
+
+                    Logger.Log($"Device {Id} ({Name}) stopped successfully");
+                },
+                ErrorCodes.Device.STATE_TRANSITION_FAILED,
+                $"Failed to stop device {Id} ({Name})",
+                ErrorSource.Device,
+                ErrorContextBuilder.Create()
+                    .WithSource(this)
+                    .WithOperation("Stop")
+                    .WithLocation()
+                    .Build(), ct: ct);
         }
 
+        /// <summary>
+        /// Override to implement device-specific stop behavior.
+        /// </summary>
         protected virtual Task OnStopAsync(CancellationToken ct) => Task.CompletedTask;
+
         #endregion
 
         #region Error Handling
+
+        /// <summary>
+        /// Reports an error that occurred in the device.
+        /// </summary>
         public virtual async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            // Create enhanced error if needed
+            // Enhance the error if needed
             var enhancedError = error as ComponentError ?? new ComponentError(
                 error.DeviceId,
                 error.ErrorCode,
                 error.Message,
                 error.Severity,
-                error.Severity < ErrorSeverity.Critical, 
-                ErrorSource.Communication,
-                true,
+                error.Severity < ErrorSeverity.Critical,
+                ErrorSource.Device,
+                error.Severity < ErrorSeverity.Error,
                 null,
                 error.Exception);
 
-            // Report through the error monitor
+            // Report to error monitor
             await ErrorMonitor.ReportErrorAsync(enhancedError, ct);
 
-            // Set component state to Error if severe enough
+            // Set device state to error if severe enough
             if (error.Severity >= ErrorSeverity.Error)
             {
                 await SetPropertyAsync(nameof(State), ComponentState.Error, ConstructDefaultPropertyMetadata(nameof(State)));
             }
 
+            // Create and publish alert event
             var alertEvent = MapToAlertEvent(error);
             if (PropertyChangedEventHandler != null)
             {
                 await PropertyChangedEventHandler.HandleEventAsync(this, alertEvent, ct);
             }
 
-            // Trigger automatic recovery attempt for recoverable errors if needed
-            if (enhancedError is { IsRecoverable: true, ErrorCode: not null } &&
+            // Attempt recovery if applicable
+            if (enhancedError.IsRecoverable &&
+                !string.IsNullOrEmpty(enhancedError.ErrorCode) &&
                 enhancedError.CanAttemptRecovery())
             {
-                // Use a fire-and-forget task for auto-recovery to avoid blocking
-                // We're not awaiting this to prevent long delays in the error reporting flow
                 _ = Task.Run(async () =>
                 {
                     try
@@ -155,33 +212,57 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
+        /// <summary>
+        /// Attempts to recover the device from an error state.
+        /// </summary>
         public async Task<bool> TryRecoverAsync(CancellationToken ct = default)
         {
             if (State != ComponentState.Error)
-                return true; 
+                return true;
 
+            Logger.Log($"Attempting recovery for device {Id} ({Name})");
+
+            // Check if we've exceeded the maximum number of consecutive recovery attempts
             if (_consecutiveRecoveryFailures >= _maxRecoveryAttempts)
             {
                 await ReportErrorAsync(new ComponentError(
-                        Id,
-                        "RECOVERY_LIMIT_EXCEEDED",
-                        $"Device recovery failed after {_maxRecoveryAttempts} attempts",
-                        ErrorSeverity.Critical,
-                        false, // Not recoverable
-                        ErrorSource.Device, // Add the missing 'source' parameter
-                        false, // Add the missing 'isTransient' parameter
-                        null, // Add the missing 'context' parameter
-                        null), // Add the missing 'exception' parameter
+                    Id,
+                    ErrorCodes.Recovery.ATTEMPT_LIMIT_REACHED,
+                    $"Device recovery failed after {_maxRecoveryAttempts} attempts",
+                    ErrorSeverity.Critical,
+                    false,
+                    ErrorSource.Device,
+                    false),
                     ct);
 
                 return false;
             }
 
+            // Try to recover using the orchestrator if available
+            if (_recoveryOrchestrator != null)
+            {
+                // Create a recovery error to pass to the orchestrator
+                var recoveryError = new ComponentError(
+                    Id,
+                    ErrorCodes.Device.STATE_TRANSITION_FAILED,
+                    $"Device {Id} ({Name}) in error state, attempting recovery",
+                    ErrorSeverity.Error,
+                    true,
+                    ErrorSource.Device,
+                    true);
+
+                bool orchestratorSuccess = await _recoveryOrchestrator.AttemptRecoveryAsync(recoveryError, ct);
+                if (orchestratorSuccess)
+                {
+                    _consecutiveRecoveryFailures = 0;
+                    return true;
+                }
+            }
+
+            // Fall back to direct recovery if no orchestrator or orchestrator failed
             try
             {
-                Logger.Log($"Attempting recovery for device {Id} ({Name})");
-
-                // First, try to stop any running operations
+                // Stop if running
                 if (State == ComponentState.Running)
                 {
                     await StopAsync(ct);
@@ -198,31 +279,39 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     return true;
                 }
 
+                // Device-specific recovery failed
                 _consecutiveRecoveryFailures++;
+                Logger.Log($"Recovery failed for device {Id} ({Name})");
                 return false;
             }
             catch (Exception ex)
             {
                 _consecutiveRecoveryFailures++;
+
                 await ReportErrorAsync(new ComponentError(
                     Id,
-                    "RECOVERY_EXCEPTION",
+                    ErrorCodes.Recovery.STRATEGY_FAILED,
                     $"Exception during recovery attempt: {ex.Message}",
                     ErrorSeverity.Error,
-                    true, // Still recoverable
-                    ErrorSource.Communication,
                     true,
-                    null,
-                    ex), ct);
+                    ErrorSource.Device,
+                    true,
+                    ErrorContextBuilder.Create()
+                        .WithOperation("TryRecover")
+                        .WithException(ex)
+                        .Build(),
+                    ex),
+                    ct);
 
                 return false;
             }
         }
 
-        // New method for error-specific recovery
+        /// <summary>
+        /// Attempts recovery specifically for the given error code.
+        /// </summary>
         protected virtual async Task<bool> AttemptRecoveryForErrorAsync(string errorCode, CancellationToken ct = default)
         {
-            // Implement basic throttling for recovery attempts
             if (!await ThrottleRecoveryAttemptsAsync(errorCode, ct))
             {
                 return false;
@@ -230,10 +319,8 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             Logger.Log($"Attempting recovery for device {Id} for error: {errorCode}");
 
-            // Perform recovery - we'll use the existing TryRecoverAsync
-            var success = await TryRecoverAsync(ct);
+            bool success = await TryRecoverAsync(ct);
 
-            // Register the recovery attempt with the error monitor
             await ErrorMonitor.RegisterRecoveryAttemptAsync(Id, errorCode, success, ct);
 
             Logger.Log(success
@@ -243,17 +330,18 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             return success;
         }
 
+        /// <summary>
+        /// Throttles recovery attempts to prevent too frequent retries.
+        /// </summary>
         private async Task<bool> ThrottleRecoveryAttemptsAsync(string errorCode, CancellationToken ct)
         {
             try
             {
                 await _recoverySemaphore.WaitAsync(ct);
 
-                // Get last recovery time for this error
                 if (_lastRecoveryAttempts.TryGetValue(errorCode, out var lastAttempt))
                 {
-                    // Determine backoff interval based on error frequency
-                    // Start with 5 seconds, double each time up to 5 minutes
+                    // Get the number of previous recovery attempts for this error
                     var consecutiveFailures = 0;
                     {
                         var activeErrors = await ErrorMonitor.GetActiveErrorsForDeviceAsync(Id, ct);
@@ -264,18 +352,20 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                         }
                     }
 
-                    // Calculate backoff time: 5s, 10s, 20s, 40s... up to 5 minutes
+                    // Calculate backoff time based on consecutive failures
                     var backoffTime = TimeSpan.FromSeconds(
                         Math.Min(300, 5 * Math.Pow(2, consecutiveFailures)));
 
-                    // If not enough time has passed, don't attempt recovery
+                    // Check if enough time has passed since last attempt
                     if (DateTimeOffset.UtcNow - lastAttempt < backoffTime)
                     {
+                        Logger.Log($"Throttling recovery for error {errorCode} - " +
+                                  $"next attempt in {(backoffTime - (DateTimeOffset.UtcNow - lastAttempt)).TotalSeconds:0.0} seconds");
                         return false;
                     }
                 }
 
-                // Update last recovery time
+                // Update last attempt time
                 _lastRecoveryAttempts[errorCode] = DateTimeOffset.UtcNow;
                 return true;
             }
@@ -286,15 +376,16 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         }
 
         /// <summary>
-        /// Device-specific recovery logic to be implemented by derived classes
+        /// Override to implement device-specific recovery.
         /// </summary>
-        /// <param name="ct"></param>
-        /// <returns>bool indicating recovery was successful otherwise false</returns>>
         protected virtual Task<bool> OnTryRecoverAsync(CancellationToken ct)
         {
             return Task.FromResult(true);
         }
 
+        /// <summary>
+        /// Maps an error to an alert event for broadcasting.
+        /// </summary>
         private IAlertEvent MapToAlertEvent(IApplicationError error)
         {
             var severity = MapErrorSeverityToAlertSeverity(error.Severity);
@@ -306,6 +397,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 error.Context);
         }
 
+        /// <summary>
+        /// Maps error severity to alert severity.
+        /// </summary>
         private AlertSeverity MapErrorSeverityToAlertSeverity(ErrorSeverity severity)
         {
             return severity switch
@@ -317,12 +411,16 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 _ => AlertSeverity.Warning
             };
         }
+
         #endregion
 
         #region Helpers
+
+        /// <summary>
+        /// Gets or creates default property metadata for this device.
+        /// </summary>
         public override IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable = true, bool isVisible = true)
         {
-            // Add device-specific property defaults
             var devicePropertyDefaults = new Dictionary<string, (bool IsEditable, bool IsVisible, string DisplayName, string Description)>
             {
                 { "State", (false, true, "Device State", "The current state of the IoT device") },
@@ -330,7 +428,6 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 { "Name", (true, true, "Device Name", "The name of the IoT device") }
             };
 
-            // Try device-specific properties first
             if (devicePropertyDefaults.TryGetValue(name, out var defaults))
             {
                 return new PropertyMetadata(
@@ -340,21 +437,25 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     defaults.Description);
             }
 
-            // Otherwise, fall back to base implementation
             return base.ConstructDefaultPropertyMetadata(name, isEditable, isVisible);
         }
 
+        /// <summary>
+        /// Disposes the device.
+        /// </summary>
         public override void Dispose()
         {
-            // Update State property with correct metadata
             SetPropertyAsync(nameof(State), ComponentState.Disposed,
-                ConstructDefaultPropertyMetadata(nameof(State))).ConfigureAwait(false).GetAwaiter().GetResult();
+                ConstructDefaultPropertyMetadata(nameof(State)))
+                .ConfigureAwait(false).GetAwaiter().GetResult();
 
             _executionCts.Cancel();
             _executionCts.Dispose();
             _recoverySemaphore.Dispose();
+
             base.Dispose();
         }
+
         #endregion
     }
 }
