@@ -124,6 +124,16 @@ namespace HydroGarden.Foundation.Common.Extensions
             }
         }
 
+        private static ErrorSeverity DetermineErrorSeverity(Exception ex)
+        {
+            return default;
+        }
+
+        private static bool IsRecoverableException(Exception ex)
+        {
+            return false;
+        }
+
         // Helper to extract device ID from source (if available)
         private static Guid GetDeviceId(object source)
         {
