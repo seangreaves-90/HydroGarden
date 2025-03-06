@@ -28,5 +28,10 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         public IDictionary<string, object> Context { get; }
         public DateTimeOffset Timestamp { get; }
         public Exception? Exception { get; }
+
+        /// <summary>
+        /// Records the recovery attempt for this error
+        /// </summary>
+        void RecordRecoveryAttempt();
     }
 }

@@ -7,18 +7,18 @@ using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using System.Collections.Concurrent;
 using HydroGarden.Foundation.Common.ErrorHandling;
-using System;
 using HydroGarden.Foundation.Common.Extensions;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
-    public abstract class IoTDeviceBase(Guid id, string name, IErrorMonitor errorMonitor, ILogger? logger = null) : ComponentBase(id, name, errorMonitor, logger), IIoTDevice
+    public abstract class IoTDeviceBase(Guid id, string name, IErrorMonitor errorMonitor, ILogger? logger = null)
+        : ComponentBase(id, name, errorMonitor, logger), IIoTDevice
     {
         private readonly CancellationTokenSource _executionCts = new();
-        private readonly ConcurrentQueue<IApplicationError> _recentErrors = new();
-        private readonly int _maxErrorsToTrack = 10;
         private int _consecutiveRecoveryFailures;
         private readonly int _maxRecoveryAttempts = 3;
+        private readonly SemaphoreSlim _recoverySemaphore = new(1, 1);
+        private readonly ConcurrentDictionary<string, DateTimeOffset> _lastRecoveryAttempts = new();
 
         #region Device Operations
         public virtual async Task InitializeAsync(CancellationToken ct = default)
@@ -42,7 +42,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 },
                 "DEVICE_INIT_FAILED",
                 $"Failed to initialize device {Id}",
-                ErrorSource.Device);
+                ErrorSource.Device, ct: ct);
         }
 
         protected virtual Task OnInitializeAsync(CancellationToken ct) => Task.CompletedTask;
@@ -103,53 +103,54 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         }
 
         protected virtual Task OnStopAsync(CancellationToken ct) => Task.CompletedTask;
-
-
         #endregion
 
         #region Error Handling
         public virtual async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            // Create an ApplicationError from the ComponentError
-            var applicationError = new ComponentError(
+            // Create enhanced error if needed
+            var enhancedError = error as ComponentError ?? new ComponentError(
                 error.DeviceId,
                 error.ErrorCode,
                 error.Message,
                 error.Severity,
+                error.Severity < ErrorSeverity.Critical, // Only critical errors are non-recoverable by default
                 error.Context,
                 error.Exception);
 
             // Report through the error monitor
-            await ErrorMonitor.ReportErrorAsync(applicationError, ct);
+            await ErrorMonitor.ReportErrorAsync(enhancedError, ct);
 
             // Set component state to Error if severe enough
             if (error.Severity >= ErrorSeverity.Error)
             {
                 await SetPropertyAsync(nameof(State), ComponentState.Error, ConstructDefaultPropertyMetadata(nameof(State)));
             }
+
             var alertEvent = MapToAlertEvent(error);
             if (PropertyChangedEventHandler != null)
             {
                 await PropertyChangedEventHandler.HandleEventAsync(this, alertEvent, ct);
             }
-        }
 
-        private IAlertEvent MapToAlertEvent(IApplicationError error)
-        {
-            var severity = error.Severity switch
+            // Trigger automatic recovery attempt for recoverable errors if needed
+            if (enhancedError is { IsRecoverable: true, ErrorCode: not null } &&
+                enhancedError.CanAttemptRecovery())
             {
-                ErrorSeverity.Warning => AlertSeverity.Warning,
-                ErrorSeverity.Error => AlertSeverity.Error,
-                ErrorSeverity.Critical => AlertSeverity.Critical,
-                ErrorSeverity.Catastrophic => AlertSeverity.Critical,
-                _ => AlertSeverity.Warning
-            };
-
-            return new AlertEvent(
-                error.DeviceId,
-                severity,
-                error.Message,
-                error.Context);
+                // Use a fire-and-forget task for auto-recovery to avoid blocking
+                // We're not awaiting this to prevent long delays in the error reporting flow
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await AttemptRecoveryForErrorAsync(enhancedError.ErrorCode, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log(ex, $"Auto-recovery attempt failed for error {enhancedError.ErrorCode}");
+                    }
+                }, ct);
+            }
         }
 
         public async Task<bool> TryRecoverAsync(CancellationToken ct = default)
@@ -163,7 +164,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     Id,
                     "RECOVERY_LIMIT_EXCEEDED",
                     $"Device recovery failed after {_maxRecoveryAttempts} attempts",
-                    ErrorSeverity.Critical), ct);
+                    ErrorSeverity.Critical,
+                    false), // Not recoverable
+                    ct);
 
                 return false;
             }
@@ -200,10 +203,77 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     "RECOVERY_EXCEPTION",
                     $"Exception during recovery attempt: {ex.Message}",
                     ErrorSeverity.Error,
+                    true, // Still recoverable
                     null,
                     ex), ct);
 
                 return false;
+            }
+        }
+
+        // New method for error-specific recovery
+        protected virtual async Task<bool> AttemptRecoveryForErrorAsync(string errorCode, CancellationToken ct = default)
+        {
+            // Implement basic throttling for recovery attempts
+            if (!await ThrottleRecoveryAttemptsAsync(errorCode, ct))
+            {
+                return false;
+            }
+
+            Logger.Log($"Attempting recovery for device {Id} for error: {errorCode}");
+
+            // Perform recovery - we'll use the existing TryRecoverAsync
+            var success = await TryRecoverAsync(ct);
+
+            // Register the recovery attempt with the error monitor
+            await ErrorMonitor.RegisterRecoveryAttemptAsync(Id, errorCode, success, ct);
+
+            Logger.Log(success
+                ? $"Recovery successful for device {Id} (error: {errorCode})"
+                : $"Recovery failed for device {Id} (error: {errorCode})");
+
+            return success;
+        }
+
+        private async Task<bool> ThrottleRecoveryAttemptsAsync(string errorCode, CancellationToken ct)
+        {
+            try
+            {
+                await _recoverySemaphore.WaitAsync(ct);
+
+                // Get last recovery time for this error
+                if (_lastRecoveryAttempts.TryGetValue(errorCode, out var lastAttempt))
+                {
+                    // Determine backoff interval based on error frequency
+                    // Start with 5 seconds, double each time up to 5 minutes
+                    var consecutiveFailures = 0;
+                    {
+                        var activeErrors = await ErrorMonitor.GetActiveErrorsForDeviceAsync(Id, ct);
+                        if (activeErrors.FirstOrDefault(e => e is ComponentError ee &&
+                                                             ee.ErrorCode == errorCode) is ComponentError targetError)
+                        {
+                            consecutiveFailures = targetError.RecoveryAttemptCount;
+                        }
+                    }
+
+                    // Calculate backoff time: 5s, 10s, 20s, 40s... up to 5 minutes
+                    var backoffTime = TimeSpan.FromSeconds(
+                        Math.Min(300, 5 * Math.Pow(2, consecutiveFailures)));
+
+                    // If not enough time has passed, don't attempt recovery
+                    if (DateTimeOffset.UtcNow - lastAttempt < backoffTime)
+                    {
+                        return false;
+                    }
+                }
+
+                // Update last recovery time
+                _lastRecoveryAttempts[errorCode] = DateTimeOffset.UtcNow;
+                return true;
+            }
+            finally
+            {
+                _recoverySemaphore.Release();
             }
         }
 
@@ -217,6 +287,17 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             return Task.FromResult(true);
         }
 
+        private IAlertEvent MapToAlertEvent(IApplicationError error)
+        {
+            var severity = MapErrorSeverityToAlertSeverity(error.Severity);
+
+            return new AlertEvent(
+                error.DeviceId,
+                severity,
+                error.Message,
+                error.Context);
+        }
+
         private AlertSeverity MapErrorSeverityToAlertSeverity(ErrorSeverity severity)
         {
             return severity switch
@@ -228,8 +309,6 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                 _ => AlertSeverity.Warning
             };
         }
-
-
         #endregion
 
         #region Helpers
@@ -265,11 +344,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
 
             _executionCts.Cancel();
             _executionCts.Dispose();
+            _recoverySemaphore.Dispose();
             base.Dispose();
         }
-
-
         #endregion
-
     }
 }
