@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
@@ -20,8 +21,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             public bool StartCalled { get; private set; }
             public bool StopCalled { get; private set; }
 
-            public TestIoTDevice(Guid id, string name, ILogger logger)
-                : base(id, name, logger)
+            public TestIoTDevice(Guid id, string name, IErrorMonitor errorMonitor, ILogger logger)
+                : base(id, name, errorMonitor, logger)
             {
             }
 
@@ -46,6 +47,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
 
         private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestIoTDevice _sut;
@@ -54,9 +56,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         {
             _mockLogger = new Mock<ILogger>();
             _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
             _testId = Guid.NewGuid();
             _testName = "Test IoT Device";
-            _sut = new TestIoTDevice(_testId, _testName, _mockLogger.Object);
+            _sut = new TestIoTDevice(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object);
             _sut.SetEventHandler(_mockEventHandler.Object);
 
             // Setup event handler to handle any events

@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
@@ -13,9 +13,8 @@ using HydroGarden.Foundation.Core.Components.Devices;
 using HydroGarden.Foundation.Core.Services;
 using HydroGarden.Foundation.Core.Stores;
 using Moq;
-using Xunit;
 
-namespace HydroGarden.Foundation.Tests.Integration
+namespace HydroGarden.Foundation.Tests.Integration.TopologyService
 {
     public class TopologyServiceEventBusIntegrationTests : IAsyncDisposable
     {
@@ -24,6 +23,7 @@ namespace HydroGarden.Foundation.Tests.Integration
         private readonly IEventBus _eventBus;
         private readonly ITopologyService _topologyService;
         private readonly IPersistenceService _persistenceService;
+        private readonly IErrorMonitor _errorMonitor;
         private readonly string _testDirectory;
         private readonly List<IAsyncDisposable> _disposables = new();
 
@@ -37,14 +37,22 @@ namespace HydroGarden.Foundation.Tests.Integration
             _logger = new Logger();
             _store = new JsonStore(_testDirectory, _logger);
 
+            // Create the error monitor
+            _errorMonitor = new TestErrorMonitor(_logger);
+
+            // Create event bus with error monitor
             _eventBus = new Common.Events.EventBus(
                 _logger,
                 new DeadLetterEventStore(),
                 new ExponentialBackoffRetryPolicy(),
-                new DefaultEventTransformer());
+                new DefaultEventTransformer(),
+                _errorMonitor);
 
-            _persistenceService = new PersistenceService(_store, _eventBus);
-            _topologyService = new TopologyService(_logger, _store, _persistenceService);
+            // Create persistence service with error monitor
+            _persistenceService = new PersistenceService(_store, _eventBus, _logger, _errorMonitor);
+
+            // Create topology service
+            _topologyService = new Core.Services.TopologyService(_logger, _store, _persistenceService);
 
             // Initialize EventBus with topology service
             _eventBus.SetTopologyService(_topologyService);
@@ -57,8 +65,8 @@ namespace HydroGarden.Foundation.Tests.Integration
         public async Task EventBus_ShouldRouteEventsBasedOnTopology()
         {
             // Arrange - Create two test devices
-            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", 100, 0, _logger);
-            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", 100, 0, _logger);
+            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", _errorMonitor,100, 0, _logger );
+            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", _errorMonitor,100, 0, _logger );
 
             // Add devices to persistence service
             await _persistenceService.AddOrUpdateAsync(sourceDevice);
@@ -122,8 +130,8 @@ namespace HydroGarden.Foundation.Tests.Integration
         public async Task EventBus_ShouldRespectConnectionConditionsWhenRouting()
         {
             // Arrange - Create two test devices
-            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", 100, 0, _logger);
-            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", 100, 0, _logger);
+            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", _errorMonitor,100, 0, _logger );
+            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", _errorMonitor,100, 0, _logger );
 
             // Add devices to persistence service
             await _persistenceService.AddOrUpdateAsync(sourceDevice);
@@ -216,8 +224,8 @@ namespace HydroGarden.Foundation.Tests.Integration
         public async Task EventBus_ShouldNotRouteEventsWhenConnectionIsDisabled()
         {
             // Arrange - Create two test devices
-            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", 100, 0, _logger);
-            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", 100, 0, _logger);
+            var sourceDevice = new PumpDevice(Guid.NewGuid(), "Source Device", _errorMonitor,100, 0, _logger);
+            var targetDevice = new PumpDevice(Guid.NewGuid(), "Target Device", _errorMonitor, 100, 0, _logger);
 
             // Add devices to persistence service
             await _persistenceService.AddOrUpdateAsync(sourceDevice);
@@ -318,7 +326,7 @@ namespace HydroGarden.Foundation.Tests.Integration
                 var targetId = Guid.NewGuid();
 
                 // First service instance
-                var topologyService1 = new TopologyService(logger, store, mockPersistenceService.Object);
+                var topologyService1 = new Core.Services.TopologyService(logger, store, mockPersistenceService.Object);
 
                 // Create a connection between source and target
                 var connection = new ComponentConnection
@@ -340,7 +348,7 @@ namespace HydroGarden.Foundation.Tests.Integration
                 await ((IAsyncDisposable)topologyService1).DisposeAsync();
 
                 // Step 2: Create a new service instance and verify connections are loaded
-                var topologyService2 = new TopologyService(logger, store, mockPersistenceService.Object);
+                var topologyService2 = new Core.Services.TopologyService(logger, store, mockPersistenceService.Object);
 
                 // Important: Explicitly initialize and wait for completion
                 await topologyService2.InitializeAsync();

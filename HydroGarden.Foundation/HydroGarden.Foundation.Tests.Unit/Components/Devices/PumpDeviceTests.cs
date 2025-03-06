@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
@@ -12,6 +13,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
     {
         private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly double _maxFlowRate;
@@ -22,11 +24,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         {
             _mockLogger = new Mock<ILogger>();
             _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
             _testId = Guid.NewGuid();
             _testName = "Test Pump";
             _maxFlowRate = 100.0;
             _minFlowRate = 0.0;
-            _sut = new PumpDevice(_testId, _testName, _maxFlowRate, _minFlowRate, _mockLogger.Object);
+            _sut = new PumpDevice(_testId, _testName, _mockErrorMonitor.Object, _maxFlowRate, _minFlowRate, _mockLogger.Object);
             _sut.SetEventHandler(_mockEventHandler.Object);
 
             // Setup event handler to handle any events

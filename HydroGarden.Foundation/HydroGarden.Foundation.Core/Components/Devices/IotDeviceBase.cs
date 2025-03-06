@@ -7,6 +7,8 @@ using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using System.Collections.Concurrent;
 using HydroGarden.Foundation.Common.ErrorHandling;
+using System;
+using HydroGarden.Foundation.Common.Extensions;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {
@@ -23,29 +25,24 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         {
             if (State != ComponentState.Created)
                 throw new InvalidOperationException($"Cannot initialize device in state {State}");
-            try
-            {
-                // Use ConstructDefaultPropertyMetadata to get correct metadata for State
-                var stateMetadata = ConstructDefaultPropertyMetadata(nameof(State));
-                await SetPropertyAsync(nameof(State), ComponentState.Initializing, stateMetadata);
 
-                await SetPropertyAsync("Id", Id);
-                await SetPropertyAsync("Name", Name);
-                await SetPropertyAsync("AssemblyType", AssemblyType);
-                await OnInitializeAsync(ct);
+            await this.ExecuteWithErrorHandlingAsync(
+                ErrorMonitor,
+                async () =>
+                {
+                    var stateMetadata = ConstructDefaultPropertyMetadata(nameof(State));
+                    await SetPropertyAsync(nameof(State), ComponentState.Initializing, stateMetadata);
+                    await SetPropertyAsync("Id", Id);
+                    await SetPropertyAsync("Name", Name);
+                    await SetPropertyAsync("AssemblyType", AssemblyType);
 
-                // Use ConstructDefaultPropertyMetadata again
-                await SetPropertyAsync(nameof(State), ComponentState.Ready, stateMetadata);
-            }
-            catch (Exception? ex)
-            {
-                Logger.Log(ex, "Failed to initialize device");
+                    await OnInitializeAsync(ct);
 
-                // Use ConstructDefaultPropertyMetadata here too
-                await SetPropertyAsync(nameof(State), ComponentState.Error,
-                    ConstructDefaultPropertyMetadata(nameof(State)));
-                throw;
-            }
+                    await SetPropertyAsync(nameof(State), ComponentState.Ready, stateMetadata);
+                },
+                "DEVICE_INIT_FAILED",
+                $"Failed to initialize device {Id}",
+                ErrorSource.Device);
         }
 
         protected virtual Task OnInitializeAsync(CancellationToken ct) => Task.CompletedTask;
@@ -111,43 +108,48 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         #endregion
 
         #region Error Handling
-        public async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
+        public virtual async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            // Add to recent errors, maintaining max size
-            _recentErrors.Enqueue(error);
-            while (_recentErrors.Count > _maxErrorsToTrack && _recentErrors.TryDequeue(out _)) { }
+            // Create an ApplicationError from the ComponentError
+            var applicationError = new ComponentError(
+                error.DeviceId,
+                error.ErrorCode,
+                error.Message,
+                error.Severity,
+                error.Context,
+                error.Exception);
 
-            // Log the error
-            if (error.Exception != null)
-                Logger.Log(error.Exception, $"[{error.Severity}] {error.ErrorCode}: {error.Message}");
+            // Report through the error monitor
+            await ErrorMonitor.ReportErrorAsync(applicationError, ct);
 
-            // Update state based on severity
+            // Set component state to Error if severe enough
             if (error.Severity >= ErrorSeverity.Error)
             {
-                await SetPropertyAsync(nameof(State), ComponentState.Error,
-                    ConstructDefaultPropertyMetadata(nameof(State)));
+                await SetPropertyAsync(nameof(State), ComponentState.Error, ConstructDefaultPropertyMetadata(nameof(State)));
             }
-
-            // Publish error as an alert event
-            var metadata = new Dictionary<string, object>
-            {
-                ["ErrorCode"] = error.ErrorCode,
-                ["Severity"] = error.Severity.ToString(),
-                ["Context"] = error.Context
-            };
-
-            // Create and publish alert event
-            var alertEvent = new AlertEvent(
-                Id,
-                MapErrorSeverityToAlertSeverity(error.Severity),
-                error.Message,
-                metadata);
-
-            // If we have an event handler, publish the event
+            var alertEvent = MapToAlertEvent(error);
             if (PropertyChangedEventHandler != null)
             {
                 await PropertyChangedEventHandler.HandleEventAsync(this, alertEvent, ct);
             }
+        }
+
+        private IAlertEvent MapToAlertEvent(IApplicationError error)
+        {
+            var severity = error.Severity switch
+            {
+                ErrorSeverity.Warning => AlertSeverity.Warning,
+                ErrorSeverity.Error => AlertSeverity.Error,
+                ErrorSeverity.Critical => AlertSeverity.Critical,
+                ErrorSeverity.Catastrophic => AlertSeverity.Critical,
+                _ => AlertSeverity.Warning
+            };
+
+            return new AlertEvent(
+                error.DeviceId,
+                severity,
+                error.Message,
+                error.Context);
         }
 
         public async Task<bool> TryRecoverAsync(CancellationToken ct = default)

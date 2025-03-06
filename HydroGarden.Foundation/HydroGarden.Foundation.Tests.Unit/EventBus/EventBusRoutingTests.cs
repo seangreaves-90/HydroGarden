@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
+using HydroGarden.Foundation.Tests.Unit.EventBus;
 
 namespace HydroGarden.Foundation.Tests.Unit.Events
 {

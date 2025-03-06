@@ -7,6 +7,7 @@ using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components;
 using Moq;
 using System.Xml.Linq;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Components
@@ -15,14 +16,15 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
     {
         private class TestComponent : ComponentBase
         {
-            public TestComponent(Guid id, string name, ILogger logger)
-                : base(id, name, logger)
+            public TestComponent(Guid id, string name, IErrorMonitor errorMonitor, ILogger logger)
+                : base(id, name, errorMonitor, logger)
             {
             }
         }
 
         private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestComponent _sut;
@@ -31,9 +33,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             _mockLogger = new Mock<ILogger>();
             _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
             _testId = Guid.NewGuid();
             _testName = "Test Component";
-            _sut = new TestComponent(_testId, _testName, _mockLogger.Object);
+            _sut = new TestComponent(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object);
             _sut.SetEventHandler(_mockEventHandler.Object);
         }
 
@@ -288,7 +291,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         [Fact]
         public async Task SetPropertyAsync_NoEventHandler_ShouldLogMessage()
         {
-            var component = new TestComponent(_testId, _testName, _mockLogger.Object);
+            var component = new TestComponent(_testId, _testName,_mockErrorMonitor.Object, _mockLogger.Object);
             await component.SetPropertyAsync("TestProperty", "Test Value");
             _mockLogger.Verify(l => l.Log(It.IsAny<string>()), Times.Once);
         }

@@ -1,4 +1,5 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 
@@ -34,8 +35,8 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         /// <summary>
         /// Initializes a new instance of the <see cref="PumpDevice"/> class.
         /// </summary>
-        public PumpDevice(Guid id, string name, double maxFlowRate = 100, double minFlowRate = 0, ILogger? logger = null)
-            : base(id, name, logger)
+        public PumpDevice(Guid id, string name, IErrorMonitor errorMonitor, double maxFlowRate = 100, double minFlowRate = 0, ILogger? logger = null)
+            : base(id, name,errorMonitor, logger)
         {
             MaxFlowRate = maxFlowRate;
             MinFlowRate = minFlowRate;

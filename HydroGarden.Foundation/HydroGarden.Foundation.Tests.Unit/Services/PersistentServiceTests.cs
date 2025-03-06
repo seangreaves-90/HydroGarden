@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
@@ -18,6 +19,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         private readonly Mock<IStoreTransaction> _mockTransaction;
         private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IEventBus> _mockEventBus;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Core.Services.PersistenceService _sut;
         private Dictionary<string, IPropertyMetadata> _capturedMetadata;
 
@@ -28,7 +30,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _mockLogger = new Mock<ILogger>();
             _mockEventBus = new Mock<IEventBus>();
             _capturedMetadata = new Dictionary<string, IPropertyMetadata>();
-
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
             _mockStore.Setup(s => s.BeginTransactionAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(_mockTransaction.Object);
 
@@ -56,6 +58,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 _mockStore.Object,
                 _mockEventBus.Object,
                 _mockLogger.Object,
+                _mockErrorMonitor.Object,
                 TimeSpan.FromMilliseconds(100))
             {
                 IsBatchProcessingEnabled = false,
@@ -75,7 +78,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
 
             // Initial device setup with one property and metadata
-            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object,100, 0, _mockLogger.Object);
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((IDictionary<string, object>?)null);
@@ -116,10 +119,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             {
                 var store = new JsonStore(testDir, _mockLogger.Object);
                 var persistenceService = new Core.Services.PersistenceService(
-                    store, _mockEventBus.Object, _mockLogger.Object);
+                    store, _mockEventBus.Object, _mockLogger.Object,_mockErrorMonitor.Object);
 
                 var deviceId = Guid.NewGuid();
-                var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+                var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object, 100, 0, _mockLogger.Object);
 
                 // Set FlowRate with metadata
                 var flowRateMetadata = new PropertyMetadata(true, true, "Flow Rate", "The percentage of pump flow rate");
@@ -163,7 +166,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         {
             // Arrange
             var deviceId = Guid.NewGuid();
-            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object, 100, 0, _mockLogger.Object);
 
             // Set up store to return empty data initially
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
@@ -229,7 +232,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         {
             // Arrange
             var deviceId = Guid.NewGuid();
-            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object,100, 0, _mockLogger.Object);
 
             // Act
             await pump.InitializeAsync();
@@ -268,7 +271,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(existingMetadata);
 
-            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object,100, 0, _mockLogger.Object);
             await _sut.AddOrUpdateAsync(pump);
 
             // Clear the captured metadata to ensure we only capture the next batch
@@ -312,7 +315,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(initialMetadata);
 
-            var pump = new PumpDevice(deviceId, "Test Pump", 100, 0, _mockLogger.Object);
+            var pump = new PumpDevice(deviceId, "Test Pump", _mockErrorMonitor.Object,100, 0, _mockLogger.Object);
 
             // Act
             await _sut.AddOrUpdateAsync(pump);

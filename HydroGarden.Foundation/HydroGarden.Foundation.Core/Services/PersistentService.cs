@@ -1,10 +1,11 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.Common.Extensions;
 using HydroGarden.Foundation.Common.Logging;
-using System.Collections.Concurrent;
 using System.Threading.Channels;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -14,8 +15,8 @@ namespace HydroGarden.Foundation.Core.Services
         private readonly IStore _store;
         private readonly IEventBus _eventBus;
         private readonly ILogger _logger;
+        private readonly IErrorMonitor _errorMonitor;
         private readonly Dictionary<Guid, Dictionary<string, object>> _deviceProperties;
-        // Add a new field to track metadata for all devices
         private readonly Dictionary<Guid, Dictionary<string, IPropertyMetadata>> _deviceMetadata;
         private readonly Channel<IPropertyChangedEvent> _eventChannel;
         private readonly CancellationTokenSource _processingCts = new();
@@ -28,22 +29,17 @@ namespace HydroGarden.Foundation.Core.Services
         public bool ForceTransactionCreation { get; set; } = false;
         public IPropertyChangedEvent? TestEvent { get; set; }
 
-        public PersistenceService(IStore store, IEventBus eventBus)
-            : this(store, eventBus, new Logger(), TimeSpan.FromSeconds(5))
-        {
-        }
-
-        public PersistenceService(IStore store, IEventBus eventBus, ILogger logger, TimeSpan? batchInterval = null)
+        public PersistenceService(IStore store, IEventBus eventBus, ILogger logger, IErrorMonitor errorMonitor, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _batchInterval = batchInterval ?? TimeSpan.FromSeconds(5);
             _deviceProperties = new Dictionary<Guid, Dictionary<string, object>>();
-            // Initialize the metadata dictionary
             _deviceMetadata = new Dictionary<Guid, Dictionary<string, IPropertyMetadata>>();
             _eventChannel = Channel.CreateUnbounded<IPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
+            _errorMonitor = errorMonitor;
         }
 
         public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice
@@ -124,45 +120,49 @@ namespace HydroGarden.Foundation.Core.Services
 
         public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
         {
-            if (evt is IPropertyChangedEvent propertyChangedEvent)
-            {
-                _logger.Log($"[DEBUG] Handling property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
-                try
+            await this.ExecuteWithErrorHandlingAsync(
+                _errorMonitor,
+                async () =>
                 {
-                    if (!_deviceProperties.TryGetValue(propertyChangedEvent.DeviceId, out var properties))
+                    if (evt is IPropertyChangedEvent propertyChangedEvent)
                     {
-                        properties = new Dictionary<string, object>();
-                        _deviceProperties[propertyChangedEvent.DeviceId] = properties;
-                    }
+                        _logger.Log($"[DEBUG] Handling property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
 
-                    // Also ensure we have a metadata dictionary for this device
-                    if (!_deviceMetadata.TryGetValue(propertyChangedEvent.DeviceId, out var metadata))
+                        if (!_deviceProperties.TryGetValue(propertyChangedEvent.DeviceId, out var properties))
+                        {
+                            properties = new Dictionary<string, object>();
+                            _deviceProperties[propertyChangedEvent.DeviceId] = properties;
+                        }
+
+                        if (!_deviceMetadata.TryGetValue(propertyChangedEvent.DeviceId, out var metadata))
+                        {
+                            metadata = new Dictionary<string, IPropertyMetadata>();
+                            _deviceMetadata[propertyChangedEvent.DeviceId] = metadata;
+                        }
+
+                        properties[propertyChangedEvent.PropertyName] = propertyChangedEvent.NewValue ?? new object();
+
+                        if (propertyChangedEvent.Metadata != null)
+                        {
+                            metadata[propertyChangedEvent.PropertyName] = propertyChangedEvent.Metadata;
+                        }
+
+                        await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
+                        await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
+                    }
+                    else
                     {
-                        metadata = new Dictionary<string, IPropertyMetadata>();
-                        _deviceMetadata[propertyChangedEvent.DeviceId] = metadata;
+                        _logger.Log($"[WARNING] Received event of unsupported type: {evt.GetType().Name}");
                     }
-
-                    // Update the property value
-                    properties[propertyChangedEvent.PropertyName] = propertyChangedEvent.NewValue ?? new object();
-
-                    // Store the metadata from this event in our tracking dictionary
-                    if (propertyChangedEvent.Metadata != null)
-                    {
-                        metadata[propertyChangedEvent.PropertyName] = propertyChangedEvent.Metadata;
-                    }
-
-                    await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
-                    await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
-                }
-                catch (Exception? ex)
+                },
+                "PROPERTY_EVENT_HANDLING_FAILED",
+                $"Failed to handle property change event",
+                ErrorSource.Service,
+                new Dictionary<string, object>
                 {
-                    _logger.Log(ex, $"[ERROR] Failed to handle property change event for device {propertyChangedEvent.DeviceId}, property {propertyChangedEvent.PropertyName}");
-                }
-            }
-            else
-            {
-                _logger.Log($"[WARNING] Received event of unsupported type: {evt.GetType().Name}");
-            }
+                    ["EventType"] = evt.EventType.ToString(),
+                    ["SourceId"] = evt.SourceId
+                });
         }
 
         public async Task ProcessPendingEventsAsync()

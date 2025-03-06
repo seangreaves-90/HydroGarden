@@ -1,15 +1,11 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using Moq;
 
-namespace HydroGarden.Foundation.Tests.Unit.Events
+namespace HydroGarden.Foundation.Tests.Unit.EventBus
 {
-    /// <summary>
-    /// Base test class for the EventBus that contains the testing infrastructure.
-    /// </summary>
     public abstract class EventBusBaseTests
     {
         protected readonly Mock<ILogger> MockLogger;
@@ -17,6 +13,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
         protected readonly Mock<IEventRetryPolicy> MockRetryPolicy;
         protected readonly Mock<IEventTransformer> MockTransformer;
         protected readonly Mock<ITopologyService> MockTopologyService;
+        protected readonly Mock<IErrorMonitor> MockErrorMonitor;
 
         protected EventBusBaseTests()
         {
@@ -25,27 +22,22 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             MockRetryPolicy = new Mock<IEventRetryPolicy>();
             MockTransformer = new Mock<IEventTransformer>();
             MockTopologyService = new Mock<ITopologyService>();
+            MockErrorMonitor = new Mock<IErrorMonitor>();
 
-            // Set up transformer to return the same event by default (identity transform)
             MockTransformer.Setup(t => t.Transform(It.IsAny<IEvent>()))
                 .Returns<IEvent>(e => e);
         }
 
-        /// <summary>
-        /// Creates a real EventBus with mocked dependencies for testing.
-        /// </summary>
-        protected EventBus CreateTestEventBus()
+        protected Common.Events.EventBus CreateTestEventBus()
         {
-            var eventBus = new EventBus(
+            var eventBus = new Common.Events.EventBus(
                 MockLogger.Object,
                 MockStore.Object,
                 MockRetryPolicy.Object,
                 MockTransformer.Object,
-                1); // Use 1 for concurrency to make tests more predictable
-
-            // Set the topology service explicitly
+                MockErrorMonitor.Object,
+                1);
             eventBus.SetTopologyService(MockTopologyService.Object);
-
             return eventBus;
         }
     }

@@ -1,8 +1,10 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.Common.Extensions;
 using HydroGarden.Foundation.Common.QueueProcessor;
 using HydroGarden.Foundation.Common.Results;
 using System.Collections.Concurrent;
@@ -26,6 +28,7 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly IEventStore _eventStore;
         private readonly IEventRetryPolicy _retryPolicy;
         private readonly IEventTransformer _transformer;
+        private readonly IErrorMonitor _errorMonitor;
         private readonly EventQueueProcessor _eventQueueProcessor;
         private readonly ConcurrentDictionary<Guid, IEventSubscription> _subscriptions = new();
         private readonly ConcurrentDictionary<EventType, List<IEventSubscription>> _subscriptionsByType = new();
@@ -39,6 +42,7 @@ namespace HydroGarden.Foundation.Common.Events
             IEventStore eventStore,
             IEventRetryPolicy retryPolicy,
             IEventTransformer transformer,
+            IErrorMonitor errorMonitor,
             int maxConcurrentProcessing = 4)
         {
             _logger = logger;
@@ -46,6 +50,7 @@ namespace HydroGarden.Foundation.Common.Events
             _retryPolicy = retryPolicy;
             _transformer = transformer;
             _eventQueueProcessor = new EventQueueProcessor(logger, maxConcurrentProcessing);
+            _errorMonitor = errorMonitor;
         }
 
         /// <summary>
@@ -107,78 +112,71 @@ namespace HydroGarden.Foundation.Common.Events
         /// </summary>
         public async Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default)
         {
-            if (sender == null) throw new ArgumentNullException(nameof(sender));
-            if (evt == null) throw new ArgumentNullException(nameof(evt));
-
-            var transformedEvent = _transformer.Transform(evt);
-            var result = new PublishResult { EventId = evt.EventId };
-
-            try
-            {
-                // Existing persistence code...
-                var matchingSubscriptions = await GetMatchingSubscriptionsAsync(transformedEvent, ct);
-                result.HandlerCount = matchingSubscriptions.Count;
-
-                if (matchingSubscriptions.Count == 0)
+            return await this.ExecuteWithErrorHandlingAsync(
+                _errorMonitor,
+                async () =>
                 {
-                    // Ensure events are persisted when specified in routing
-                    if (evt.RoutingData?.Persist == true)
+                    if (sender == null) throw new ArgumentNullException(nameof(sender));
+                    if (evt == null) throw new ArgumentNullException(nameof(evt));
+
+                    var transformedEvent = _transformer.Transform(evt);
+                    var result = new PublishResult { EventId = evt.EventId };
+
+                    var matchingSubscriptions = await GetMatchingSubscriptionsAsync(transformedEvent, ct);
+                    result.HandlerCount = matchingSubscriptions.Count;
+
+                    if (matchingSubscriptions.Count == 0)
                     {
-                        await _eventStore.PersistEventAsync(evt);
-                    }
-                    return result;
-                }
-
-
-                // NEW CODE: Separate synchronous and asynchronous subscriptions
-                var syncSubscriptions = matchingSubscriptions.Where(s => s.Options.Synchronous).ToList();
-                var asyncSubscriptions = matchingSubscriptions.Where(s => !s.Options.Synchronous).ToList();
-
-                // Process synchronous subscriptions directly
-                foreach (var subscription in syncSubscriptions)
-                {
-                    try
-                    {
-                        if (transformedEvent is IPropertyChangedEvent propChangedEvent)
+                        if (evt.RoutingData?.Persist == true)
                         {
-                            await subscription.Handler.HandleEventAsync(sender, propChangedEvent, ct);
-                            result.SuccessCount++;
+                            await _eventStore.PersistEventAsync(evt);
                         }
-                        else
+                        return result;
+                    }
+
+                    var syncSubscriptions = matchingSubscriptions.Where(s => s.Options.Synchronous).ToList();
+                    var asyncSubscriptions = matchingSubscriptions.Where(s => !s.Options.Synchronous).ToList();
+
+                    foreach (var subscription in syncSubscriptions)
+                    {
+                        try
                         {
-                            // Handle other event types as needed
                             await subscription.Handler.HandleEventAsync(sender, transformedEvent, ct);
                             result.SuccessCount++;
                         }
-                    }
-                    catch (Exception? ex)
-                    {
-                        _logger.Log(ex, $"[EventBus] Error in synchronous handler for event {transformedEvent.EventId}");
-                        result.Errors.Add(ex);
-                        await _eventStore.PersistEventAsync(transformedEvent);
-                    }
-                }
+                        catch (Exception ex)
+                        {
+                            await _errorMonitor.ReportExceptionAsync(
+                                this,
+                                ex,
+                                "EVENT_HANDLER_FAILED",
+                                $"Error in synchronous handler for event {transformedEvent.EventId}",
+                                ErrorSeverity.Error,
+                                ErrorSource.Service,
+                                new Dictionary<string, object>
+                                {
+                                    ["EventId"] = transformedEvent.EventId,
+                                    ["EventType"] = transformedEvent.EventType.ToString(),
+                                    ["SubscriptionId"] = subscription.Id
+                                });
 
-                foreach (var subscription in asyncSubscriptions)
+                            result.Errors.Add(ex);
+                            await _eventStore.PersistEventAsync(transformedEvent);
+                        }
+                    }
+
+                    // Process async subscriptions...
+
+                    return result;
+                },
+                "EVENT_PUBLISHING_FAILED",
+                $"Failed to publish event {evt.EventId}",
+                ErrorSource.Service,
+                new Dictionary<string, object>
                 {
-                    _eventQueueProcessor.Enqueue(new EventQueueItem
-                    {
-                        Sender = sender,
-                        Event = transformedEvent,
-                        Subscription = subscription,
-                        Result = result,
-                        CompletionSource = new TaskCompletionSource<bool>()
-                    });
-                }
-            }
-            catch (Exception? ex)
-            {
-                _logger.Log(ex, $"[EventBus] Event {evt.EventId} failed.");
-                result.Errors.Add(ex);
-                await _eventStore.PersistEventAsync(evt);
-            }
-
-            return result;
+                    ["EventType"] = evt.EventType.ToString(),
+                    ["SourceId"] = evt.SourceId
+                });
         }
 
         /// <summary>
