@@ -2,11 +2,10 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Extensions;
-using HydroGarden.Foundation.Common.Logging;
 using System.Threading.Channels;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
 {
@@ -29,7 +28,7 @@ namespace HydroGarden.Foundation.Core.Services
         public bool ForceTransactionCreation { get; set; } = false;
         public IPropertyChangedEvent? TestEvent { get; set; }
 
-        public PersistenceService(IStore store, IEventBus eventBus, ILogger logger, IErrorMonitor errorMonitor, TimeSpan? batchInterval = null)
+        public PersistenceService(IStore store, IEventBus eventBus, ILogger? logger, IErrorMonitor errorMonitor, TimeSpan? batchInterval = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -142,10 +141,7 @@ namespace HydroGarden.Foundation.Core.Services
 
                         properties[propertyChangedEvent.PropertyName] = propertyChangedEvent.NewValue ?? new object();
 
-                        if (propertyChangedEvent.Metadata != null)
-                        {
-                            metadata[propertyChangedEvent.PropertyName] = propertyChangedEvent.Metadata;
-                        }
+                        metadata[propertyChangedEvent.PropertyName] = propertyChangedEvent.Metadata;
 
                         await _eventChannel.Writer.WriteAsync(propertyChangedEvent, ct);
                         await _eventBus.PublishAsync(this, propertyChangedEvent, ct);
@@ -162,7 +158,7 @@ namespace HydroGarden.Foundation.Core.Services
                 {
                     ["EventType"] = evt.EventType.ToString(),
                     ["SourceId"] = evt.SourceId
-                });
+                }, ct: ct);
         }
 
         public async Task ProcessPendingEventsAsync()
@@ -261,10 +257,7 @@ namespace HydroGarden.Foundation.Core.Services
                         foreach (var (propName, evt) in deviceEvents)
                         {
                             properties[propName] = evt.NewValue ?? new object();
-                            if (evt.Metadata != null)
-                            {
-                                allDeviceMetadata[propName] = evt.Metadata;
-                            }
+                            allDeviceMetadata[propName] = evt.Metadata;
                         }
 
                         // Send ALL metadata to the transaction
@@ -295,9 +288,9 @@ namespace HydroGarden.Foundation.Core.Services
                 var properties = await LoadDevicePropertiesAsync(deviceId);
                 var metadata = await LoadDeviceMetadataAsync(deviceId);
 
-                if (properties != null && properties.TryGetValue("Name", out var nameObj) && nameObj is string name)
+                if (properties.TryGetValue("Name", out var nameObj) && nameObj is string name)
                 {
-                    storedDevices.Add((deviceId, name, properties, metadata ?? new Dictionary<string, IPropertyMetadata>()));
+                    storedDevices.Add((deviceId, name, properties, metadata));
                 }
             }
 
@@ -325,7 +318,7 @@ namespace HydroGarden.Foundation.Core.Services
         {
             if (_isDisposed) return;
             _isDisposed = true;
-            _processingCts.Cancel();
+            await _processingCts.CancelAsync();
             try
             {
                 await _processingTask;

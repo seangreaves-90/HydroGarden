@@ -1,10 +1,7 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Common.ErrorHandling.Constants;
-using System;
-using System.Collections.Generic;
-using System.Text.Json;
+﻿using HydroGarden.ErrorHandling.Core.Common;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
-namespace HydroGarden.Foundation.Common.ErrorHandling
+namespace HydroGarden.ErrorHandling.Core
 {
     /// <summary>
     /// Enhanced error representation for IoT components with improved classification,

@@ -4,9 +4,9 @@ using HydroGarden.Foundation.Common.Events;
 using Moq;
 using FluentAssertions;
 using HydroGarden.Foundation.Core.Components.Devices;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Tests.Unit.EventBus;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Tests.Integration.EventBus
 {

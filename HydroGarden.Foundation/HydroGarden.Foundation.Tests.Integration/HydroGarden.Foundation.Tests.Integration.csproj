@@ -17,10 +17,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\HydroGarden.ErrorHandling.Core\HydroGarden.ErrorHandling.Core.csproj" />
     <ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
     <ProjectReference Include="..\HydroGarden.Foundation.Common\HydroGarden.Foundation.Common.csproj" />
     <ProjectReference Include="..\HydroGarden.Foundation.Core\HydroGarden.Foundation.Core.csproj" />
     <ProjectReference Include="..\HydroGarden.Foundation.Tests.Unit\HydroGarden.Foundation.Tests.Unit.csproj" />
+    <ProjectReference Include="..\HydroGarden.Logger\HydroGarden.Logger.csproj" />
   </ItemGroup>
 
   <ItemGroup>

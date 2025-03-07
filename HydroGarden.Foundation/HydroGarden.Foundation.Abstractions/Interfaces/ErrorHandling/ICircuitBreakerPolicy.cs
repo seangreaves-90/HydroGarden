@@ -1,6 +1,6 @@
 ﻿
 
-namespace HydroGarden.Foundation.Abstractions.Interfaces
+namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
 {
     public enum CircuitState
     {

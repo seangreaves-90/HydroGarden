@@ -1,8 +1,8 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.Foundation.Common.ErrorHandling
+namespace HydroGarden.ErrorHandling.Core
 {
     public abstract class ErrorMonitorBase(ILogger logger, int maxErrorQueueSize = 1000)
     {

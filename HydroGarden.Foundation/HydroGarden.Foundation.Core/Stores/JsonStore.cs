@@ -1,11 +1,9 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Logging;
-using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Serialization;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Stores
 {
@@ -16,7 +14,7 @@ namespace HydroGarden.Foundation.Core.Stores
         private readonly JsonSerializerOptions _serializerOptions;
         private readonly ILogger _logger;
 
-        public JsonStore(string basePath, ILogger logger)
+        public JsonStore(string basePath, ILogger? logger)
         {
             string fullPath = Path.GetFullPath(basePath);
             _filePath = Path.Combine(fullPath, "ComponentProperties.json");
@@ -34,7 +32,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 }
             };
 
-            _logger = logger ?? new Logger();
+            _logger = logger ?? new Logger.Logging.Logger();
             _logger.Log($"JsonStore initialized with file path: {_filePath}");
         }
 
@@ -81,7 +79,7 @@ namespace HydroGarden.Foundation.Core.Stores
                 return jsonElement.ValueKind switch
                 {
                     JsonValueKind.String => jsonElement.GetString()?.Trim() ?? string.Empty,
-                    JsonValueKind.Number => jsonElement.TryGetDouble(out double d) ? d : (double)jsonElement.GetInt64(), // Force double conversion
+                    JsonValueKind.Number => jsonElement.TryGetDouble(out double d) ? d : jsonElement.GetInt64(), // Force double conversion
                     JsonValueKind.True => true,
                     JsonValueKind.False => false,
                     JsonValueKind.Null => null!,

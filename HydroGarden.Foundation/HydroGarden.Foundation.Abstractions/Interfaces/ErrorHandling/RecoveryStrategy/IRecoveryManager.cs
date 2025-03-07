@@ -1,9 +1,4 @@
-﻿
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// Status of a recovery operation.

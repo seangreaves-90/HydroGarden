@@ -1,8 +1,8 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
+using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.Foundation.Common.ErrorHandling.RecoveryStrategy
+namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
 {
     /// <summary>
     /// Base class for error recovery strategies with common functionality.

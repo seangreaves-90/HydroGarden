@@ -1,7 +1,8 @@
-﻿using System.Runtime.CompilerServices;
+﻿
+using System.Runtime.CompilerServices;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 
-namespace HydroGarden.Foundation.Common.ErrorHandling
+namespace HydroGarden.ErrorHandling.Core
 {
     /// <summary>
     /// Builder class for creating rich error context with important diagnostic information.

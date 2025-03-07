@@ -2,8 +2,8 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
+using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
 

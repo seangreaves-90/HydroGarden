@@ -3,7 +3,6 @@ using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.Events.RetryPolicies;
 using HydroGarden.Foundation.Common.Events.Stores;
 using HydroGarden.Foundation.Common.Events.Transforms;
-using HydroGarden.Foundation.Common.Logging;
 using HydroGarden.Foundation.Core.Components.Devices;
 using HydroGarden.Foundation.Core.Services;
 using HydroGarden.Foundation.Core.Stores;

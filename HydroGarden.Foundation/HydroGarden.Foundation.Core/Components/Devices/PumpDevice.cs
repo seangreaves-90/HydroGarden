@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
 {

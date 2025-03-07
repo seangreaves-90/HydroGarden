@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Logging
+﻿namespace HydroGarden.Logger.Abstractions
 {
     /// <summary>
     /// Provides logging functionality for HydroGarden components.

@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
+using HydroGarden.ErrorHandling.Core;
+using HydroGarden.ErrorHandling.Core.Common;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Common.ErrorHandling;
-using HydroGarden.Foundation.Common.ErrorHandling.Constants;
 using HydroGarden.Foundation.Common.Policies;
 
 namespace HydroGarden.Foundation.Common.Extensions
@@ -23,7 +19,7 @@ namespace HydroGarden.Foundation.Common.Extensions
         public static async Task<T?> ExecuteWithErrorHandlingAsync<T>(
             this object source,
             IErrorMonitor errorMonitor,
-            Func<Task<T>> operation,
+            Func<Task<T?>> operation,
             string errorCode,
             string errorMessage,
             ErrorSource errorSource,

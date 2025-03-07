@@ -2,12 +2,12 @@
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components;
 using Moq;
 using System.Xml.Linq;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Logger.Abstractions;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Components

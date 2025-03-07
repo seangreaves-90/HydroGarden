@@ -1,8 +1,8 @@
 ﻿using FluentAssertions;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Core.Services;
+using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
 

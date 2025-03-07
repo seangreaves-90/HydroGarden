@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Core.Stores;
+using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
 
@@ -10,12 +10,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Stores
     {
         private readonly string _testFilePath;
         private readonly JsonStore _jsonStore;
-        private readonly Mock<ILogger> _loggerMock;
+        private readonly Mock<ILogger?> _loggerMock;
 
         public JsonStoreTests()
         {
             _testFilePath = Path.Combine(Path.GetTempPath(), "TestComponentProperties.json");
-            _loggerMock = new Mock<ILogger>();
+            _loggerMock = new Mock<ILogger?>();
             _jsonStore = new JsonStore(Path.GetTempPath(), _loggerMock.Object);
         }
 

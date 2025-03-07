@@ -2,12 +2,12 @@
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components.Devices;
 using HydroGarden.Foundation.Core.Stores;
+using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
 
@@ -17,7 +17,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
     {
         private readonly Mock<IStore> _mockStore;
         private readonly Mock<IStoreTransaction> _mockTransaction;
-        private readonly Mock<ILogger> _mockLogger;
+        private readonly Mock<ILogger?> _mockLogger;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Core.Services.PersistenceService _sut;
@@ -27,7 +27,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
         {
             _mockStore = new Mock<IStore>();
             _mockTransaction = new Mock<IStoreTransaction>();
-            _mockLogger = new Mock<ILogger>();
+            _mockLogger = new Mock<ILogger?>();
             _mockEventBus = new Mock<IEventBus>();
             _capturedMetadata = new Dictionary<string, IPropertyMetadata>();
             _mockErrorMonitor = new Mock<IErrorMonitor>();

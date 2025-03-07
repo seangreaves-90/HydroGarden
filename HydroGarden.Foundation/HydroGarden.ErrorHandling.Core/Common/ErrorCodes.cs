@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Common.ErrorHandling.Constants
+﻿namespace HydroGarden.ErrorHandling.Core.Common
 {
     /// <summary>
     /// Standardized error codes for the HydroGarden system.

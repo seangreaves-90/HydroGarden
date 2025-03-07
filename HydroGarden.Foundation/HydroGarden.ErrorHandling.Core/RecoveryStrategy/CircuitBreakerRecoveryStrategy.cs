@@ -1,8 +1,8 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Common.ErrorHandling.Constants;
+﻿using HydroGarden.ErrorHandling.Core.Common;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.Foundation.Common.ErrorHandling.RecoveryStrategy;
+namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy;
 
 /// <summary>
 /// Recovery strategy for circuit breaker related issues.

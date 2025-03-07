@@ -1,14 +1,13 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Common.Logging;
-using HydroGarden.Foundation.Common.PropertyMetadata;
+﻿using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
 using System.Reflection;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Extensions;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Components
 {
@@ -37,7 +36,7 @@ namespace HydroGarden.Foundation.Core.Components
             Id = id;
             Name = name;
             AssemblyType = GetType().FullName ?? "UnknownType";
-            Logger = logger ?? new Logger();
+            Logger = logger ?? new Logger.Logging.Logger();
             ErrorMonitor = errorMonitor;
         }
 

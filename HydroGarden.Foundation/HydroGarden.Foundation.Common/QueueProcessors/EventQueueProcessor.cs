@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
+using HydroGarden.Logger.Abstractions;
 
 
 namespace HydroGarden.Foundation.Common.QueueProcessor

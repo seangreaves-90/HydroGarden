@@ -1,8 +1,7 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
-using System.Text;
+﻿using System.Text;
+using HydroGarden.Logger.Abstractions;
 
-
-namespace HydroGarden.Foundation.Common.Logging
+namespace HydroGarden.Logger.Logging
 {
     /// <summary>
     /// Provides logging functionality for HydroGarden components.

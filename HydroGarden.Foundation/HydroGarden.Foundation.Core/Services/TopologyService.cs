@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
-using HydroGarden.Foundation.Abstractions.Interfaces.Logging;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
 {
