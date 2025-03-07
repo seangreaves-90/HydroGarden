@@ -208,7 +208,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         public async Task InitializeAsync_OnInitializeException_ShouldSetStateToError()
         {
             // Arrange - use a mock for direct interface access
-            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockLogger.Object) { CallBase = true };
+            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object, null, 3) { CallBase = true };
 
             // Setup the method to throw
             mockDevice.Protected()
@@ -218,11 +218,21 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
             // Setup event handler
             mockDevice.Object.SetEventHandler(_mockEventHandler.Object);
 
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(async () =>
-                await ((IIoTDevice)mockDevice.Object).InitializeAsync());
+            // Setup ErrorMonitor to capture reported errors
+            _mockErrorMonitor
+                .Setup(m => m.ReportErrorAsync(It.IsAny<IApplicationError>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
 
-            ex.Message.Should().Be("Test exception");
+            // Act
+            await ((IIoTDevice)mockDevice.Object).InitializeAsync();
+
+            // Assert
+            // Verify error was reported to the monitor
+            _mockErrorMonitor.Verify(
+                m => m.ReportErrorAsync(
+                    It.Is<IApplicationError>(e => e.Message.Contains("Failed to initialize device")),
+                    It.IsAny<CancellationToken>()),
+                Times.AtLeastOnce);
 
             // Verify state changed to Error
             mockDevice.Object.State.Should().Be(ComponentState.Error);
@@ -232,7 +242,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         public async Task StartAsync_OnStartException_ShouldSetStateToError()
         {
             // Arrange - use a mock that allows the base implementation
-            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockLogger.Object) { CallBase = true };
+            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object) { CallBase = true };
 
             // Setup InitializeAsync to work normally
             await ((IIoTDevice)mockDevice.Object).InitializeAsync();
