@@ -6,7 +6,7 @@ using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.Core.Components;
 using Moq;
 using System.Xml.Linq;
-using HydroGarden.ErrorHandling.Core.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using Xunit;
 

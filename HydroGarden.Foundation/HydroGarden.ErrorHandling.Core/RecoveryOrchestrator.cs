@@ -1,6 +1,6 @@
-﻿using HydroGarden.ErrorHandling.Core.Interfaces;
-using HydroGarden.ErrorHandling.Core.Interfaces.RecoveryStrategy;
-using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
+﻿using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.ErrorHandling.Core

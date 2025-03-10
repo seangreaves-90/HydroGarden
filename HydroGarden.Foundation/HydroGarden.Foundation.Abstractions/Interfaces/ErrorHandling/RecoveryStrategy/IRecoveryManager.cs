@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.ErrorHandling.Core.Interfaces.RecoveryStrategy
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// Status of a recovery operation.

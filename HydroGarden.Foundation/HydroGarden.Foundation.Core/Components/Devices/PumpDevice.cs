@@ -1,5 +1,5 @@
-﻿using HydroGarden.ErrorHandling.Core.Interfaces;
-using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Logger.Abstractions;
 

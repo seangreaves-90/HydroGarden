@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿
+using System.Runtime.CompilerServices;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 
 namespace HydroGarden.ErrorHandling.Core
 {
@@ -7,7 +9,7 @@ namespace HydroGarden.ErrorHandling.Core
     /// </summary>
     public class ErrorContextBuilder
     {
-        private readonly Dictionary<string, object?> _context = new();
+        private readonly Dictionary<string, object> _context = new();
 
         /// <summary>
         /// Creates a new error context builder.
@@ -21,28 +23,11 @@ namespace HydroGarden.ErrorHandling.Core
         {
             _context["SourceType"] = source.GetType().FullName ?? "UnknownType";
 
-            // Use reflection to check if the source implements IComponent
-            var iComponentType = Type.GetType("HydroGarden.Foundation.Abstractions.Interfaces.Components.IComponent, HydroGarden.Foundation.Abstractions");
-            if (iComponentType != null && iComponentType.IsInstanceOfType(source))
+            if (source is IComponent component)
             {
-                var idProperty = iComponentType.GetProperty("Id");
-                var nameProperty = iComponentType.GetProperty("Name");
-                var stateProperty = iComponentType.GetProperty("State");
-
-                if (idProperty != null)
-                {
-                    _context["ComponentId"] = idProperty.GetValue(source)?.ToString();
-                }
-
-                if (nameProperty != null)
-                {
-                    _context["ComponentName"] = nameProperty.GetValue(source)?.ToString();
-                }
-
-                if (stateProperty != null)
-                {
-                    _context["ComponentState"] = stateProperty.GetValue(source)?.ToString();
-                }
+                _context["ComponentId"] = component.Id;
+                _context["ComponentName"] = component.Name;
+                _context["ComponentState"] = component.State.ToString();
             }
 
             return this;
@@ -64,7 +49,7 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Adds operation details such as method name and parameters.
         /// </summary>
-        public ErrorContextBuilder WithOperation(string? operationName, object? parameters = null)
+        public ErrorContextBuilder WithOperation(string operationName, object? parameters = null)
         {
             _context["Operation"] = operationName;
 
@@ -79,7 +64,7 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Adds custom key-value pairs to the context.
         /// </summary>
-        public ErrorContextBuilder WithProperty(string key, object? value)
+        public ErrorContextBuilder WithProperty(string key, object value)
         {
             _context[key] = value;
             return this;
@@ -88,7 +73,7 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Adds multiple properties from a dictionary.
         /// </summary>
-        public ErrorContextBuilder WithProperties(IDictionary<string, object?> properties)
+        public ErrorContextBuilder WithProperties(IDictionary<string, object> properties)
         {
             foreach (var (key, value) in properties)
             {
@@ -124,10 +109,10 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Builds the final context dictionary.
         /// </summary>
-        public Dictionary<string, object?> Build()
+        public Dictionary<string, object> Build()
         {
             _context["ContextCreatedAt"] = DateTimeOffset.UtcNow.ToString("o");
-            return new Dictionary<string, object?>(_context);
+            return new Dictionary<string, object>(_context);
         }
     }
 }

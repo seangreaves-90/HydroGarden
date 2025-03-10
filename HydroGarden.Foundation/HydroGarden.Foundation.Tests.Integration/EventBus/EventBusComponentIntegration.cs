@@ -3,8 +3,8 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Events;
 using Moq;
 using FluentAssertions;
-using HydroGarden.ErrorHandling.Core.Interfaces;
 using HydroGarden.Foundation.Core.Components.Devices;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Tests.Unit.EventBus;
 using HydroGarden.Logger.Abstractions;
 

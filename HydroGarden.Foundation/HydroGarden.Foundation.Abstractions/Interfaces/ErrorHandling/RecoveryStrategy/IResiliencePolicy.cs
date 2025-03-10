@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.ErrorHandling.Core.Interfaces.RecoveryStrategy
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy
 {
     public interface IResiliencePolicy
     {

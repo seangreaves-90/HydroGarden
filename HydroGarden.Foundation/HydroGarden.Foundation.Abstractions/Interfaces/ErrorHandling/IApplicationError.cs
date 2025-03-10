@@ -1,6 +1,6 @@
 ﻿
 
-namespace HydroGarden.ErrorHandling.Core.Interfaces
+namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
 {
     public enum ErrorSeverity
     {

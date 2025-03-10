@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.ErrorHandling.Core.Interfaces
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
 {
     /// <summary>
     /// Interface for services that can recover components
