@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
+﻿namespace HydroGarden.ErrorHandling.Core.Interfaces
 {
     public interface IErrorMonitor
     {

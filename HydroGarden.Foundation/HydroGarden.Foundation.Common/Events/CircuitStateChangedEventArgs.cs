@@ -1,5 +1,5 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.ErrorHandling.Core.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 
 namespace HydroGarden.Foundation.Common.Events
 {

@@ -1,6 +1,6 @@
 ﻿using HydroGarden.ErrorHandling.Core;
 using HydroGarden.ErrorHandling.Core.Common;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.ErrorHandling.Core.Interfaces;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Logger.Abstractions;
 

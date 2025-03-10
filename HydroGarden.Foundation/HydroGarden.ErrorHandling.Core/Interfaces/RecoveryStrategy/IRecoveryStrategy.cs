@@ -1,6 +1,6 @@
 ﻿
 
-namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy
+namespace HydroGarden.ErrorHandling.Core.Interfaces.RecoveryStrategy
 {
     public interface IRecoveryStrategy
     {

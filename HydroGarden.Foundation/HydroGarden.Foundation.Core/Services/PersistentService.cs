@@ -1,10 +1,10 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Extensions;
 using System.Threading.Channels;
+using HydroGarden.ErrorHandling.Core.Interfaces;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services

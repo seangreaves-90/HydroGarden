@@ -2,9 +2,9 @@
 using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
 using System.Reflection;
+using HydroGarden.ErrorHandling.Core.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Extensions;
 using HydroGarden.Logger.Abstractions;
