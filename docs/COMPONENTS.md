@@ -47,6 +47,7 @@ The central messaging system that facilitates communication between components.
 - Event routing and delivery
 - Error handling and retry mechanisms
 - Event filtering and prioritization
+- Integration with Event Processing Pipeline
 
 **Main Interfaces:**
 - `IEventBus`: Core functionality for subscribing and publishing
@@ -81,6 +82,78 @@ var command = new CommandEvent(
 );
 
 await eventBus.PublishAsync(this, command);
+```
+
+### Event Processing Pipeline
+
+New component added in Phase 2 that enhances the EventBus with middleware capabilities.
+
+**Features:**
+- Middleware-based event processing
+- Advanced error handling and recovery
+- Circuit breaking for preventing cascading failures
+- Dead letter queue for managing failed events
+- Logging and monitoring
+
+**Main Interfaces:**
+- `IEventProcessingPipeline`: Core pipeline functionality
+- `IEventMiddleware`: Interface for creating middleware components
+- `IEventProcessingResult`: Result of processing an event
+
+**Middleware Components:**
+- `LoggingMiddleware`: Logs event processing with configurable detail levels
+- `RetryMiddleware`: Implements exponential backoff retry policy with jitter
+- `CircuitBreakerMiddleware`: Prevents cascading failures with circuit breaking pattern
+- `DeadLetterQueueMiddleware`: Captures permanently failed events for analysis
+
+**Example Usage:**
+```csharp
+// Configure pipeline with fluent builder API
+var pipeline = new EventPipelineBuilder(logger)
+    .AddLogging(LoggingMiddleware.LoggingLevel.Detailed)
+    .AddCircuitBreaker(failureThreshold: 5, resetTimeout: TimeSpan.FromMinutes(1))
+    .AddRetry(maxRetries: 3, initialDelay: TimeSpan.FromSeconds(1))
+    .AddDeadLetterQueue()
+    .Build();
+
+// Attach to EventBus
+eventBus.SetEventProcessingPipeline(pipeline);
+```
+
+### Error-Event Transformation Service
+
+New component added in Phase 1 that handles bidirectional conversion between errors and events.
+
+**Features:**
+- Error to event conversion
+- Event to error conversion
+- Correlation tracking
+- Error publishing as events
+
+**Main Interfaces:**
+- `IErrorEventTransformationService`: Core transformation functionality
+- `ErrorEvent`: Model representing an error that can be converted to an event
+- `RecoveryEvent`: Model representing a recovery attempt
+
+**Event Classes:**
+- `ErrorOccurredEvent`: Event published when an error occurs
+- `RecoveryAttemptedEvent`: Event published when a recovery is attempted
+
+**Example Usage:**
+```csharp
+// Convert an error to an event
+var errorEvent = _transformationService.TransformErrorToEvent(applicationError);
+
+// Publish an error as an event
+await _transformationService.PublishErrorAsEventAsync(applicationError);
+
+// Publish a recovery attempt
+await _transformationService.PublishRecoveryAsEventAsync(
+    deviceId,
+    "DEVICE_OFFLINE",
+    isSuccessful: true,
+    message: "Device reconnected successfully",
+    correlationId: errorEvent.CorrelationId);
 ```
 
 ### PersistenceService
@@ -251,3 +324,68 @@ User interface for monitoring and controlling the hydroponic system.
 - Control panel for manual operations
 - Configuration interface
 - Alerts and notifications
+
+## Middleware Components
+
+New section added for Phase 2 middleware components that can be added to the Event Processing Pipeline.
+
+### LoggingMiddleware
+
+Logs event processing with configurable detail levels.
+
+**Features:**
+- Multiple logging levels (Basic, Detailed, Diagnostic)
+- Performance timing for event processing
+- Event context logging
+- Error logging
+
+**Configuration Options:**
+- Logging level
+- Custom logger implementation
+- Context enrichment
+
+### RetryMiddleware
+
+Implements retry policies with exponential backoff.
+
+**Features:**
+- Configurable retry limits
+- Exponential backoff with jitter
+- Per-event retry state tracking
+- Failure reporting
+
+**Configuration Options:**
+- Maximum retry count
+- Initial delay
+- Backoff multiplier
+- Jitter enabled/disabled
+
+### CircuitBreakerMiddleware
+
+Prevents cascading failures with the circuit breaker pattern.
+
+**Features:**
+- Multiple circuit states (Closed, Open, Half-Open)
+- Per-event type circuit tracking
+- Automatic recovery attempts
+- Manual reset capability
+
+**Configuration Options:**
+- Failure threshold
+- Reset timeout
+- Circuit state change notifications
+
+### DeadLetterQueueMiddleware
+
+Captures permanently failed events for later analysis and processing.
+
+**Features:**
+- In-memory storage of failed events
+- Event metadata enrichment
+- Configurable retention
+- Queue capacity management
+
+**Configuration Options:**
+- Queue capacity
+- Retention period
+- Cleanup frequency

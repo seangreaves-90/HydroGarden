@@ -3,11 +3,13 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.Common.Events.Pipeline;
 using HydroGarden.Foundation.Common.Extensions;
 using HydroGarden.Foundation.Common.QueueProcessor;
+using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.Results;
-using System.Collections.Concurrent;
 using HydroGarden.Logger.Abstractions;
+using System.Collections.Concurrent;
 
 namespace HydroGarden.Foundation.Common.Events
 {
@@ -24,6 +26,7 @@ namespace HydroGarden.Foundation.Common.Events
     public class EventBus : IEventBus, IDisposable
     {
         private ITopologyService? _topologyService;
+        private IEventProcessingPipeline? _pipeline;
         private readonly ILogger _logger;
         private readonly IEventStore _eventStore;
         private readonly IEventRetryPolicy _retryPolicy;
@@ -32,6 +35,7 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly EventQueueProcessor _eventQueueProcessor;
         private readonly ConcurrentDictionary<Guid, IEventSubscription> _subscriptions = new();
         private readonly ConcurrentDictionary<EventType, List<IEventSubscription>> _subscriptionsByType = new();
+        private readonly object _pipelineLock = new();
         private bool _isDisposed;
 
         /// <summary>
@@ -61,6 +65,31 @@ namespace HydroGarden.Foundation.Common.Events
         public void SetTopologyService(ITopologyService topologyService)
         {
             _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
+        }
+
+        /// <summary>
+        /// Sets the event processing pipeline for the EventBus.
+        /// </summary>
+        /// <param name="pipeline">The event processing pipeline to use.</param>
+        public void SetEventProcessingPipeline(IEventProcessingPipeline pipeline)
+        {
+            lock (_pipelineLock)
+            {
+                _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
+                _logger.Log($"Event processing pipeline configured for EventBus");
+            }
+        }
+
+        /// <summary>
+        /// Gets the event processing pipeline used by the EventBus.
+        /// </summary>
+        /// <returns>The event processing pipeline, or null if none is configured.</returns>
+        public IEventProcessingPipeline? GetEventProcessingPipeline()
+        {
+            lock (_pipelineLock)
+            {
+                return _pipeline;
+            }
         }
 
         /// <summary>
@@ -122,14 +151,58 @@ namespace HydroGarden.Foundation.Common.Events
                     var transformedEvent = _transformer.Transform(evt);
                     var result = new PublishResult { EventId = evt.EventId };
 
+                    // Process through the pipeline if available
+                    IEventProcessingPipeline? pipeline;
+                    lock (_pipelineLock)
+                    {
+                        pipeline = _pipeline;
+                    }
+
+                    if (pipeline != null)
+                    {
+                        var pipelineResult = await pipeline.ProcessEventAsync(sender, transformedEvent, ct);
+                        
+                        // If the pipeline processed the event and it was successful, we're done
+                        if (pipelineResult.IsSuccess)
+                        {
+                            result.HandlerCount = 1; // We don't know exactly how many handlers were invoked
+                            result.SuccessCount = 1;
+                            return result;
+                        }
+                        
+                        // If the pipeline indicated we should retry, persist the event for later
+                        if (pipelineResult.ShouldRetry)
+                        {
+                            // Store the event for retry
+                            await _eventStore.PersistEventAsync(transformedEvent);
+                            
+                            // Add the error to the result
+                            if (pipelineResult.Exception != null)
+                            {
+                                result.Errors.Add(pipelineResult.Exception);
+                            }
+                            
+                            return result;
+                        }
+                        
+                        // If we get here, the pipeline failed and we should not retry
+                        // Continue with the legacy event handling as a fallback
+                        if (pipelineResult.Exception != null)
+                        {
+                            result.Errors.Add(pipelineResult.Exception);
+                            _logger.Log(pipelineResult.Exception, $"Pipeline processing failed for event {transformedEvent.EventId}, falling back to legacy event handling");
+                        }
+                    }
+
+                    // Legacy event handling
                     var matchingSubscriptions = await GetMatchingSubscriptionsAsync(transformedEvent, ct);
                     result.HandlerCount = matchingSubscriptions.Count;
 
                     if (matchingSubscriptions.Count == 0)
                     {
-                        if (evt.RoutingData?.Persist == true)
+                        if (transformedEvent.RoutingData?.Persist == true)
                         {
-                            await _eventStore.PersistEventAsync(evt);
+                            await _eventStore.PersistEventAsync(transformedEvent);
                         }
                         return result;
                     }
@@ -137,6 +210,7 @@ namespace HydroGarden.Foundation.Common.Events
                     var syncSubscriptions = matchingSubscriptions.Where(s => s.Options.Synchronous).ToList();
                     var asyncSubscriptions = matchingSubscriptions.Where(s => !s.Options.Synchronous).ToList();
 
+                    // Process synchronous subscriptions
                     foreach (var subscription in syncSubscriptions)
                     {
                         try
@@ -165,7 +239,26 @@ namespace HydroGarden.Foundation.Common.Events
                         }
                     }
 
-                    // Process async subscriptions...
+                    // Process asynchronous subscriptions
+                    if (asyncSubscriptions.Count > 0)
+                    {
+                        // Queue the async handlers for processing
+                        foreach (var subscription in asyncSubscriptions)
+                        {
+                            // Create an event queue item for async processing
+                            var queueItem = new EventQueueItem
+                            {
+                                Sender = sender,
+                                Event = transformedEvent,
+                                Subscription = subscription,
+                                Result = result,
+                                CompletionSource = new TaskCompletionSource<bool>()
+                            };
+                            
+                            // Enqueue the item for processing
+                            _eventQueueProcessor.Enqueue(queueItem);
+                        }
+                    }
 
                     return result;
                 },
@@ -324,6 +417,16 @@ namespace HydroGarden.Foundation.Common.Events
         {
             if (_isDisposed) return;
             _isDisposed = true;
+            
+            // Dispose the pipeline if it's disposable
+            lock (_pipelineLock)
+            {
+                if (_pipeline is IDisposable disposablePipeline)
+                {
+                    disposablePipeline.Dispose();
+                }
+            }
+            
             _eventQueueProcessor.Dispose();
             GC.SuppressFinalize(this);
         }

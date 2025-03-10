@@ -19,12 +19,20 @@ The HydroGarden solution consists of several projects organized by responsibilit
   - Event implementations
   - Utility classes
   - Extension methods
+  - Event Processing Pipeline
+  - Middleware components
 
 - **HydroGarden.Foundation.Core**
   - Core component implementations
   - Base classes for devices and controllers
   - Service implementations
   - Storage implementations
+
+- **HydroGarden.Foundation.ErrorHandling.Core**
+  - Error handling and transformation implementations
+  - Error-Event transformation service
+  - Error monitoring implementations
+  - Recovery coordination
 
 ### Testing Projects
 
@@ -189,6 +197,162 @@ public class TemperatureController : HydroGardenComponentBase, IHydroGardenPrope
 }
 ```
 
+## Event Processing Pipeline
+
+New in Phase 2, the Event Processing Pipeline enhances event handling with middleware capabilities.
+
+### Pipeline Configuration
+
+```csharp
+// Configure the pipeline using the builder
+var pipeline = new EventPipelineBuilder(logger)
+    .AddLogging(LoggingMiddleware.LoggingLevel.Detailed)
+    .AddCircuitBreaker(failureThreshold: 5, resetTimeout: TimeSpan.FromMinutes(1))
+    .AddRetry(maxRetries: 3, initialDelay: TimeSpan.FromSeconds(1))
+    .AddDeadLetterQueue()
+    .Build();
+
+// Attach to the EventBus
+eventBus.SetEventProcessingPipeline(pipeline);
+
+// Or use extension method
+var pipeline = eventBus.UsePipeline(logger, builder => 
+{
+    builder.AddLogging()
+           .AddCircuitBreaker()
+           .AddRetry()
+           .AddDeadLetterQueue();
+});
+```
+
+### Creating Custom Middleware
+
+```csharp
+public class CustomMiddleware : IEventMiddleware
+{
+    private readonly ILogger _logger;
+    
+    public CustomMiddleware(ILogger logger)
+    {
+        _logger = logger;
+        Id = Guid.NewGuid();
+        Name = "Custom Middleware";
+        Order = 300; // Run after logging but before retry
+    }
+
+    public Guid Id { get; }
+    public string Name { get; }
+    public int Order { get; }
+
+    public async Task<IEventProcessingResult> ProcessAsync(
+        object sender,
+        IEvent @event,
+        Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> next,
+        CancellationToken cancellationToken = default)
+    {
+        // Do something before the next middleware
+        _logger.Log($"Custom middleware processing event {@event.EventId}");
+
+        // Call the next middleware in the pipeline
+        var result = await next(sender, @event, cancellationToken);
+
+        // Do something after the next middleware
+        if (!result.IsSuccess)
+        {
+            _logger.Log($"Event {@event.EventId} failed processing");
+        }
+
+        return result;
+    }
+
+    public bool ShouldApply(IEvent @event)
+    {
+        // Apply this middleware to all events except system events
+        return @event.EventType != EventType.System;
+    }
+}
+
+// Add to pipeline
+pipeline.AddMiddleware(new CustomMiddleware(logger));
+```
+
+### Using the Dead Letter Queue
+
+```csharp
+// Access the dead letter queue middleware
+var deadLetterQueueMiddleware = serviceProvider.GetRequiredService<DeadLetterQueueMiddleware>();
+
+// Get all entries
+var failedEvents = deadLetterQueueMiddleware.GetAllEntries();
+
+// Process failed events
+foreach (var entry in failedEvents)
+{
+    Console.WriteLine($"Failed event: {entry.EventId}, Error: {entry.ErrorMessage}");
+    
+    // Attempt to reprocess
+    if (entry.ProcessingAttempts < 5)
+    {
+        await eventBus.PublishAsync(this, entry.Event);
+        deadLetterQueueMiddleware.RemoveEntry(entry.Id);
+    }
+}
+```
+
+## Error-Event Integration
+
+New in Phase 1, the Error-Event integration allows errors to be published as events and vice versa.
+
+### Publishing Errors as Events
+
+```csharp
+// Using the transformation service directly
+await errorEventTransformationService.PublishErrorAsEventAsync(applicationError);
+
+// Extension method for IErrorMonitor
+await errorMonitor.PublishErrorAsEventAsync(applicationError);
+
+// Publishing a recovery attempt
+await errorEventTransformationService.PublishRecoveryAsEventAsync(
+    deviceId,
+    "SENSOR_FAILURE",
+    isSuccessful: true,
+    message: "Sensor reconnected successfully",
+    correlationId: errorEvent.CorrelationId);
+```
+
+### Subscribing to Error Events
+
+```csharp
+// Using extension methods
+eventBus.SubscribeToErrorEvents(
+    async (error, ct) =>
+    {
+        // Handle the error
+        Console.WriteLine($"Received error: {error.ErrorCode} - {error.Message}");
+        
+        // Attempt recovery
+        if (error.ErrorCode == "DEVICE_OFFLINE")
+        {
+            await TryReconnectDeviceAsync(error.DeviceId);
+        }
+    });
+
+// Subscribe to recovery events
+eventBus.SubscribeToRecoveryEvents(
+    async (deviceId, errorCode, successful, message, correlationId, ct) =>
+    {
+        if (successful)
+        {
+            Console.WriteLine($"Device {deviceId} recovered from {errorCode}: {message}");
+        }
+        else
+        {
+            Console.WriteLine($"Recovery failed for device {deviceId}, error {errorCode}: {message}");
+        }
+    });
+```
+
 ## Creating New Components
 
 ### IoT Device
@@ -342,34 +506,73 @@ public class TemperatureController : HydroGardenComponentBase, IHydroGardenPrope
 
 ## Testing Best Practices
 
-### Unit Testing
+### Unit Testing the Event Processing Pipeline
 
 ```csharp
 [Fact]
-public async Task TemperatureSensor_WhenStarted_ShouldPublishReadings()
+public async Task RetryMiddleware_WhenEventFails_ShouldRetrySpecifiedTimes()
 {
     // Arrange
-    var mockEventHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
-    var sensorId = Guid.NewGuid();
-    var sensor = new TemperatureSensor(sensorId, "Test Sensor");
+    var logger = new TestLogger();
+    var middleware = new RetryMiddleware(logger, maxRetries: 3);
     
-    sensor.SetEventHandler(mockEventHandler.Object);
+    var event = new TestEvent { EventId = Guid.NewGuid() };
+    var failCount = 0;
+    
+    Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> next = 
+        (sender, evt, ct) =>
+        {
+            failCount++;
+            if (failCount <= 2) // Fail twice
+            {
+                return Task.FromResult<IEventProcessingResult>(
+                    EventProcessingResult.Failure(evt, new Exception("Test failure"), shouldRetry: true));
+            }
+            else // Succeed on third attempt
+            {
+                return Task.FromResult<IEventProcessingResult>(
+                    EventProcessingResult.Success(evt));
+            }
+        };
     
     // Act
-    await sensor.InitializeAsync();
-    await sensor.StartAsync();
-    
-    // Wait for readings
-    await Task.Delay(1000);
+    var result = await middleware.ProcessAsync(this, event, next, CancellationToken.None);
     
     // Assert
-    mockEventHandler.Verify(h => h.HandleEventAsync(
-        It.IsAny<object>(),
-        It.Is<IHydroGardenPropertyChangedEvent>(e => 
-            e.PropertyName == "CurrentTemperature" && 
-            e.NewValue is double),
-        It.IsAny<CancellationToken>()),
-        Times.AtLeastOnce);
+    Assert.True(result.IsSuccess);
+    Assert.Equal(3, failCount); // Should have attempted 3 times
+}
+```
+
+### Unit Testing Error-Event Transformation
+
+```csharp
+[Fact]
+public void TransformErrorToEvent_ShouldCreateValidErrorEvent()
+{
+    // Arrange
+    var mockEventBus = new Mock<IEventBus>();
+    var mockLogger = new Mock<ILogger>();
+    var service = new ErrorEventTransformationService(mockEventBus.Object, mockLogger.Object);
+    
+    var error = new TestError
+    {
+        DeviceId = Guid.NewGuid(),
+        ErrorCode = "TEST_ERROR",
+        Message = "Test error message",
+        Severity = ErrorSeverity.Error,
+        CorrelationId = Guid.NewGuid()
+    };
+    
+    // Act
+    var errorEvent = service.TransformErrorToEvent(error);
+    
+    // Assert
+    Assert.Equal(error.DeviceId, errorEvent.DeviceId);
+    Assert.Equal(error.ErrorCode, errorEvent.ErrorCode);
+    Assert.Equal(error.Message, errorEvent.Message);
+    Assert.Equal(error.Severity, errorEvent.Severity);
+    Assert.Equal(error.CorrelationId, errorEvent.CorrelationId);
 }
 ```
 
@@ -377,10 +580,20 @@ public async Task TemperatureSensor_WhenStarted_ShouldPublishReadings()
 
 ```csharp
 [Fact]
-public async Task EventBus_ComponentIntegration_ShouldRouteCommands()
+public async Task EventBus_WithPipeline_ShouldRouteCommands()
 {
     // Arrange
     using var eventBus = CreateTestEventBus();
+    var logger = new TestLogger();
+    
+    // Configure pipeline
+    var pipeline = new EventPipelineBuilder(logger)
+        .AddLogging()
+        .AddRetry(maxRetries: 1)
+        .Build();
+    
+    eventBus.SetEventProcessingPipeline(pipeline);
+    
     var deviceId = Guid.NewGuid();
     var controllerId = Guid.NewGuid();
     
@@ -427,20 +640,28 @@ public async Task EventBus_ComponentIntegration_ShouldRouteCommands()
 1. **Enable Diagnostic Logging**
    - Set log level to Debug or Trace during development
    - Use the `_logger.Log()` method liberally for visibility
+   - Use the LoggingMiddleware with Diagnostic level for detailed event processing logs
 
 2. **Monitor Event Flow**
    - Use the EventBus diagnostic features to see event routing
    - Add event subscription to monitor all events during debugging
+   - Check the Dead Letter Queue for failed events
 
-3. **Use TestConsole**
+3. **Circuit Breaker Monitoring**
+   - Examine circuit breaker states for different event types
+   - Check for open circuits when events aren't being delivered
+   - Manually reset circuits for testing
+
+4. **Use TestConsole**
    - The TestConsole project is helpful for isolated testing
    - Manually trigger events and observe system behavior
 
-4. **Common Issues**
+5. **Common Issues**
    - Event subscriptions not matching expected events
    - Incorrect event routing due to topology setup
    - Transaction failures in persistence layer
    - Asynchronous timing issues in event handling
+   - Middleware ordering problems
 
 ## Performance Considerations
 
@@ -452,13 +673,19 @@ public async Task EventBus_ComponentIntegration_ShouldRouteCommands()
    - Be specific in subscription filters to reduce processing
    - Use source IDs and event types to limit event delivery
 
-3. **Transaction Management**
-   - Keep transactions short-lived
-   - Use appropriate isolation levels
+3. **Middleware Efficiency**
+   - Only add necessary middleware to the pipeline
+   - Use ShouldApply method to skip middleware for certain events
+   - Consider middleware order for optimal performance
 
-4. **Memory Management**
-   - Be mindful of event capture and storage
-   - Consider event pruning for long-running systems
+4. **Circuit Breaking**
+   - Use circuit breakers to prevent overwhelming failing components
+   - Configure appropriate thresholds based on component importance
+
+5. **Memory Management**
+   - Configure appropriate Dead Letter Queue capacity
+   - Enable cleanup for old entries
+   - Be mindful of event size when publishing
 
 ## Contributing Guidelines
 
@@ -482,3 +709,4 @@ public async Task EventBus_ComponentIntegration_ShouldRouteCommands()
    - Update relevant documentation files
    - Include code comments for complex logic
    - Provide examples for new features
+   - Create handoff documents when transitioning work to another developer

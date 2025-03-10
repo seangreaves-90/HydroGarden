@@ -100,6 +100,43 @@ The central messaging system that routes all communication between components.
 - `Telemetry`: Sensor readings and measurements
 - `Alert`: System warnings and notifications
 
+### Event Processing Pipeline
+
+New in Phase 2, the Event Processing Pipeline enhances the EventBus with middleware capabilities.
+
+**Responsibilities:**
+- Applying middleware to event processing
+- Managing retry policies
+- Implementing circuit breaker patterns
+- Logging and monitoring
+- Managing failed events through dead letter queue
+
+**Interfaces:**
+- `IEventProcessingPipeline`: Core pipeline interface
+- `IEventMiddleware`: Interface for middleware components
+- `IEventProcessingResult`: Result of processing an event
+
+**Middleware Components:**
+- `LoggingMiddleware`: Logs event processing
+- `RetryMiddleware`: Implements retry policies with exponential backoff
+- `CircuitBreakerMiddleware`: Prevents cascading failures
+- `DeadLetterQueueMiddleware`: Manages failed events
+
+### Error-Event Transformation
+
+New in Phase 1, provides bidirectional conversion between errors and events.
+
+**Responsibilities:**
+- Converting application errors to events
+- Converting events back to error objects
+- Maintaining correlation context
+- Publishing errors as events
+
+**Interfaces:**
+- `IErrorEventTransformationService`: Core transformation interface
+- `ErrorOccurredEvent`: Event representing an error
+- `RecoveryAttemptedEvent`: Event representing a recovery attempt
+
 ### PersistenceService
 
 Manages the storage and retrieval of component state and configuration.
@@ -174,44 +211,59 @@ Connects the core system to the user interface layer.
 
 1. Device reads sensor and updates property value
 2. Property change is published to EventBus
-3. EventBus checks for relevant subscriptions and connections
-4. PersistenceService receives event and persists to storage
-5. Other components (like ModuleControllers) receive event based on subscriptions
-6. SignalR bridge forwards updates to connected UI clients
-7. ModuleController executes business logic based on event
-8. Any resulting actions generate new events, continuing the cycle
+3. EventBus processes the event through the Event Processing Pipeline
+4. Pipeline applies middleware (logging, retries, circuit breaking)
+5. PersistenceService receives event and persists to storage
+6. Other components (like ModuleControllers) receive event based on subscriptions
+7. SignalR bridge forwards updates to connected UI clients
+8. ModuleController executes business logic based on event
+9. Any resulting actions generate new events, continuing the cycle
 
 ## Implementation Strategy
 
-### Phase 1: Core Event System Refactoring (Completed)
+### Phase 1: Core Event System and Error Integration (Completed)
 
 - ✅ Update HydroGardenComponentBase to use EventBus
 - ✅ Modify PersistenceService to subscribe to events
 - ✅ Enhance EventBus for proper routing and subscription management
 - ✅ Implement basic event types and handling
+- ✅ Create Error-Event Transformation Service
+- ✅ Implement bidirectional conversion between errors and events
+- ✅ Add error correlation and tracking
 
-### Phase 2: Persistence and Topology Integration (In Progress)
+### Phase 2: Event Processing Pipeline (Completed)
 
-- ✅ Implement specialized entity handlers for persistence
-- ✅ Ensure transaction integrity during persistence
-- ✅ Integrate TopologyService with EventBus
-- ✅ Implement conditional routing based on connection rules
-- ⚠️ Complete event filtering and transformation mechanisms
-- ⚠️ Finalize error handling and recovery processes
+- ✅ Design and implement the Event Processing Pipeline
+- ✅ Create middleware interfaces and core pipeline classes
+- ✅ Implement logging middleware
+- ✅ Implement retry middleware with exponential backoff
+- ✅ Implement circuit breaker middleware
+- ✅ Implement dead letter queue for failed events
+- ✅ Integrate pipeline with EventBus
+- ✅ Add dependency injection support
 
-### Phase 3: UI Integration (Planned)
+### Phase 3: Recovery Orchestration (In Progress)
+
+- ⚠️ Design Recovery Orchestration Service
+- ⚠️ Implement recovery planning and execution
+- ⚠️ Add recovery state management
+- ⚠️ Integrate with error monitoring system
+- ⚠️ Add retry and circuit breaking support
+- ⚠️ Create recovery analytics and reporting
+
+### Phase 4: UI Integration (Planned)
 
 - ❌ Create SignalR bridge for real-time updates
 - ❌ Implement REST API for configuration management
 - ❌ Enable service control through API endpoints
 - ❌ Develop web-based management interface
 
-### Phase 4: Testing and Optimization (Planned)
+### Phase 5: Testing and Optimization (Planned)
 
 - ⚠️ Update unit tests to cover new functionality
 - ❌ Create comprehensive integration tests
 - ❌ Perform performance optimization
-- ❌ Document system architecture and APIs
+- ✅ Document system architecture and APIs
 
 ## Testing Strategy
 
@@ -261,3 +313,4 @@ Connects the core system to the user interface layer.
 - **Centralized Control**: EventBus provides a single point for event monitoring and management
 - **Flexible Topology**: Component connections can be modified dynamically
 - **Improved Maintainability**: Clearer separation of concerns throughout the system
+- **Enhanced Resilience**: Retry policies, circuit breaking, and dead letter queue for robustness
