@@ -2,6 +2,8 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Foundation.ErrorHandling.Common;
+using HydroGarden.Foundation.ErrorHandling.Models;
+using HydroGarden.Foundation.ErrorHandling.Policies;
 using HydroGarden.Foundation.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Logger.Abstractions;
 
@@ -75,7 +77,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryStatus> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
+        public async Task<IRecoveryStatus> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (error == null)
                 throw new ArgumentNullException(nameof(error));
@@ -100,7 +102,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryPlan> CreateRecoveryPlanAsync(IApplicationError? error, CancellationToken ct = default)
+        public Task<IRecoveryPlan> CreateRecoveryPlanAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (error == null)
                 throw new ArgumentNullException(nameof(error));
@@ -120,14 +122,9 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                     .ToList();
             }
 
-            if (!strategies.Any())
-            {
-                _logger.Log($"No applicable recovery strategies found for error {error.ErrorCode}");
-            }
-            else
-            {
-                _logger.Log($"Found {strategies.Count} applicable recovery strategies for error {error.ErrorCode}");
-            }
+            _logger.Log(!strategies.Any()
+                ? $"No applicable recovery strategies found for error {error.ErrorCode}"
+                : $"Found {strategies.Count} applicable recovery strategies for error {error.ErrorCode}");
 
             // Create the recovery plan
             var plan = new RecoveryPlan
@@ -158,11 +155,11 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 _ => 3
             };
 
-            return plan;
+            return Task.FromResult<IRecoveryPlan>(plan);
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryStatus> ExecuteRecoveryPlanAsync(RecoveryPlan plan, CancellationToken ct = default)
+        public async Task<IRecoveryStatus> ExecuteRecoveryPlanAsync(IRecoveryPlan plan, CancellationToken ct = default)
         {
             if (plan == null)
                 throw new ArgumentNullException(nameof(plan));
@@ -230,11 +227,11 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                         try
                         {
                             // Execute with retry and circuit breaker policies
-                            bool success = await Policy
-                                .WrapAsync(retryPolicy, circuitBreakerPolicy)
-                                .ExecuteAsync(async (ctx, token) =>
+                            bool success = await retryPolicy.ExecuteWithPoliciesAsync(
+                                circuitBreakerPolicy,
+                                async (ctx, token) =>
                                 {
-                                    int attempt = ctx.ContainsKey("RetryCount") ? (int)ctx["RetryCount"] + 1 : 1;
+                                    int attempt = ctx.TryGetValue("RetryCount", out var value) ? (int)value + 1 : 1;
                                     operation.CurrentAttempt = attempt;
                                     
                                     if (attempt > 1)
@@ -243,7 +240,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                                     }
                                     
                                     return await strategy.AttemptRecoveryAsync(error, token);
-                                }, 
+                                },
                                 new Dictionary<string, object>(), 
                                 linkedToken);
 
@@ -268,7 +265,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                                 {
                                     IsSuccessful = true,
                                     SuccessfulStrategy = strategy.Name,
-                                    ErrorCodes = new[] { error.ErrorCode ?? "UNKNOWN" },
+                                    ErrorCodes = [error.ErrorCode ?? "UNKNOWN"],
                                     AttemptCount = operation.CurrentAttempt,
                                     SuccessCount = 1,
                                     Timestamp = DateTimeOffset.UtcNow,
@@ -335,7 +332,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryStatus> RecoverDeviceAsync(Guid deviceId, CancellationToken ct = default)
+        public async Task<IRecoveryStatus> RecoverDeviceAsync(Guid deviceId, CancellationToken ct = default)
         {
             if (deviceId == Guid.Empty)
                 throw new ArgumentException("Device ID cannot be empty", nameof(deviceId));
@@ -348,7 +345,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 {
                     IsSuccessful = false,
                     AttemptCount = 0,
-                    ErrorCodes = Array.Empty<string>(),
+                    ErrorCodes = [],
                     Timestamp = DateTimeOffset.UtcNow,
                     LastAttempt = DateTimeOffset.UtcNow
                 };
@@ -363,7 +360,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 {
                     IsSuccessful = true,
                     AttemptCount = 0,
-                    ErrorCodes = Array.Empty<string>(),
+                    ErrorCodes = [],
                     Timestamp = DateTimeOffset.UtcNow,
                     LastAttempt = DateTimeOffset.UtcNow
                 };
@@ -373,9 +370,10 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
 
             // Sort errors by severity and recoverability
             var orderedErrors = errors
-                .OrderByDescending(e => e.Severity)
-                .ThenBy(e => e is ComponentError ce && ce.IsUnrecoverable)
+                .OrderByDescending(e => e?.Severity ?? 0)
+                .ThenBy(e => e is ComponentError { IsUnrecoverable: true })
                 .ToList();
+
 
             // Track success count
             int successCount = 0;
@@ -386,7 +384,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
             // Try to recover each error
             foreach (var error in orderedErrors)
             {
-                if (!string.IsNullOrEmpty(error.ErrorCode))
+                if (!string.IsNullOrEmpty(error?.ErrorCode))
                 {
                     errorCodes.Add(error.ErrorCode);
                 }
@@ -427,14 +425,14 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         }
 
         /// <inheritdoc />
-        public Task<IReadOnlyList<ActiveRecoveryOperation>> GetActiveRecoveriesAsync(CancellationToken ct = default)
+        public Task<IReadOnlyList<IActiveRecoveryOperation>> GetActiveRecoveriesAsync(CancellationToken ct = default)
         {
             var activeRecoveries = _activeRecoveries.Values.ToList();
-            return Task.FromResult<IReadOnlyList<ActiveRecoveryOperation>>(activeRecoveries);
+            return Task.FromResult<IReadOnlyList<IActiveRecoveryOperation>>(activeRecoveries);
         }
 
         /// <inheritdoc />
-        public Task<IReadOnlyList<RecoveryRecord>> GetRecoveryHistoryAsync(
+        public Task<IReadOnlyList<IRecoveryRecord>> GetRecoveryHistoryAsync(
             Guid deviceId, 
             int maxEntries = 50, 
             CancellationToken ct = default)
@@ -445,15 +443,15 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 .Take(maxEntries)
                 .ToList();
                 
-            return Task.FromResult<IReadOnlyList<RecoveryRecord>>(history);
+            return Task.FromResult<IReadOnlyList<IRecoveryRecord>>(history);
         }
 
         /// <inheritdoc />
-        public Task<IDictionary<string, RecoveryMetrics>> GetRecoveryStatisticsAsync(
+        public Task<IDictionary<string, IRecoveryMetrics>> GetRecoveryStatisticsAsync(
             DateTimeOffset since, 
             CancellationToken ct = default)
         {
-            var metrics = new Dictionary<string, RecoveryMetrics>();
+            var metrics = new Dictionary<string, IRecoveryMetrics>();
             
             // Group history by error code
             var groups = _recoveryHistory
@@ -487,7 +485,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 };
             }
             
-            return Task.FromResult<IDictionary<string, RecoveryMetrics>>(metrics);
+            return Task.FromResult<IDictionary<string, IRecoveryMetrics>>(metrics);
         }
 
         /// <summary>
@@ -495,16 +493,15 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         /// </summary>
         private AsyncRetryPolicy CreateRetryPolicy(string strategyName)
         {
-            return Policy
-                .Handle<Exception>(ex => !(ex is OperationCanceledException))
-                .WaitAndRetryAsync(
-                    3, // Max retries
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    onRetry: (ex, timeSpan, retryCount, context) =>
-                    {
-                        context["RetryCount"] = retryCount;
-                        _logger.Log($"Retry {retryCount} for strategy {strategyName} after exception: {ex.Message}");
-                    });
+            return PolicyExtensions.CreateRetryPolicy(
+                _logger,
+                3, // Max retries
+                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                (ex, _, retryCount, context) =>
+                {
+                    context["RetryCount"] = retryCount;
+                    _logger.Log($"Retry {retryCount} for strategy {strategyName} after exception: {ex.Message}");
+                });
         }
 
         /// <summary>
@@ -513,18 +510,14 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         private AsyncCircuitBreakerPolicy GetCircuitBreakerForStrategy(string strategyName)
         {
             return _circuitBreakers.GetOrAdd(strategyName, _ => 
-                Policy
-                    .Handle<Exception>(ex => !(ex is OperationCanceledException))
-                    .CircuitBreakerAsync(
-                        exceptionsAllowedBeforeBreaking: 5,
-                        durationOfBreak: TimeSpan.FromMinutes(5),
-                        onBreak: (ex, timespan) => 
-                            _logger.Log($"Circuit breaker for strategy {strategyName} tripped due to: {ex.Message}"),
-                        onReset: () => 
-                            _logger.Log($"Circuit breaker for strategy {strategyName} reset"),
-                        onHalfOpen: () => 
-                            _logger.Log($"Circuit breaker for strategy {strategyName} half-open")
-                    ));
+                PolicyExtensions.CreateCircuitBreakerPolicy(
+                    _logger,
+                    5, // exceptionsAllowedBeforeBreaking
+                    TimeSpan.FromMinutes(5), // durationOfBreak
+                    (ex, _) => _logger.Log($"Circuit breaker for strategy {strategyName} tripped due to: {ex.Message}"),
+                    () => _logger.Log($"Circuit breaker for strategy {strategyName} reset"),
+                    () => _logger.Log($"Circuit breaker for strategy {strategyName} half-open")
+                ));
         }
 
         /// <summary>
@@ -541,16 +534,17 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
         /// <summary>
         /// Creates a failed recovery status.
         /// </summary>
-        private static RecoveryStatus CreateFailedStatus(IApplicationError? error, string? details = null)
+        private static IRecoveryStatus CreateFailedStatus(IApplicationError? error, string? details = null)
         {
             return new RecoveryStatus
             {
                 IsSuccessful = false,
-                ErrorCodes = new[] { error.ErrorCode ?? "UNKNOWN" },
+                ErrorCodes = [error?.ErrorCode ?? "UNKNOWN"],
                 AttemptCount = 1,
                 SuccessCount = 0,
                 Timestamp = DateTimeOffset.UtcNow,
-                LastAttempt = DateTimeOffset.UtcNow
+                LastAttempt = DateTimeOffset.UtcNow,
+                Details = details
             };
         }
 

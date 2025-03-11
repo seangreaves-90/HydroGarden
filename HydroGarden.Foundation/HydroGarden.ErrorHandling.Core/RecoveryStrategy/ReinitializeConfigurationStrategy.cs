@@ -1,6 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 
@@ -44,19 +45,19 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// <summary>
         /// Root causes this strategy can address.
         /// </summary>
-        public override ErrorTaxonomy.RootCause[] SupportedRootCauses => new[]
-        {
+        public override ErrorTaxonomy.RootCause[] SupportedRootCauses =>
+        [
             ErrorTaxonomy.RootCause.ConfigurationError,
             ErrorTaxonomy.RootCause.ValidationFailure,
             ErrorTaxonomy.RootCause.InvalidState
-        };
+        ];
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
         public override bool CanRecover(IApplicationError? error)
         {
-            if (!base.CanRecover(error))
+            if (!base.CanRecover(error) || error == null)
                 return false;
                 
             // Handle specific error codes related to configuration
@@ -69,6 +70,9 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// </summary>
         protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct)
         {
+            if (error == null)
+                return false;
+                
             try
             {
                 // Try to retrieve the device
@@ -197,8 +201,11 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// Creates hardcoded default configuration values based on device type.
         /// This is a fallback when no stored defaults are available.
         /// </summary>
-        private IDictionary<string, object>? CreateHardcodedDefaults(IIoTDevice device)
+        private IDictionary<string, object>? CreateHardcodedDefaults(IIoTDevice? device)
         {
+            if (device == null)
+                return null;
+                
             var deviceType = device.GetType().Name;
             
             // Use device type to determine defaults
@@ -242,10 +249,15 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// Applies default configuration to a device.
         /// </summary>
         private async Task<bool> ApplyDefaultConfigurationAsync(
-            IIoTDevice device, 
-            IDictionary<string, object> defaultConfig,
+            IIoTDevice? device, 
+            IDictionary<string, object>? defaultConfig,
             CancellationToken ct)
         {
+            if (device == null || defaultConfig == null || !defaultConfig.Any())
+            {
+                return false;
+            }
+            
             try
             {
                 Logger.Log($"Applying {defaultConfig.Count} default configuration values to device {device.Id}");
@@ -253,16 +265,13 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Apply each configuration value
                 foreach (var (key, value) in defaultConfig)
                 {
-                    // Skip null values
-                    if (value == null)
-                        continue;
-                        
                     Logger.Log($"Setting property {key} = {value}");
-                    await device.SetPropertyAsync(key, value, ct);
+                    var metadata = new PropertyMetadata(isEditable: true, isVisible: true);
+                    await device.SetPropertyAsync(key, value, metadata);
                 }
                 
                 // Save the updated configuration
-                await _persistenceService.SaveAsync(device.Id, ct);
+                await _persistenceService.AddOrUpdateAsync(device, ct);
                 
                 return true;
             }

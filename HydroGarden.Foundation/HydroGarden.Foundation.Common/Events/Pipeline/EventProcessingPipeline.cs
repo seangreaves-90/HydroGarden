@@ -87,7 +87,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         }
 
         /// <inheritdoc />
-        public async Task<IEventProcessingResult> ProcessEventAsync(object sender, IEvent @event, CancellationToken cancellationToken = default)
+        public async Task<IEventProcessingResult> ProcessEventAsync(object? sender, IEvent @event, CancellationToken cancellationToken = default)
         {
             if (sender == null)
             {

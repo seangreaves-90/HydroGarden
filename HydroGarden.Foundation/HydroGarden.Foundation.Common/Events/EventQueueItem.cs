@@ -9,7 +9,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// </summary>
     public class EventQueueItem
     {
-        public required object Sender { get; init; }
+        public required object? Sender { get; init; }
         public required IEvent Event { get; init; }
         public required IEventSubscription Subscription { get; init; }
         public required PublishResult Result { get; init; }

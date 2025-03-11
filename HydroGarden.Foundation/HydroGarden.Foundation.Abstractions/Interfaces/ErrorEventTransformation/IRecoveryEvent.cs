@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation
 {
     public interface IRecoveryEvent
     {

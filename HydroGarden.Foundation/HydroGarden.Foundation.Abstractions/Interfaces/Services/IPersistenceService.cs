@@ -11,7 +11,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Services
         /// <typeparam name="T">The type of the IIoTDevice component (must implement <see cref="IIoTDevice"/>).</typeparam>
         /// <param name="component">The component to add or update.</param>
         /// <param name="ct">Cancellation token for the operation.</param>
-        public Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice;
+        public Task AddOrUpdateAsync<T>(T? component, CancellationToken ct = default) where T : IIoTDevice;
 
         /// <summary>
         /// Manually triggers batch processing of pending events (for testing or manual execution).

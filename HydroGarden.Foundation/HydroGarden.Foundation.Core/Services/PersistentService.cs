@@ -3,8 +3,8 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Extensions;
 using System.Threading.Channels;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -41,7 +41,7 @@ namespace HydroGarden.Foundation.Core.Services
             _errorMonitor = errorMonitor;
         }
 
-        public async Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice
+        public async Task AddOrUpdateAsync<T>(T? component, CancellationToken ct = default) where T : IIoTDevice
         {
             if (component == null)
                 throw new ArgumentNullException(nameof(component));
@@ -117,7 +117,7 @@ namespace HydroGarden.Foundation.Core.Services
             return Task.FromResult(default(T?));
         }
 
-        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
+        public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
         {
             await this.ExecuteWithErrorHandlingAsync(
                 _errorMonitor,

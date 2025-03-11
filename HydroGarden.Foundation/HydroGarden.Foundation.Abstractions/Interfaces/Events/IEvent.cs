@@ -48,7 +48,7 @@
         /// <param name="evt">The event to handle</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>A task representing the asynchronous operation</returns>
-        Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent;
+        Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent;
     }
 
     /// <summary>

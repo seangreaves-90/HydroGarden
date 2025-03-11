@@ -17,7 +17,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <param name="event">The event to process.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A result indicating the outcome of the event processing.</returns>
-        Task<IEventProcessingResult> ProcessEventAsync(object sender, IEvent @event, CancellationToken cancellationToken = default);
+        Task<IEventProcessingResult> ProcessEventAsync(object? sender, IEvent @event, CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Adds a middleware to the pipeline.

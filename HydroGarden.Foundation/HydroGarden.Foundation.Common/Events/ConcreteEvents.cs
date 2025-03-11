@@ -166,7 +166,7 @@ namespace HydroGarden.Foundation.Common.Events
             _completionSource = completionSource ?? throw new ArgumentNullException(nameof(completionSource));
         }
 
-        public async Task HandleEventAsync<T>(object sender, T evt, CancellationToken ct = default) where T : IEvent
+        public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
         {
             // Handle property changed events that represent state changes
             if (evt is IPropertyChangedEvent propEvt &&

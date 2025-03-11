@@ -60,10 +60,10 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 return false;
                 
             // Handle specific communication error codes
-            return error.ErrorCode == ErrorCodes.Device.COMMUNICATION_LOST ||
-                   error.ErrorCode == ErrorCodes.Communication.CONNECTION_FAILED ||
-                   error.ErrorCode == ErrorCodes.Communication.TIMEOUT ||
-                   error.ErrorCode == ErrorCodes.Communication.PROTOCOL_ERROR;
+            return error?.ErrorCode == ErrorCodes.Device.COMMUNICATION_LOST ||
+                   error?.ErrorCode == ErrorCodes.Communication.CONNECTION_FAILED ||
+                   error?.ErrorCode == ErrorCodes.Communication.TIMEOUT ||
+                   error?.ErrorCode == ErrorCodes.Communication.PROTOCOL_ERROR;
         }
         
         /// <summary>
@@ -74,50 +74,54 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             try
             {
                 // Get device details
-                var device = await GetDeviceAsync(error.DeviceId, ct);
-                if (device == null)
+                if (error != null)
                 {
-                    Logger.Log($"Device {error.DeviceId} not found for communication recovery");
-                    return false;
+                    var device = await GetDeviceAsync(error.DeviceId, ct);
+                    if (device == null)
+                    {
+                        Logger.Log($"Device {error.DeviceId} not found for communication recovery");
+                        return false;
+                    }
+                
+                    Logger.Log($"Starting communication recovery for device {device.Id} ({device.Name})");
+                
+                    // Extract connection details from device properties or error context
+                    string? ipAddress = await ExtractIpAddressAsync(device, error);
+                    if (string.IsNullOrEmpty(ipAddress))
+                    {
+                        Logger.Log($"Could not determine IP address for device {device.Id}");
+                        return false;
+                    }
+                
+                    // Step 1: Test network connectivity
+                    bool pingSuccess = await TestNetworkConnectivityAsync(ipAddress);
+                    if (!pingSuccess)
+                    {
+                        Logger.Log($"Network connectivity test failed for {ipAddress}");
+                        return false;
+                    }
+                
+                    Logger.Log($"Network connectivity verified for {ipAddress}");
+                
+                    // Step 2: Reset communication channel
+                    await ResetCommunicationChannelAsync(device, ct);
+                
+                    // Step 3: Test device communication
+                    bool commTestSuccess = await TestDeviceCommunicationAsync(device, ct);
+                    if (!commTestSuccess)
+                    {
+                        Logger.Log($"Device communication test failed for {device.Id}");
+                        return false;
+                    }
+                
+                    Logger.Log($"Communication successfully restored for device {device.Id}");
                 }
-                
-                Logger.Log($"Starting communication recovery for device {device.Id} ({device.Name})");
-                
-                // Extract connection details from device properties or error context
-                string? ipAddress = await ExtractIpAddressAsync(device, error);
-                if (string.IsNullOrEmpty(ipAddress))
-                {
-                    Logger.Log($"Could not determine IP address for device {device.Id}");
-                    return false;
-                }
-                
-                // Step 1: Test network connectivity
-                bool pingSuccess = await TestNetworkConnectivityAsync(ipAddress);
-                if (!pingSuccess)
-                {
-                    Logger.Log($"Network connectivity test failed for {ipAddress}");
-                    return false;
-                }
-                
-                Logger.Log($"Network connectivity verified for {ipAddress}");
-                
-                // Step 2: Reset communication channel
-                await ResetCommunicationChannelAsync(device, ct);
-                
-                // Step 3: Test device communication
-                bool commTestSuccess = await TestDeviceCommunicationAsync(device, ct);
-                if (!commTestSuccess)
-                {
-                    Logger.Log($"Device communication test failed for {device.Id}");
-                    return false;
-                }
-                
-                Logger.Log($"Communication successfully restored for device {device.Id}");
+
                 return true;
             }
             catch (Exception ex)
             {
-                Logger.Log(ex, $"Error during communication recovery for device {error.DeviceId}");
+                if (error != null) Logger.Log(ex, $"Error during communication recovery for device {error.DeviceId}");
                 return false;
             }
         }
@@ -151,7 +155,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         private async Task<string?> ExtractIpAddressAsync(IIoTDevice device, IApplicationError? error)
         {
             // Try to get from error context first
-            if (error.Context.TryGetValue("IPAddress", out var ipObj) && ipObj is string ipStr)
+            if (error != null && error.Context.TryGetValue("IPAddress", out var ipObj) && ipObj is string ipStr)
             {
                 return ipStr;
             }

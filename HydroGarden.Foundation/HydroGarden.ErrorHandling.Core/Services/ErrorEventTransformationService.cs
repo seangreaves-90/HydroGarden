@@ -41,28 +41,26 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 throw new ArgumentNullException(nameof(error));
             }
 
-            var errorEvent = new ErrorEvent
+            var errorEvent = new ErrorEvent(
+                id: Guid.NewGuid(),
+                deviceId: error.DeviceId,
+                errorCode: error.ErrorCode ?? "UNKNOWN_ERROR",
+                message: error.Message,
+                timestamp: error.Timestamp,
+                severity: error.Severity,
+                source: error.Source,
+                exceptionDetails: error.Exception?.ToString(),
+                correlationId: error.CorrelationId,
+                isTransient: error.IsTransient,
+                exceptionType: error.Exception?.GetType().FullName // Provide the missing exceptionType parameter
+            )
             {
-                Id = Guid.NewGuid(),
-                DeviceId = error.DeviceId,
-                ErrorCode = error.ErrorCode ?? "UNKNOWN_ERROR",
-                Message = error.Message,
-                Timestamp = error.Timestamp,
-                Severity = error.Severity,
-                Source = error.Source,
-                CorrelationId = error.CorrelationId,
-                IsTransient = error.IsTransient,
                 Context = new Dictionary<string, object>(error.Context)
             };
 
-            if (error.Exception != null)
-            {
-                errorEvent.ExceptionDetails = error.Exception.ToString();
-                errorEvent.ExceptionType = error.Exception.GetType().FullName;
-            }
-
             return errorEvent;
         }
+
 
         /// <inheritdoc/>
         public IEvent TransformToPublishableEvent(IErrorEvent errorEvent)
@@ -188,22 +186,21 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
             try
             {
                 _logger.Log($"Publishing recovery attempt for error {errorCode} as event");
-                
-                var recoveryEvent = new RecoveryEvent
-                {
-                    Id = Guid.NewGuid(),
-                    DeviceId = deviceId,
-                    ErrorCode = errorCode,
-                    Timestamp = DateTimeOffset.UtcNow,
-                    IsSuccessful = isSuccessful,
-                    Message = message,
-                    CorrelationId = correlationId
-                };
-                
+
+                var recoveryEvent = new RecoveryEvent(
+                    id: Guid.NewGuid(), // Provide the missing id parameter
+                    deviceId: deviceId,
+                    errorCode: errorCode,
+                    timestamp: DateTimeOffset.UtcNow,
+                    isSuccessful: isSuccessful,
+                    message: message,
+                    correlationId: correlationId
+                );
+
                 var publishableEvent = TransformToPublishableEvent(recoveryEvent);
-                
+
                 await _eventBus.PublishAsync(this, publishableEvent, cancellationToken);
-                
+
                 _logger.Log($"Successfully published recovery for error {errorCode} as event with ID {publishableEvent.EventId}");
             }
             catch (Exception ex)
@@ -212,5 +209,6 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
                 throw;
             }
         }
+
     }
 }

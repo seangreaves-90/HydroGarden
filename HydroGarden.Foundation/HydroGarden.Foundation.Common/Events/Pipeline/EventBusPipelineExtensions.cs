@@ -1,7 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using System;
 
 namespace HydroGarden.Foundation.Common.Events.Pipeline
 {
@@ -46,15 +45,15 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
 
             var pipeline = builder.Build();
             
-            // Attach the pipeline to the EventBus
-            if (eventBus is EventBus bus)
-            {
-                bus.SetEventProcessingPipeline(pipeline);
-            }
-            else
-            {
-                logger.Log($"Warning: Cannot attach pipeline to EventBus of type {eventBus.GetType().Name}. The EventBus must be an instance of {nameof(EventBus)}.");
-            }
+            //// Attach the pipeline to the EventBus
+            //if (eventBus is EventBus bus)
+            //{
+            //    bus.SetEventProcessingPipeline(pipeline);
+            //}
+            //else
+            //{
+            //    logger.Log($"Warning: Cannot attach pipeline to EventBus of type {eventBus.GetType().Name}. The EventBus must be an instance of {nameof(EventBus)}.");
+            //}
 
             return pipeline;
         }

@@ -1,7 +1,9 @@
 ﻿using System.Reflection;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.ErrorHandling.Common;
+using HydroGarden.Foundation.ErrorHandling.Exceptions;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -58,7 +60,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// </summary>
         public override bool CanRecover(IApplicationError? error)
         {
-            if (!base.CanRecover(error))
+            if (!base.CanRecover(error) || error == null)
                 return false;
                 
             // Handle specific circuit breaker error codes
@@ -71,6 +73,9 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// </summary>
         protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct)
         {
+            if (error == null)
+                return false;
+                
             try
             {
                 Logger.Log($"Attempting to reset circuit breakers for device {error.DeviceId}");
@@ -79,12 +84,12 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 string? circuitBreakerType = null;
                 string? eventType = null;
                 
-                if (error.Context.TryGetValue("CircuitBreakerType", out var cbTypeObj) && cbTypeObj is string cbType)
+                if (error.Context != null && error.Context.TryGetValue("CircuitBreakerType", out var cbTypeObj) && cbTypeObj is string cbType)
                 {
                     circuitBreakerType = cbType;
                 }
                 
-                if (error.Context.TryGetValue("EventType", out var evtTypeObj) && evtTypeObj is string evtType)
+                if (error.Context != null && error.Context.TryGetValue("EventType", out var evtTypeObj) && evtTypeObj is string evtType)
                 {
                     eventType = evtType;
                 }

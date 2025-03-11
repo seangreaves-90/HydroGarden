@@ -19,7 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HydroGarden.ErrorHandling.Core\HydroGarden.Foundation.ErrorHandling.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
     <ProjectReference Include="..\HydroGarden.Logger\HydroGarden.Logger.csproj" />
   </ItemGroup>
