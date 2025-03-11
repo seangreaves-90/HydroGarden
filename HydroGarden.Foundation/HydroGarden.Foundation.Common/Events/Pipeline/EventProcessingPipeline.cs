@@ -90,7 +90,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
                 List<MiddlewareEntry> middlewareList;
                 lock (_middlewareLock)
                 {
-                    middlewareList = _middleware.ToList();
+                    middlewareList = _middleware;
                 }
 
                 // Create the middleware pipeline
