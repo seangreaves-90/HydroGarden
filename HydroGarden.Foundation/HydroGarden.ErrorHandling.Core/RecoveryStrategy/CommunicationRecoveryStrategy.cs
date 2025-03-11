@@ -1,11 +1,11 @@
-﻿using HydroGarden.ErrorHandling.Core.Common;
+﻿using System.Net.NetworkInformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
-using System.Net.NetworkInformation;
 
-namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
+namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// A recovery strategy focused on resolving communication-related errors.
@@ -54,7 +54,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
-        public override bool CanRecover(IApplicationError error)
+        public override bool CanRecover(IApplicationError? error)
         {
             if (!base.CanRecover(error))
                 return false;
@@ -69,7 +69,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Attempts to recover from communication errors.
         /// </summary>
-        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
+        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct)
         {
             try
             {
@@ -148,7 +148,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Extracts the IP address for a device from its properties or error context.
         /// </summary>
-        private async Task<string?> ExtractIpAddressAsync(IIoTDevice device, IApplicationError error)
+        private async Task<string?> ExtractIpAddressAsync(IIoTDevice device, IApplicationError? error)
         {
             // Try to get from error context first
             if (error.Context.TryGetValue("IPAddress", out var ipObj) && ipObj is string ipStr)

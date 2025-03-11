@@ -1,4 +1,6 @@
-﻿namespace HydroGarden.ErrorHandling.Core.Common
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+
+namespace HydroGarden.Foundation.ErrorHandling.Common
 {
     /// <summary>
     /// Provides a detailed taxonomy for error categorization, enabling precise targeting of recovery strategies.
@@ -202,10 +204,10 @@
         /// </summary>
         /// <param name="error">The application error.</param>
         /// <returns>The recovery complexity assessment.</returns>
-        public static RecoveryComplexity AssessRecoveryComplexity(IApplicationError error)
+        public static RecoveryComplexity AssessRecoveryComplexity(IApplicationError? error)
         {
             // Non-recoverable errors require manual intervention
-            if (error is ComponentError componentError && componentError.IsUnrecoverable)
+            if (error is ComponentError { IsUnrecoverable: true })
                 return RecoveryComplexity.Manual;
                 
             // Consider the root cause
@@ -230,7 +232,7 @@
         /// </summary>
         /// <param name="error">The application error.</param>
         /// <returns>The time sensitivity assessment.</returns>
-        public static TimeSensitivity AssessTimeSensitivity(IApplicationError error)
+        public static TimeSensitivity AssessTimeSensitivity(IApplicationError? error)
         {
             // Consider severity first
             if (error.Severity == ErrorSeverity.Catastrophic)
@@ -301,7 +303,7 @@
         /// </summary>
         /// <param name="error">The application error to profile.</param>
         /// <returns>A dictionary containing the error profile.</returns>
-        public static IDictionary<string, object> CreateErrorProfile(IApplicationError error)
+        public static IDictionary<string, object> CreateErrorProfile(IApplicationError? error)
         {
             var profile = new Dictionary<string, object>
             {

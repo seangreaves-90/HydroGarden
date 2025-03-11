@@ -1,15 +1,11 @@
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.ErrorHandling.Core.Events;
-using HydroGarden.Foundation.ErrorHandling.Core.Interfaces;
-using HydroGarden.Foundation.ErrorHandling.Core.Models;
+using HydroGarden.Foundation.ErrorHandling.Events;
+using HydroGarden.Foundation.ErrorHandling.Models;
 using HydroGarden.Logger.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Services
+namespace HydroGarden.Foundation.ErrorHandling.Services
 {
     /// <summary>
     /// Service that handles the conversion between errors and events.
@@ -18,7 +14,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
     {
         private readonly IEventBus _eventBus;
         private readonly ILogger _logger;
-        private static readonly IDictionary<ErrorSeverity, EventPriority> _severityToPriorityMap = new Dictionary<ErrorSeverity, EventPriority>
+        private static readonly IDictionary<ErrorSeverity, EventPriority> SeverityToPriorityMap = new Dictionary<ErrorSeverity, EventPriority>
         {
             { ErrorSeverity.Warning, EventPriority.Normal },
             { ErrorSeverity.Error, EventPriority.High },
@@ -38,7 +34,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc/>
-        public ErrorEvent TransformErrorToEvent(IApplicationError error)
+        public IErrorEvent TransformErrorToEvent(IApplicationError error)
         {
             if (error == null)
             {
@@ -56,7 +52,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
                 Source = error.Source,
                 CorrelationId = error.CorrelationId,
                 IsTransient = error.IsTransient,
-                Context = new Dictionary<string, object>(error.Context ?? new Dictionary<string, object>())
+                Context = new Dictionary<string, object>(error.Context)
             };
 
             if (error.Exception != null)
@@ -69,7 +65,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc/>
-        public IEvent TransformToPublishableEvent(ErrorEvent errorEvent)
+        public IEvent TransformToPublishableEvent(IErrorEvent errorEvent)
         {
             if (errorEvent == null)
             {
@@ -85,7 +81,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
             };
 
             // Set routing data based on error severity
-            var priority = _severityToPriorityMap.TryGetValue(errorEvent.Severity, out var eventPriority)
+            var priority = SeverityToPriorityMap.TryGetValue(errorEvent.Severity, out var eventPriority)
                 ? eventPriority
                 : EventPriority.High;
 
@@ -99,7 +95,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc/>
-        public IEvent TransformToPublishableEvent(RecoveryEvent recoveryEvent)
+        public IEvent TransformToPublishableEvent(IRecoveryEvent recoveryEvent)
         {
             if (recoveryEvent == null)
             {
@@ -111,20 +107,19 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
                 DeviceId = recoveryEvent.DeviceId,
                 SourceId = Guid.Empty, // Will be set by the publisher
                 RecoveryData = recoveryEvent,
-                CorrelationId = recoveryEvent.CorrelationId
+                CorrelationId = recoveryEvent.CorrelationId,
+                RoutingData = new ErrorEventRoutingData(
+                    persist: true,
+                    priority: EventPriority.High,
+                    requiresAcknowledgment: false
+                )
             };
-
-            publishableEvent.RoutingData = new ErrorEventRoutingData(
-                persist: true,
-                priority: EventPriority.High,
-                requiresAcknowledgment: false
-            );
 
             return publishableEvent;
         }
 
         /// <inheritdoc/>
-        public ErrorEvent ExtractErrorEvent(IEvent @event)
+        public IErrorEvent? ExtractErrorEvent(IEvent @event)
         {
             if (@event == null)
             {
@@ -140,7 +135,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc/>
-        public RecoveryEvent ExtractRecoveryEvent(IEvent @event)
+        public IRecoveryEvent? ExtractRecoveryEvent(IEvent @event)
         {
             if (@event == null)
             {

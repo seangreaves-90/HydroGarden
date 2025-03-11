@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using HydroGarden.ErrorHandling.Core;
-using HydroGarden.ErrorHandling.Core.Common;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Common.Policies;
+using HydroGarden.Foundation.ErrorHandling;
+using HydroGarden.Foundation.ErrorHandling.Common;
 
 namespace HydroGarden.Foundation.Common.Extensions
 {

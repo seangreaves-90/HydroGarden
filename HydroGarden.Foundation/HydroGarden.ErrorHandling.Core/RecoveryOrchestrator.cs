@@ -1,9 +1,9 @@
-﻿using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Orchestrates error recovery using multiple strategies.
@@ -41,7 +41,7 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Attempts to recover from an error using all applicable strategies.
         /// </summary>
-        public async Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default)
+        public async Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (error == null)
                 throw new ArgumentNullException(nameof(error));

@@ -1,118 +1,97 @@
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using System;
-using System.Collections.Generic;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Models
+namespace HydroGarden.Foundation.ErrorHandling.Models
 {
     /// <summary>
     /// Represents an error that has been converted to an event.
     /// </summary>
-    public class ErrorEvent
+    public class ErrorEvent(
+        Guid id,
+        Guid deviceId,
+        string errorCode,
+        string message,
+        DateTimeOffset timestamp,
+        ErrorSeverity severity,
+        ErrorSource source,
+        string exceptionDetails,
+        Guid correlationId,
+        bool isTransient,
+        string? exceptionType)
+        : IErrorEvent
     {
-        /// <summary>
-        /// Gets or sets the unique identifier for this error event.
-        /// </summary>
-        public Guid Id { get; set; }
+        /// <inheritdoc />
+        public Guid Id { get; set; } = id;
 
-        /// <summary>
-        /// Gets or sets the device ID associated with this error.
-        /// </summary>
-        public Guid DeviceId { get; set; }
+        /// <inheritdoc />
+        public Guid DeviceId { get; set; } = deviceId;
 
-        /// <summary>
-        /// Gets or sets the error code.
-        /// </summary>
-        public string ErrorCode { get; set; }
+        /// <inheritdoc />
+        public string ErrorCode { get; set; } = errorCode;
 
-        /// <summary>
-        /// Gets or sets the error message.
-        /// </summary>
-        public string Message { get; set; }
+        /// <inheritdoc />
+        public string Message { get; set; } = message;
 
-        /// <summary>
-        /// Gets or sets the timestamp when the error occurred.
-        /// </summary>
-        public DateTimeOffset Timestamp { get; set; }
+        /// <inheritdoc />
+        public DateTimeOffset Timestamp { get; set; } = timestamp;
 
-        /// <summary>
-        /// Gets or sets the severity level of the error.
-        /// </summary>
-        public ErrorSeverity Severity { get; set; }
+        /// <inheritdoc />
+        public ErrorSeverity Severity { get; set; } = severity;
 
-        /// <summary>
-        /// Gets or sets the source of the error.
-        /// </summary>
-        public ErrorSource Source { get; set; }
+        /// <inheritdoc />
+        public ErrorSource Source { get; set; } = source;
 
-        /// <summary>
-        /// Gets or sets the exception details.
-        /// </summary>
-        public string ExceptionDetails { get; set; }
+        /// <inheritdoc />
+        public string ExceptionDetails { get; set; } = exceptionDetails;
 
-        /// <summary>
-        /// Gets or sets the correlation identifier for tracing.
-        /// </summary>
-        public Guid CorrelationId { get; set; }
+        /// <inheritdoc />
+        public Guid CorrelationId { get; set; } = correlationId;
 
-        /// <summary>
-        /// Gets or sets additional contextual information about the error.
-        /// </summary>
-        public Dictionary<string, object> Context { get; set; } = new Dictionary<string, object>();
+        /// <inheritdoc />
+        public Dictionary<string, object>? Context { get; set; } = new();
 
-        /// <summary>
-        /// Gets or sets a value indicating whether the error is transient.
-        /// </summary>
-        public bool IsTransient { get; set; }
+        /// <inheritdoc />
+        public bool IsTransient { get; set; } = isTransient;
 
-        /// <summary>
-        /// Gets or sets the type of the original exception.
-        /// </summary>
-        public string ExceptionType { get; set; }
+        /// <inheritdoc />
+        public string? ExceptionType { get; set; } = exceptionType;
     }
 
     /// <summary>
     /// Represents an event indicating a recovery attempt for a previous error.
     /// </summary>
-    public class RecoveryEvent
+    public class RecoveryEvent(
+        Guid id,
+        Guid deviceId,
+        string errorCode,
+        DateTimeOffset timestamp,
+        bool isSuccessful,
+        string message,
+        Guid correlationId)
+        : IRecoveryEvent
     {
-        /// <summary>
-        /// Gets or sets the unique identifier for this recovery event.
-        /// </summary>
-        public Guid Id { get; set; }
+        /// <inheritdoc />
+        public Guid Id { get; set; } = id;
 
-        /// <summary>
-        /// Gets or sets the device ID associated with this recovery.
-        /// </summary>
-        public Guid DeviceId { get; set; }
+        /// <inheritdoc />
+        public Guid DeviceId { get; set; } = deviceId;
 
-        /// <summary>
-        /// Gets or sets the error code being recovered.
-        /// </summary>
-        public string ErrorCode { get; set; }
+        /// <inheritdoc />
+        public string ErrorCode { get; set; } = errorCode;
 
-        /// <summary>
-        /// Gets or sets the timestamp when the recovery was attempted.
-        /// </summary>
-        public DateTimeOffset Timestamp { get; set; }
+        /// <inheritdoc />
+        public DateTimeOffset Timestamp { get; set; } = timestamp;
 
-        /// <summary>
-        /// Gets or sets whether the recovery was successful.
-        /// </summary>
-        public bool IsSuccessful { get; set; }
+        /// <inheritdoc />
+        public bool IsSuccessful { get; set; } = isSuccessful;
 
-        /// <summary>
-        /// Gets or sets a message describing the recovery action or result.
-        /// </summary>
-        public string Message { get; set; }
+        /// <inheritdoc />
+        public string Message { get; set; } = message;
 
-        /// <summary>
-        /// Gets or sets the correlation identifier for tracing.
-        /// </summary>
-        public Guid CorrelationId { get; set; }
+        /// <inheritdoc />
+        public Guid CorrelationId { get; set; } = correlationId;
 
-        /// <summary>
-        /// Gets or sets additional contextual information about the recovery.
-        /// </summary>
-        public Dictionary<string, object> Context { get; set; } = new Dictionary<string, object>();
+        /// <inheritdoc />
+        public Dictionary<string, object> Context { get; set; } = new();
     }
 }

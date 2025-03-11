@@ -1,7 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using System;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Events
+namespace HydroGarden.Foundation.ErrorHandling.Events
 {
     /// <summary>
     /// Implementation of event routing data for error events.
@@ -17,13 +16,13 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Events
         /// <param name="requiresAcknowledgment">Whether the event requires acknowledgment.</param>
         /// <param name="timeout">The timeout for processing the event.</param>
         public ErrorEventRoutingData(
-            Guid[] targetIds = null,
+            Guid[]? targetIds = null,
             bool persist = true,
             EventPriority priority = EventPriority.High,
             bool requiresAcknowledgment = false,
             TimeSpan? timeout = null)
         {
-            TargetIds = targetIds ?? Array.Empty<Guid>();
+            TargetIds = targetIds ?? [];
             Persist = persist;
             Priority = priority;
             RequiresAcknowledgment = requiresAcknowledgment;

@@ -1,7 +1,7 @@
-﻿using HydroGarden.ErrorHandling.Core;
-using HydroGarden.ErrorHandling.Core.Common;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.ErrorHandling;
+using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Common.Policies

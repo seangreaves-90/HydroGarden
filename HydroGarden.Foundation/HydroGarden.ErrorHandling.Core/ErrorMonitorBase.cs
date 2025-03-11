@@ -2,7 +2,7 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     public abstract class ErrorMonitorBase(ILogger logger, int maxErrorQueueSize = 1000)
     {

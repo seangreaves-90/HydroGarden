@@ -1,12 +1,9 @@
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.ErrorHandling.Core.Interfaces;
 using HydroGarden.Logger.Abstractions;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Adapters
+namespace HydroGarden.Foundation.ErrorHandling.Adapters
 {
     /// <summary>
     /// Adapter that connects the error monitoring system to the event system,

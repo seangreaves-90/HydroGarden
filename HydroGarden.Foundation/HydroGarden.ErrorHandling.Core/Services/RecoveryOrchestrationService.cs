@@ -1,14 +1,11 @@
-﻿using HydroGarden.ErrorHandling.Core.Common;
-using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
+﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.ErrorHandling.Common;
+using HydroGarden.Foundation.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Logger.Abstractions;
-using Polly;
-using Polly.CircuitBreaker;
-using Polly.Retry;
-using System.Collections.Concurrent;
 
-namespace HydroGarden.ErrorHandling.Core.Services
+namespace HydroGarden.Foundation.ErrorHandling.Services
 {
     /// <summary>
     /// Implements the Recovery Orchestration Service that coordinates recovery efforts
@@ -78,7 +75,7 @@ namespace HydroGarden.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryStatus> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default)
+        public async Task<RecoveryStatus> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (error == null)
                 throw new ArgumentNullException(nameof(error));
@@ -103,7 +100,7 @@ namespace HydroGarden.ErrorHandling.Core.Services
         }
 
         /// <inheritdoc />
-        public async Task<RecoveryPlan> CreateRecoveryPlanAsync(IApplicationError error, CancellationToken ct = default)
+        public async Task<RecoveryPlan> CreateRecoveryPlanAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (error == null)
                 throw new ArgumentNullException(nameof(error));
@@ -544,7 +541,7 @@ namespace HydroGarden.ErrorHandling.Core.Services
         /// <summary>
         /// Creates a failed recovery status.
         /// </summary>
-        private static RecoveryStatus CreateFailedStatus(IApplicationError error, string? details = null)
+        private static RecoveryStatus CreateFailedStatus(IApplicationError? error, string? details = null)
         {
             return new RecoveryStatus
             {

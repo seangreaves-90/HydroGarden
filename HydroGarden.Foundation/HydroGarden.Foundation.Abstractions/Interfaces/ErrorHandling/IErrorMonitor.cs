@@ -9,7 +9,7 @@
         /// <summary>
         /// Gets all active errors for a specific device
         /// </summary>
-        Task<IReadOnlyList<IApplicationError>> GetActiveErrorsForDeviceAsync(
+        Task<IReadOnlyList<IApplicationError?>> GetActiveErrorsForDeviceAsync(
             Guid deviceId,
             CancellationToken ct = default);
 

@@ -1,10 +1,10 @@
-﻿using HydroGarden.ErrorHandling.Core.Common;
-using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
+namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// Attempts to recover a device by restarting it.
@@ -59,7 +59,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// </summary>
         /// <param name="error">The error to check.</param>
         /// <returns>True if this strategy can recover from the error, false otherwise.</returns>
-        public override bool CanRecover(IApplicationError error)
+        public override bool CanRecover(IApplicationError? error)
         {
             if (!base.CanRecover(error))
                 return false;
@@ -80,7 +80,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <param name="error">The error to recover from.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>True if recovery was successful, false otherwise.</returns>
-        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
+        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct)
         {
             try
             {

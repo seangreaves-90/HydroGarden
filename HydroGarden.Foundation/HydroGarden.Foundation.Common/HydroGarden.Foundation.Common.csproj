@@ -7,22 +7,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Events\Handlers\**" />
     <Compile Remove="Result\**" />
     <Compile Remove="Validation\**" />
+    <EmbeddedResource Remove="Events\Handlers\**" />
     <EmbeddedResource Remove="Result\**" />
     <EmbeddedResource Remove="Validation\**" />
+    <None Remove="Events\Handlers\**" />
     <None Remove="Result\**" />
     <None Remove="Validation\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HydroGarden.ErrorHandling.Core\HydroGarden.ErrorHandling.Core.csproj" />
+    <ProjectReference Include="..\HydroGarden.ErrorHandling.Core\HydroGarden.Foundation.ErrorHandling.csproj" />
     <ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
     <ProjectReference Include="..\HydroGarden.Logger\HydroGarden.Logger.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Events\Handlers\" />
   </ItemGroup>
 
 </Project>

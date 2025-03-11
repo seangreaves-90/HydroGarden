@@ -1,12 +1,11 @@
-﻿using HydroGarden.ErrorHandling.Core.Common;
+﻿using System.Reflection;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
-using HydroGarden.Foundation.Common.Events.Pipeline.Middleware;
+using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
 
-namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
+namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// A recovery strategy that attempts to reset open circuit breakers.
@@ -57,7 +56,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
-        public override bool CanRecover(IApplicationError error)
+        public override bool CanRecover(IApplicationError? error)
         {
             if (!base.CanRecover(error))
                 return false;
@@ -70,7 +69,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Attempts to reset circuit breakers to recover from the error.
         /// </summary>
-        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
+        protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct)
         {
             try
             {

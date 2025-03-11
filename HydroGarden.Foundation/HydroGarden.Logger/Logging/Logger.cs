@@ -35,10 +35,10 @@ namespace HydroGarden.Logger.Logging
         {
             var logMessage = new StringBuilder();
             logMessage.AppendLine($"[{DateTimeOffset.UtcNow:O}] [ERROR] {message}");
-            logMessage.AppendLine($"Exception: {ex.GetType().Name}");
-            logMessage.AppendLine($"Message: {ex.Message}");
+            logMessage.AppendLine($"Exception: {ex?.GetType().Name}");
+            logMessage.AppendLine($"Message: {ex?.Message}");
             logMessage.AppendLine("StackTrace:");
-            logMessage.AppendLine(ex.StackTrace);
+            logMessage.AppendLine(ex?.StackTrace);
             WriteLogRecord(logMessage.ToString());
         }
 

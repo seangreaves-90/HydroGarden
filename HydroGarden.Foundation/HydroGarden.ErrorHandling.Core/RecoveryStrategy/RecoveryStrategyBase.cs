@@ -1,10 +1,9 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 
-using HydroGarden.ErrorHandling.Core.Common;
-
-namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
+namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 {
     /// <summary>
     /// Base class for error recovery strategies with common functionality.
@@ -37,7 +36,7 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// <summary>
         /// Gets types of root causes this strategy can address.
         /// </summary>
-        public virtual ErrorTaxonomy.RootCause[] SupportedRootCauses => new[] { ErrorTaxonomy.RootCause.Unknown };
+        public virtual ErrorTaxonomy.RootCause[] SupportedRootCauses => [ErrorTaxonomy.RootCause.Unknown];
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
@@ -48,30 +47,33 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// </summary>
         /// <param name="error">The error to check.</param>
         /// <returns>True if this strategy can recover from the error, false otherwise.</returns>
-        public virtual bool CanRecover(IApplicationError error)
+        public virtual bool CanRecover(IApplicationError? error)
         {
-            if (error == null)
-                return false;
-                
-            // Check if it's a non-recoverable error
-            if (error is ComponentError compError && compError.IsUnrecoverable)
-                return false;
-                
-            // Get the root cause
-            var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
+            switch (error)
+            {
+                case null:
+                // Check if it's a non-recoverable error
+                case ComponentError { IsUnrecoverable: true }:
+                    return false;
+                default:
+                {
+                    // Get the root cause
+                    var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
             
-            // Check if this strategy supports the root cause
-            return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
+                    // Check if this strategy supports the root cause
+                    return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
+                }
+            }
         }
 
         /// <summary>
         /// Attempts to recover from the error.
         /// </summary>
-        public async Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default)
+        public async Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
         {
             if (!CanRecover(error))
             {
-                Logger.Log($"Strategy '{Name}' cannot recover from error {error.ErrorCode}");
+                Logger.Log($"Strategy '{Name}' cannot recover from error {error?.ErrorCode}");
                 return false;
             }
 
@@ -82,66 +84,71 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
             }
 
             // Get or create recovery status
-            var status = GetRecoveryStatus(error.DeviceId);
-
-            // Check if we've exceeded max attempts for this device with this strategy
-            if (status.AttemptCount >= MaxRecoveryAttempts)
+            if (error != null)
             {
-                Logger.Log($"Max recovery attempts ({MaxRecoveryAttempts}) exceeded for device {error.DeviceId} with strategy '{Name}'");
-                return false;
-            }
+                var status = GetRecoveryStatus(error.DeviceId);
 
-            // Apply exponential backoff
-            if (status.LastAttempt.HasValue)
-            {
-                var backoffTime = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, status.AttemptCount)));
-                if (DateTimeOffset.UtcNow - status.LastAttempt.Value < backoffTime)
+                // Check if we've exceeded max attempts for this device with this strategy
+                if (status.AttemptCount >= MaxRecoveryAttempts)
                 {
-                    Logger.Log($"Backoff period not elapsed for device {error.DeviceId} with strategy '{Name}'");
+                    Logger.Log($"Max recovery attempts ({MaxRecoveryAttempts}) exceeded for device {error.DeviceId} with strategy '{Name}'");
+                    return false;
+                }
+
+                // Apply exponential backoff
+                if (status.LastAttempt.HasValue)
+                {
+                    var backoffTime = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, status.AttemptCount)));
+                    if (DateTimeOffset.UtcNow - status.LastAttempt.Value < backoffTime)
+                    {
+                        Logger.Log($"Backoff period not elapsed for device {error.DeviceId} with strategy '{Name}'");
+                        return false;
+                    }
+                }
+
+                // Update status and record attempt on the error
+                status.AttemptCount++;
+                status.LastAttempt = DateTimeOffset.UtcNow;
+
+                if (error is ComponentError compError)
+                {
+                    compError.RecordRecoveryAttempt();
+                }
+
+                Logger.Log($"Attempting recovery for device {error.DeviceId} using strategy '{Name}' (attempt {status.AttemptCount})");
+
+                try
+                {
+                    // Perform the actual recovery
+                    bool result = await ExecuteRecoveryAsync(error, ct);
+
+                    // Reset attempts on success
+                    if (result)
+                    {
+                        Logger.Log($"Recovery successful for device {error.DeviceId} using strategy '{Name}'");
+                        status.AttemptCount = 0;
+                    }
+                    else
+                    {
+                        Logger.Log($"Recovery failed for device {error.DeviceId} using strategy '{Name}'");
+                    }
+
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log(ex, $"Exception during recovery for device {error.DeviceId} using strategy '{Name}'");
                     return false;
                 }
             }
 
-            // Update status and record attempt on the error
-            status.AttemptCount++;
-            status.LastAttempt = DateTimeOffset.UtcNow;
-
-            if (error is ComponentError compError)
-            {
-                compError.RecordRecoveryAttempt();
-            }
-
-            Logger.Log($"Attempting recovery for device {error.DeviceId} using strategy '{Name}' (attempt {status.AttemptCount})");
-
-            try
-            {
-                // Perform the actual recovery
-                bool result = await ExecuteRecoveryAsync(error, ct);
-
-                // Reset attempts on success
-                if (result)
-                {
-                    Logger.Log($"Recovery successful for device {error.DeviceId} using strategy '{Name}'");
-                    status.AttemptCount = 0;
-                }
-                else
-                {
-                    Logger.Log($"Recovery failed for device {error.DeviceId} using strategy '{Name}'");
-                }
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log(ex, $"Exception during recovery for device {error.DeviceId} using strategy '{Name}'");
-                return false;
-            }
+            return false;
         }
 
         /// <summary>
         /// Executes the recovery logic specific to this strategy.
         /// </summary>
-        protected abstract Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct);
+        protected abstract Task<bool> ExecuteRecoveryAsync(IApplicationError? error, CancellationToken ct);
 
         /// <summary>
         /// Gets the recovery status for a device.

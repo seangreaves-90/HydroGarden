@@ -1,8 +1,7 @@
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.ErrorHandling.Core.Models;
-using System;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Events
+namespace HydroGarden.Foundation.ErrorHandling.Events
 {
     /// <summary>
     /// Base class for error-related events.
@@ -58,7 +57,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Events
         /// <summary>
         /// Gets or sets the error event data.
         /// </summary>
-        public ErrorEvent ErrorData { get; set; }
+        public IErrorEvent? ErrorData { get; set; }
     }
 
     /// <summary>
@@ -77,6 +76,6 @@ namespace HydroGarden.Foundation.ErrorHandling.Core.Events
         /// <summary>
         /// Gets or sets the recovery event data.
         /// </summary>
-        public RecoveryEvent RecoveryData { get; set; }
+        public IRecoveryEvent? RecoveryData { get; set; }
     }
 }

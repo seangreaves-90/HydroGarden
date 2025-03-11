@@ -14,7 +14,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         /// <param name="error">The error to recover from.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Information about the recovery attempt.</returns>
-        Task<RecoveryStatus> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default);
+        Task<RecoveryStatus> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default);
 
         /// <summary>
         /// Attempts to recover a device that may have multiple errors.
@@ -30,7 +30,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         /// <param name="error">The error to create a recovery plan for.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>The recovery plan.</returns>
-        Task<RecoveryPlan> CreateRecoveryPlanAsync(IApplicationError error, CancellationToken ct = default);
+        Task<RecoveryPlan> CreateRecoveryPlanAsync(IApplicationError? error, CancellationToken ct = default);
 
         /// <summary>
         /// Executes a previously created recovery plan.
@@ -96,7 +96,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         /// <summary>
         /// Gets or sets the error this plan is designed to recover from.
         /// </summary>
-        public IApplicationError Error { get; set; } = null!;
+        public IApplicationError? Error { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the list of strategies to try, in order of priority.
@@ -239,7 +239,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling
         /// <summary>
         /// Gets or sets the error being recovered.
         /// </summary>
-        public IApplicationError Error { get; set; } = null!;
+        public IApplicationError? Error { get; set; } = null!;
 
         /// <summary>
         /// Gets or sets the start time of the operation.

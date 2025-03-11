@@ -1,10 +1,10 @@
-﻿using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
-using HydroGarden.ErrorHandling.Core.Services;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.ErrorHandling.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HydroGarden.ErrorHandling.Core.Extensions
+namespace HydroGarden.Foundation.ErrorHandling.Extensions
 {
     /// <summary>
     /// Extension methods for registering error handling and recovery services with dependency injection.
