@@ -299,6 +299,119 @@ foreach (var entry in failedEvents)
 }
 ```
 
+## Recovery Orchestration
+
+New in Phase 3, the Recovery Orchestration Service provides advanced error recovery capabilities.
+
+### Using the Recovery Orchestration Service
+
+```csharp
+// Attempt to recover from an error
+var recoveryStatus = await recoveryOrchestrationService.AttemptRecoveryAsync(error);
+
+if (recoveryStatus.IsSuccessful)
+{
+    Console.WriteLine($"Recovery successful using {recoveryStatus.SuccessfulStrategy}");
+}
+else
+{
+    Console.WriteLine("Recovery failed");
+}
+
+// Attempt to recover a device (handles all active errors)
+var deviceRecoveryStatus = await recoveryOrchestrationService.RecoverDeviceAsync(deviceId);
+
+// Create a recovery plan without executing it
+var plan = await recoveryOrchestrationService.CreateRecoveryPlanAsync(error);
+
+// Add custom context to the plan
+plan.Context["MaxRetries"] = 5;
+plan.Context["Priority"] = "High";
+
+// Execute the plan
+var executionStatus = await recoveryOrchestrationService.ExecuteRecoveryPlanAsync(plan);
+```
+
+### Creating Custom Recovery Strategies
+
+```csharp
+public class CustomRecoveryStrategy : RecoveryStrategyBase
+{
+    private readonly IMyService _service;
+    
+    public CustomRecoveryStrategy(ILogger logger, IMyService service)
+        : base(logger)
+    {
+        _service = service;
+    }
+    
+    public override string Name => "Custom Recovery Strategy";
+    
+    public override int Priority => 20; // Lower numbers run first
+    
+    public override ErrorTaxonomy.RecoveryComplexity ComplexityLevel =>
+        ErrorTaxonomy.RecoveryComplexity.Moderate;
+    
+    public override ErrorTaxonomy.RootCause[] SupportedRootCauses => new[]
+    {
+        ErrorTaxonomy.RootCause.ConfigurationError,
+        ErrorTaxonomy.RootCause.ValidationFailure
+    };
+    
+    public override bool CanRecover(IApplicationError error)
+    {
+        // Use base implementation first (checks root causes)
+        if (!base.CanRecover(error))
+            return false;
+            
+        // Add custom logic
+        return error.ErrorCode == "CUSTOM_ERROR_CODE";
+    }
+    
+    protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
+    {
+        try
+        {
+            // Implement recovery logic
+            await _service.FixIssueAsync(error.DeviceId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log(ex, "Custom recovery failed");
+            return false;
+        }
+    }
+}
+
+// Register the strategy
+recoveryOrchestrationService.RegisterStrategy(new CustomRecoveryStrategy(logger, myService));
+```
+
+### Analyzing Recovery Performance
+
+```csharp
+// Get overall recovery statistics
+var metrics = await recoveryOrchestrationService.GetRecoveryStatisticsAsync(
+    DateTimeOffset.UtcNow.AddDays(-7));
+    
+foreach (var (errorCode, metric) in metrics)
+{
+    Console.WriteLine($"Error {errorCode}:");
+    Console.WriteLine($"  Success rate: {metric.SuccessRate}%");
+    Console.WriteLine($"  Total attempts: {metric.TotalAttempts}");
+    Console.WriteLine($"  Best strategy: {metric.MostSuccessfulStrategy}");
+    Console.WriteLine($"  Avg recovery time: {metric.AverageRecoveryTimeMs}ms");
+}
+
+// Get device-specific recovery history
+var history = await recoveryOrchestrationService.GetRecoveryHistoryAsync(deviceId);
+foreach (var record in history)
+{
+    Console.WriteLine($"{record.Timestamp}: {(record.IsSuccessful ? "Success" : "Failed")} using {record.StrategyUsed}");
+}
+```
+
 ## Error-Event Integration
 
 New in Phase 1, the Error-Event integration allows errors to be published as events and vice versa.

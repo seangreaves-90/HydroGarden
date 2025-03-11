@@ -215,6 +215,55 @@ await topologyService.CreateConnectionAsync(connection);
 var sensorConnections = await topologyService.GetConnectionsForSourceAsync(pHSensorId);
 ```
 
+## Recovery Orchestration Service
+
+New component added in Phase 3 that orchestrates error recovery operations across the system.
+
+**Features:**
+- Coordinates recovery efforts using multiple strategies
+- Creates recovery plans based on error characteristics
+- Tracks recovery state and history
+- Provides analytics on recovery success rates
+- Integrates with the Error-Event transformation service
+
+**Main Interfaces:**
+- `IRecoveryOrchestrationService`: Core recovery orchestration functionality
+- `RecoveryPlan`: Defines a plan for recovering from errors
+- `RecoveryStatus`: Reports outcome of recovery operations
+- `RecoveryMetrics`: Provides analytics about recovery effectiveness
+
+**Recovery Models:**
+- `ErrorTaxonomy`: Sophisticated error categorization system
+- `RecoveryRecord`: Historical record of recovery attempts
+- `ActiveRecoveryOperation`: Represents a recovery in progress
+
+**Recovery Strategies:**
+- `RestartComponentStrategy`: Recovers devices through restart cycles
+- `ReinitializeConfigurationStrategy`: Resets device configuration
+- Additional custom strategies can be implemented and registered
+
+**Example Usage:**
+```csharp
+// Attempt to recover from an error
+var recoveryStatus = await recoveryOrchestrationService.AttemptRecoveryAsync(error);
+
+if (recoveryStatus.IsSuccessful)
+{
+    logger.Log($"Recovery successful using strategy: {recoveryStatus.SuccessfulStrategy}");
+}
+else
+{
+    logger.Log("All recovery strategies failed");
+}
+
+// Get recovery statistics
+var metrics = await recoveryOrchestrationService.GetRecoveryStatisticsAsync(DateTime.UtcNow.AddDays(-7));
+foreach (var (errorCode, metric) in metrics)
+{
+    logger.Log($"Error {errorCode}: {metric.SuccessRate}% success rate");
+}
+```
+
 ## IoT Devices
 
 The system supports various IoT devices for monitoring and controlling hydroponics systems.

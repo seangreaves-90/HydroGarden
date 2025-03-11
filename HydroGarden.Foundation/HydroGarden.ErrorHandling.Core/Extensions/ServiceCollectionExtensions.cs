@@ -1,27 +1,45 @@
-using HydroGarden.Foundation.ErrorHandling.Core.Interfaces;
-using HydroGarden.Foundation.ErrorHandling.Core.Services;
+﻿using HydroGarden.ErrorHandling.Core.RecoveryStrategy;
+using HydroGarden.ErrorHandling.Core.Services;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 using Microsoft.Extensions.DependencyInjection;
-using System;
 
-namespace HydroGarden.Foundation.ErrorHandling.Core.Extensions
+namespace HydroGarden.ErrorHandling.Core.Extensions
 {
     /// <summary>
-    /// Extension methods for registering error handling components with dependency injection.
+    /// Extension methods for registering error handling and recovery services with dependency injection.
     /// </summary>
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// Adds the error-event transformation service to the service collection.
+        /// Adds the Recovery Orchestration Service and its dependencies to the service collection.
         /// </summary>
-        /// <param name="services">The service collection to add to.</param>
+        /// <param name="services">The service collection to add services to.</param>
         /// <returns>The service collection for chaining.</returns>
-        public static IServiceCollection AddErrorEventTransformation(this IServiceCollection services)
+        public static IServiceCollection AddRecoveryOrchestration(this IServiceCollection services)
         {
-            if (services == null)
-                throw new ArgumentNullException(nameof(services));
-
-            services.AddTransient<IErrorEventTransformationService, ErrorEventTransformationService>();
-
+            // Register the main recovery orchestration service
+            services.AddSingleton<IRecoveryOrchestrationService, RecoveryOrchestrationService>();
+            
+            // Register recovery strategies
+            services.AddSingleton<IRecoveryStrategy, RestartComponentStrategy>();
+            services.AddSingleton<IRecoveryStrategy, ReinitializeConfigurationStrategy>();
+            services.AddSingleton<IRecoveryStrategy, CommunicationRecoveryStrategy>();
+            services.AddSingleton<IRecoveryStrategy, CircuitBreakerRecoveryStrategy>();
+            
+            return services;
+        }
+        
+        /// <summary>
+        /// Adds a custom recovery strategy to the service collection.
+        /// </summary>
+        /// <typeparam name="TStrategy">The type of the strategy to add.</typeparam>
+        /// <param name="services">The service collection to add the strategy to.</param>
+        /// <returns>The service collection for chaining.</returns>
+        public static IServiceCollection AddRecoveryStrategy<TStrategy>(this IServiceCollection services)
+            where TStrategy : class, IRecoveryStrategy
+        {
+            services.AddSingleton<IRecoveryStrategy, TStrategy>();
             return services;
         }
     }

@@ -2,6 +2,8 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Logger.Abstractions;
 
+using HydroGarden.ErrorHandling.Core.Common;
+
 namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
 {
     /// <summary>
@@ -26,11 +28,41 @@ namespace HydroGarden.ErrorHandling.Core.RecoveryStrategy
         /// Gets the priority of this strategy (lower numbers run first).
         /// </summary>
         public virtual int Priority => 100;
+        
+        /// <summary>
+        /// Gets the recovery complexity this strategy can handle.
+        /// </summary>
+        public virtual ErrorTaxonomy.RecoveryComplexity ComplexityLevel => ErrorTaxonomy.RecoveryComplexity.Moderate;
+        
+        /// <summary>
+        /// Gets types of root causes this strategy can address.
+        /// </summary>
+        public virtual ErrorTaxonomy.RootCause[] SupportedRootCauses => new[] { ErrorTaxonomy.RootCause.Unknown };
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
-        public abstract bool CanRecover(IApplicationError error);
+        /// <summary>
+        /// Determines if this strategy can recover from the specified error.
+        /// The base implementation checks if the error's root cause is supported by this strategy.
+        /// </summary>
+        /// <param name="error">The error to check.</param>
+        /// <returns>True if this strategy can recover from the error, false otherwise.</returns>
+        public virtual bool CanRecover(IApplicationError error)
+        {
+            if (error == null)
+                return false;
+                
+            // Check if it's a non-recoverable error
+            if (error is ComponentError compError && compError.IsUnrecoverable)
+                return false;
+                
+            // Get the root cause
+            var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
+            
+            // Check if this strategy supports the root cause
+            return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
+        }
 
         /// <summary>
         /// Attempts to recover from the error.
