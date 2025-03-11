@@ -1,7 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
@@ -30,7 +26,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// </summary>
         /// <param name="middleware">The middleware to add.</param>
         /// <param name="eventTypes">The event types to apply this middleware to.</param>
-        void AddMiddleware(IEventMiddleware middleware, params EventType[] eventTypes);
+        void AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes);
         
         /// <summary>
         /// Removes a middleware from the pipeline.
@@ -53,7 +49,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <summary>
         /// Gets the exception that occurred during processing, if any.
         /// </summary>
-        Exception Exception { get; }
+        Exception? Exception { get; }
         
         /// <summary>
         /// Gets the event after it has been processed through the pipeline.

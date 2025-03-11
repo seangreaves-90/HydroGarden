@@ -1,4 +1,6 @@
-﻿/// <summary>
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events;
+
+/// <summary>
 /// Represents a connection between two components
 /// </summary>
 public interface IComponentConnection

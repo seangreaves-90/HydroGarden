@@ -1,6 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 
@@ -28,7 +29,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 .Returns<IEvent>(e => e);
         }
 
-        protected Common.Events.EventBus CreateTestEventBus()
+        protected EventBus CreateTestEventBus()
         {
             var eventBus = new Common.Events.EventBus(
                 MockLogger.Object,

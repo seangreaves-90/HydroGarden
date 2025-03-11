@@ -1,6 +1,4 @@
-﻿
-
-using HydroGarden.Foundation.Abstractions.Interfaces;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 
 namespace HydroGarden.Foundation.Common.Results
 {
@@ -25,12 +23,12 @@ namespace HydroGarden.Foundation.Common.Results
         public bool TimedOut { get; set; }
 
         /// <inheritdoc />
-        public List<Exception?> Errors { get; set; } = new();
+        public List<Exception?> Errors { get; set; } = [];
 
         
         public bool HasErrors => Errors.Count > 0;
 
         /// <inheritdoc />
-        public List<Task> HandlerTasks { get; } = new List<Task>();
+        public List<Task> HandlerTasks { get; } = [];
     }
 }

@@ -38,7 +38,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline.Middleware
         /// <summary>
         /// Gets or sets the exception that caused the failure.
         /// </summary>
-        public Exception Exception { get; set; }
+        public Exception? Exception { get; set; }
 
         /// <summary>
         /// Gets or sets the error message.

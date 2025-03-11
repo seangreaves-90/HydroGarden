@@ -1,4 +1,8 @@
-﻿/// <summary>
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+
+namespace HydroGarden.Foundation.Abstractions.Interfaces.Services;
+
+/// <summary>
 /// Service for managing component connections and topology
 /// </summary>
 public interface ITopologyService : IAsyncDisposable

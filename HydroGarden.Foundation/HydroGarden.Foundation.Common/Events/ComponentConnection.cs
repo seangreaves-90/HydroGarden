@@ -1,4 +1,6 @@
-﻿namespace HydroGarden.Foundation.Common.Events
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+
+namespace HydroGarden.Foundation.Common.Events
 {
     /// <summary>
     /// Implementation of a connection between components

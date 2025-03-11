@@ -19,17 +19,11 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         public static IEventProcessingPipeline UsePipeline(
             this IEventBus eventBus,
             ILogger logger,
-            Action<EventPipelineBuilder> configureAction = null)
+            Action<EventPipelineBuilder>? configureAction = null)
         {
-            if (eventBus == null)
-            {
-                throw new ArgumentNullException(nameof(eventBus));
-            }
+            ArgumentNullException.ThrowIfNull(eventBus);
 
-            if (logger == null)
-            {
-                throw new ArgumentNullException(nameof(logger));
-            }
+            ArgumentNullException.ThrowIfNull(logger);
 
             var builder = new EventPipelineBuilder(logger);
             
@@ -66,7 +60,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         /// <returns>The service collection for chaining.</returns>
         public static IServiceCollection AddEventProcessingPipeline(
             this IServiceCollection services,
-            Action<EventPipelineBuilder> configureAction = null)
+            Action<EventPipelineBuilder>? configureAction = null)
         {
             // Register the pipeline builder
             services.AddSingleton<EventPipelineBuilder>();

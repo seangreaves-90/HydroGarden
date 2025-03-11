@@ -1,6 +1,4 @@
-﻿
-
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
 namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
 {

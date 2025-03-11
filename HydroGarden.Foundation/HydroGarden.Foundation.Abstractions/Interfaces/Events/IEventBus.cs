@@ -1,4 +1,6 @@
-﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+
+namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
     /// Interface for the event bus service

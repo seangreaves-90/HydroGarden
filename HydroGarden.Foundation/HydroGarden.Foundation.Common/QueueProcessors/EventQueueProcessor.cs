@@ -1,10 +1,9 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+﻿using System.Collections.Concurrent;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Events;
-using System.Collections.Concurrent;
 using HydroGarden.Logger.Abstractions;
 
-
-namespace HydroGarden.Foundation.Common.QueueProcessor
+namespace HydroGarden.Foundation.Common.QueueProcessors
 {
     /// <summary>
     /// Processes event queues based on priority levels and manages event execution asynchronously.
@@ -14,7 +13,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
         private readonly ConcurrentDictionary<EventPriority, ConcurrentQueue<EventQueueItem>> _eventQueues;
         private readonly ILogger _logger;
         private readonly CancellationTokenSource _cancellationSource = new();
-        private readonly List<Task> _processingTasks = new();
+        private readonly List<Task> _processingTasks = [];
         private readonly int _maxConcurrentProcessingPerPriority;
 
         /// <summary>
@@ -106,7 +105,7 @@ namespace HydroGarden.Foundation.Common.QueueProcessor
             _cancellationSource.Cancel();
             try
             {
-                Task.WaitAll(_processingTasks.ToArray(), TimeSpan.FromSeconds(5));
+                Task.WaitAll([.. _processingTasks], TimeSpan.FromSeconds(5));
             }
             catch (AggregateException ex) when (ex.InnerExceptions.All(e => e is TaskCanceledException))
             {

@@ -1,53 +1,43 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
 namespace HydroGarden.Foundation.Common.Events
 {
     /// <summary>
     /// Event arguments for circuit breaker state changes.
     /// </summary>
-    public class CircuitStateChangedEventArgs : EventArgs
+    /// <remarks>
+    /// Creates a new circuit state changed event args.
+    /// </remarks>
+    public class CircuitStateChangedEventArgs(
+        string serviceName,
+        CircuitState oldState,
+        CircuitState newState,
+        DateTimeOffset lastFailureTime,
+        string reason = "") : EventArgs
     {
         /// <summary>
         /// Name of the service protected by the circuit breaker.
         /// </summary>
-        public string ServiceName { get; }
+        public string ServiceName { get; } = serviceName;
 
         /// <summary>
         /// Previous state of the circuit breaker.
         /// </summary>
-        public CircuitState OldState { get; }
+        public CircuitState OldState { get; } = oldState;
 
         /// <summary>
         /// New state of the circuit breaker.
         /// </summary>
-        public CircuitState NewState { get; }
+        public CircuitState NewState { get; } = newState;
 
         /// <summary>
         /// Time of the last failure that influenced the state change.
         /// </summary>
-        public DateTimeOffset LastFailureTime { get; }
+        public DateTimeOffset LastFailureTime { get; } = lastFailureTime;
 
         /// <summary>
         /// Reason for the state change.
         /// </summary>
-        public string Reason { get; }
-
-        /// <summary>
-        /// Creates a new circuit state changed event args.
-        /// </summary>
-        public CircuitStateChangedEventArgs(
-            string serviceName,
-            CircuitState oldState,
-            CircuitState newState,
-            DateTimeOffset lastFailureTime,
-            string reason = "")
-        {
-            ServiceName = serviceName;
-            OldState = oldState;
-            NewState = newState;
-            LastFailureTime = lastFailureTime;
-            Reason = reason;
-        }
+        public string Reason { get; } = reason;
     }
 }

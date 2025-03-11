@@ -169,9 +169,7 @@ namespace HydroGarden.Foundation.Common.Events
         public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
         {
             // Handle property changed events that represent state changes
-            if (evt is IPropertyChangedEvent propEvt &&
-                propEvt.PropertyName == "State" &&
-                propEvt.NewValue is ComponentState state)
+            if (evt is IPropertyChangedEvent { PropertyName: "State", NewValue: ComponentState state })
             {
                 _stateChanges.Add(state);
 

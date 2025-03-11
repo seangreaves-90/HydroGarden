@@ -1,11 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Logger.Abstractions;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Common.Events.Pipeline
 {
@@ -13,30 +8,22 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
     /// Implementation of the event processing pipeline that manages middleware components 
     /// and orchestrates event processing through the pipeline.
     /// </summary>
-    public class EventProcessingPipeline : IEventProcessingPipeline, IDisposable
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="EventProcessingPipeline"/> class.
+    /// </remarks>
+    /// <param name="logger">The logger to use.</param>
+    public class EventProcessingPipeline(ILogger logger) : IEventProcessingPipeline, IDisposable
     {
-        private readonly ILogger _logger;
-        private readonly List<MiddlewareEntry> _middleware = new();
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly List<MiddlewareEntry> _middleware = [];
         private readonly ConcurrentDictionary<Guid, IEvent> _inProcessEvents = new();
         private readonly object _middlewareLock = new();
         private bool _disposed;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EventProcessingPipeline"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        public EventProcessingPipeline(ILogger logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
         /// <inheritdoc />
         public void AddMiddleware(IEventMiddleware middleware)
         {
-            if (middleware == null)
-            {
-                throw new ArgumentNullException(nameof(middleware));
-            }
+            ArgumentNullException.ThrowIfNull(middleware);
 
             lock (_middlewareLock)
             {
@@ -48,12 +35,9 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         }
 
         /// <inheritdoc />
-        public void AddMiddleware(IEventMiddleware middleware, params EventType[] eventTypes)
+        public void AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes)
         {
-            if (middleware == null)
-            {
-                throw new ArgumentNullException(nameof(middleware));
-            }
+            ArgumentNullException.ThrowIfNull(middleware);
 
             if (eventTypes == null || eventTypes.Length == 0)
             {
@@ -89,20 +73,11 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         /// <inheritdoc />
         public async Task<IEventProcessingResult> ProcessEventAsync(object? sender, IEvent @event, CancellationToken cancellationToken = default)
         {
-            if (sender == null)
-            {
-                throw new ArgumentNullException(nameof(sender));
-            }
+            ArgumentNullException.ThrowIfNull(sender);
 
-            if (@event == null)
-            {
-                throw new ArgumentNullException(nameof(@event));
-            }
+            ArgumentNullException.ThrowIfNull(@event);
 
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(EventProcessingPipeline));
-            }
+            ObjectDisposedException.ThrowIf(_disposed, nameof(EventProcessingPipeline));
 
             // Add event to in-process tracking
             _inProcessEvents.TryAdd(@event.EventId, @event);
@@ -124,7 +99,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
                 // Start the pipeline
                 return await pipeline(sender, @event, cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception? ex)
             {
                 _logger.Log(ex, $"Unhandled exception in event processing pipeline for event {@event.EventId}");
                 return EventProcessingResult.Failure(@event, ex);
@@ -139,8 +114,8 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         private Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> CreatePipeline(List<MiddlewareEntry> middlewareList)
         {
             // Build the pipeline from the end to the beginning
-            Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> pipeline = (sender, @event, ct) => 
-                Task.FromResult<IEventProcessingResult>(EventProcessingResult.Success(@event));
+            Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> pipeline = (_, @event, _) => 
+                Task.FromResult(EventProcessingResult.Success(@event));
 
             // Add each middleware, starting from the last one
             for (int i = middlewareList.Count - 1; i >= 0; i--)
@@ -163,7 +138,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
                         // Apply the middleware
                         return await currentEntry.Middleware.ProcessAsync(sender, @event, currentPipeline, ct);
                     }
-                    catch (Exception ex)
+                    catch (Exception? ex)
                     {
                         _logger.Log(ex, $"Exception in middleware '{currentEntry.Middleware.Name}' for event {@event.EventId}");
                         return EventProcessingResult.Failure(@event, ex);
@@ -174,7 +149,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
             return pipeline;
         }
 
-        private bool ShouldApplyMiddleware(MiddlewareEntry entry, IEvent @event)
+        private static bool ShouldApplyMiddleware(MiddlewareEntry entry, IEvent @event)
         {
             // If the middleware itself says it shouldn't apply, respect that
             if (!entry.Middleware.ShouldApply(@event))
@@ -216,16 +191,10 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
             GC.SuppressFinalize(this);
         }
 
-        private class MiddlewareEntry
+        private class MiddlewareEntry(IEventMiddleware middleware, EventType[]? eventTypes)
         {
-            public IEventMiddleware Middleware { get; }
-            public EventType[] EventTypes { get; }
-
-            public MiddlewareEntry(IEventMiddleware middleware, EventType[] eventTypes)
-            {
-                Middleware = middleware;
-                EventTypes = eventTypes;
-            }
+            public IEventMiddleware Middleware { get; } = middleware;
+            public EventType[]? EventTypes { get; } = eventTypes;
         }
     }
 }

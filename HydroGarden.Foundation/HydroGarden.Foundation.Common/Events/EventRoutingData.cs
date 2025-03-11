@@ -8,16 +8,16 @@ namespace HydroGarden.Foundation.Common.Events
     public class EventRoutingData : IEventRoutingData
     {
         /// <inheritdoc />
-        public Guid[] TargetIds { get; set; } = Array.Empty<Guid>();
+        public Guid[] TargetIds { get; set; }
 
         /// <inheritdoc />
-        public bool Persist { get; set; } = false;
+        public bool Persist { get; set; }
 
         /// <inheritdoc />
-        public EventPriority Priority { get; set; } = EventPriority.Normal;
+        public EventPriority Priority { get; set; }
 
         /// <inheritdoc />
-        public bool RequiresAcknowledgment { get; set; } = false;
+        public bool RequiresAcknowledgment { get; set; }
 
         /// <inheritdoc />
         public TimeSpan? Timeout { get; set; }
@@ -27,7 +27,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// </summary>
         public EventRoutingData()
         {
-            TargetIds = Array.Empty<Guid>();
+            TargetIds = [];
             Persist = false;
             Priority = EventPriority.Normal;
             RequiresAcknowledgment = false;

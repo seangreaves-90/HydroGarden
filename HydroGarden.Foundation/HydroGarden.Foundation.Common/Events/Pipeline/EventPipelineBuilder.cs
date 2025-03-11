@@ -1,27 +1,20 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Events.Pipeline.Middleware;
 using HydroGarden.Logger.Abstractions;
-using System;
 
 namespace HydroGarden.Foundation.Common.Events.Pipeline
 {
     /// <summary>
     /// Builder for creating and configuring event processing pipelines.
     /// </summary>
-    public class EventPipelineBuilder
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="EventPipelineBuilder"/> class.
+    /// </remarks>
+    /// <param name="logger">The logger to use.</param>
+    public class EventPipelineBuilder(ILogger logger)
     {
-        private readonly IEventProcessingPipeline _pipeline;
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EventPipelineBuilder"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        public EventPipelineBuilder(ILogger logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _pipeline = new EventProcessingPipeline(logger);
-        }
+        private readonly EventProcessingPipeline _pipeline = new(logger);
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <summary>
         /// Adds a middleware to the pipeline.
@@ -40,7 +33,7 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         /// <param name="middleware">The middleware to add.</param>
         /// <param name="eventTypes">The event types to apply this middleware to.</param>
         /// <returns>The builder for chaining.</returns>
-        public EventPipelineBuilder AddMiddleware(IEventMiddleware middleware, params EventType[] eventTypes)
+        public EventPipelineBuilder AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes)
         {
             _pipeline.AddMiddleware(middleware, eventTypes);
             return this;

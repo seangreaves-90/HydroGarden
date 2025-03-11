@@ -6,6 +6,8 @@ using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.ErrorHandling.Exceptions;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using CircuitBreakerMiddlewareNS = HydroGarden.Foundation.Common.Events.Pipeline.Middleware;
+using CircuitBreakerState = HydroGarden.Foundation.Common.Events.Pipeline.Middleware.CircuitState;
 
 namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 {
@@ -180,12 +182,12 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Reset specific event type circuit if provided
                 if (!string.IsNullOrEmpty(eventType) && Enum.TryParse<EventType>(eventType, true, out var parsedEventType))
                 {
-                    var currentState = circuitBreaker.GetCircuitState(parsedEventType);
+                    var currentState = circuitBreaker.GetCircuitState(parsedEventType.ToString());
                     
-                    if (currentState == CircuitState.Open || currentState == CircuitState.HalfOpen)
+                    if (currentState == CircuitBreakerMiddleware.CircuitState.Open || currentState == CircuitBreakerMiddleware.CircuitState.HalfOpen)
                     {
                         Logger.Log($"Resetting circuit for event type {eventType} (was {currentState})");
-                        circuitBreaker.ResetCircuit(parsedEventType);
+                        circuitBreaker.ResetCircuit(parsedEventType.ToString());
                         return true;
                     }
                     else
@@ -199,11 +201,11 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 bool anyReset = false;
                 foreach (EventType commonType in Enum.GetValues(typeof(EventType)))
                 {
-                    var state = circuitBreaker.GetCircuitState(commonType);
-                    if (state == CircuitState.Open || state == CircuitState.HalfOpen)
+                    var state = circuitBreaker.GetCircuitState(commonType.ToString());
+                    if (state == CircuitBreakerMiddleware.CircuitState.Open || state == CircuitBreakerMiddleware.CircuitState.HalfOpen)
                     {
                         Logger.Log($"Resetting circuit for event type {commonType} (was {state})");
-                        circuitBreaker.ResetCircuit(commonType);
+                        circuitBreaker.ResetCircuit(commonType.ToString());
                         anyReset = true;
                     }
                 }
@@ -233,7 +235,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 }
                 
                 // Reset circuit breakers for the device
-                return await policyManager.ResetCircuitBreakersAsync(deviceId, CancellationToken.None);
+                await policyManager.ResetCircuitBreakersAsync(deviceId.ToString(), CancellationToken.None);
+                return true;
             }
             catch (Exception ex)
             {
