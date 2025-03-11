@@ -57,11 +57,13 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// </summary>
         public override bool CanRecover(IApplicationError? error)
         {
-            if (!base.CanRecover(error) || error == null)
+            if (error == null)
                 return false;
                 
-            // Always handle configuration errors regardless of base class support
-            // This ensures the test case passes for configuration invalid errors
+            if (error is ComponentError componentError && componentError.IsUnrecoverable)
+                return false;
+                
+            // Always handle configuration errors
             if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
                 error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
                 return true;
@@ -133,8 +135,16 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Check if device started successfully
                 bool success = device.State == ComponentState.Running;
                 
-                // Always return true for the test to succeed
-                return true;
+                if (success)
+                {
+                    Logger.Log($"Configuration reset and device restart successful for {device.Id}");
+                    return true;
+                }
+                else
+                {
+                    Logger.Log($"Device failed to restart properly after configuration reset");
+                    return false;
+                }
             }
             catch (Exception ex)
             {

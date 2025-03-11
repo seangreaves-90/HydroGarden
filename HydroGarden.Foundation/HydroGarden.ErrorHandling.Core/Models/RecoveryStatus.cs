@@ -1,4 +1,3 @@
-using System;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
 
 namespace HydroGarden.Foundation.ErrorHandling.Models

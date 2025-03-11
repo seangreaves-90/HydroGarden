@@ -142,22 +142,23 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                     if (!commTestSuccess)
                     {
                         Logger.Log($"Device communication test failed for {device.Id}");
-                        // Return true anyway for test purposes
+                        return false;
                     }
                     else
                     {
                         Logger.Log($"Communication successfully restored for device {device.Id}");
+                        return true;
                     }
                 }
 
-                // Always return true for the test to pass
-                return true;
+                // Return false if we didn't complete recovery successfully
+                return false;
             }
             catch (Exception ex)
             {
                 if (error != null) Logger.Log(ex, $"Error during communication recovery for device {error.DeviceId}");
-                // Return true even with exceptions for test purposes
-                return true;
+                // Return false on exceptions
+                return false;
             }
         }
         

@@ -72,7 +72,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             // Check if it's a device error that's recoverable
             if (error is ComponentError componentError && 
                 error.Source == ErrorSource.Device && 
-                componentError.IsRecoverable)
+                componentError.IsRecoverable &&
+                !ErrorCodes.IsUnrecoverable(error.ErrorCode))
                 return true;
                 
             // Check supported root causes from base class
@@ -187,8 +188,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Check if device started successfully
                 bool success = device.State == ComponentState.Running;
                     
-                    // Make sure to return true to ensure test passes
-                    return true;
+                // Return the actual success state
+                return success;
             }
             catch (Exception ex)
             {

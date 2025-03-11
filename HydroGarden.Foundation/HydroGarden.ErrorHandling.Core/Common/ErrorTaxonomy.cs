@@ -216,13 +216,15 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
             return rootCause switch
             {
                 RootCause.HardwareFailure => RecoveryComplexity.Manual,
-                RootCause.ConfigurationError => RecoveryComplexity.Manual,
+                RootCause.ConfigurationError => RecoveryComplexity.Complex,
                 RootCause.SensorMalfunction => RecoveryComplexity.Moderate,
                 RootCause.NetworkFailure => RecoveryComplexity.Moderate,
                 RootCause.ConnectionTimeout => RecoveryComplexity.Simple,
                 RootCause.InvalidState => RecoveryComplexity.Moderate,
                 RootCause.ResourceExhaustion => RecoveryComplexity.Moderate,
                 RootCause.RetryExhaustion => RecoveryComplexity.Complex,
+                RootCause.CircuitBreakerOpen => RecoveryComplexity.Simple,
+                RootCause.ProtocolError => RecoveryComplexity.Moderate,
                 _ => RecoveryComplexity.Moderate
             };
         }
