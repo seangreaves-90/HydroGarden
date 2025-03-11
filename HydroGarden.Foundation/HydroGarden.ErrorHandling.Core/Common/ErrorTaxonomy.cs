@@ -216,7 +216,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
             return rootCause switch
             {
                 RootCause.HardwareFailure => RecoveryComplexity.Manual,
-                RootCause.ConfigurationError => RecoveryComplexity.Complex,
+                RootCause.ConfigurationError => RecoveryComplexity.Manual,
                 RootCause.SensorMalfunction => RecoveryComplexity.Moderate,
                 RootCause.NetworkFailure => RecoveryComplexity.Moderate,
                 RootCause.ConnectionTimeout => RecoveryComplexity.Simple,

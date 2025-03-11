@@ -101,7 +101,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                     var backoffTime = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, status.AttemptCount)));
                     if (DateTimeOffset.UtcNow - status.LastAttempt.Value < backoffTime)
                     {
-                        Logger.Log($"Backoff period not elapsed for device {error.DeviceId} with strategy '{Name}'");
+                        Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed or max attempts reached");
                         return false;
                     }
                 }

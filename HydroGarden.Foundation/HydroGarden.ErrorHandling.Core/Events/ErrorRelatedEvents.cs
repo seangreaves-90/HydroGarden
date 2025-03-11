@@ -15,6 +15,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         {
             EventId = Guid.NewGuid();
             Timestamp = DateTimeOffset.UtcNow;
+            CorrelationId = Guid.NewGuid();
         }
 
         /// <inheritdoc/>

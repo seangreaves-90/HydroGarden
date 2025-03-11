@@ -39,7 +39,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// <summary>
         /// Lower priority than basic strategies.
         /// </summary>
-        public override int Priority => 50;
+        public override int Priority => 20;
         
         /// <summary>
         /// This strategy handles simple recovery scenarios.
@@ -85,6 +85,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Get circuit breaker details from error context
                 string? circuitBreakerType = null;
                 string? eventType = null;
+                string? serviceKey = null;
                 
                 if (error.Context != null && error.Context.TryGetValue("CircuitBreakerType", out var cbTypeObj) && cbTypeObj is string cbType)
                 {
@@ -94,6 +95,15 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (error.Context != null && error.Context.TryGetValue("EventType", out var evtTypeObj) && evtTypeObj is string evtType)
                 {
                     eventType = evtType;
+                }
+                
+                if (error.Context != null && error.Context.TryGetValue("ServiceKey", out var serviceKeyObj) && serviceKeyObj is string svcKey)
+                {
+                    serviceKey = svcKey;
+                }
+                else
+                {
+                    Logger.Log("Service key not found in error context");
                 }
                 
                 // Check if we're dealing with an event pipeline circuit breaker
