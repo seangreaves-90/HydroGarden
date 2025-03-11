@@ -1,19 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
 
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="coverlet.collector" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" />
+		<PackageReference Include="xunit" />
+		<PackageReference Include="xunit.runner.visualstudio" />
+		<PackageReference Include="Moq" />
+		<PackageReference Include="FluentAssertions" />
+	</ItemGroup>
 
-  <ItemGroup>
-	  <PackageReference Include="coverlet.collector" />
-	  <PackageReference Include="Microsoft.NET.Test.Sdk" />
-	  <PackageReference Include="xunit" />
-	  <PackageReference Include="xunit.runner.visualstudio" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\HydroGarden.ErrorHandling.Core\HydroGarden.Foundation.ErrorHandling.csproj" />
+		<ProjectReference Include="..\HydroGarden.Foundation.Abstractions\HydroGarden.Foundation.Abstractions.csproj" />
+		<ProjectReference Include="..\HydroGarden.Foundation.Common\HydroGarden.Foundation.Common.csproj" />
+		<ProjectReference Include="..\HydroGarden.Logger\HydroGarden.Logger.csproj" />
+	</ItemGroup>
 
 </Project>

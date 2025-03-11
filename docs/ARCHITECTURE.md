@@ -131,11 +131,19 @@ New in Phase 1, provides bidirectional conversion between errors and events.
 - Converting events back to error objects
 - Maintaining correlation context
 - Publishing errors as events
+- Tracking error recovery attempts
 
 **Interfaces:**
 - `IErrorEventTransformationService`: Core transformation interface
+- `IApplicationError`: Interface for error representation
+- `IErrorMonitor`: Interface for error reporting and monitoring
 - `ErrorOccurredEvent`: Event representing an error
 - `RecoveryAttemptedEvent`: Event representing a recovery attempt
+
+**Key Components:**
+- `ComponentError`: Concrete implementation of IApplicationError with enhanced recovery features
+- `ErrorContextBuilder`: Utility for building rich error context information
+- `ErrorMonitorBase`: Base implementation for error monitoring services
 
 ### PersistenceService
 

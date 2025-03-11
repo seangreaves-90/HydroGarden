@@ -416,6 +416,48 @@ foreach (var record in history)
 
 New in Phase 1, the Error-Event integration allows errors to be published as events and vice versa.
 
+### Creating and Reporting Errors
+
+```csharp
+// Create a device error
+var error = new ComponentError(
+    deviceId: deviceId,
+    errorCode: "DEVICE_OFFLINE",
+    message: "Device not responding to commands",
+    severity: ErrorSeverity.Error,
+    isRecoverable: true,
+    source: ErrorSource.Device,
+    isTransient: true,
+    context: new Dictionary<string, object>
+    {
+        { "LastSeenTimestamp", DateTime.UtcNow.AddMinutes(-5) },
+        { "ConnectionAttempts", 3 }
+    },
+    exception: exception
+);
+
+// Report the error to the monitoring system
+await errorMonitor.ReportErrorAsync(error);
+
+// Create a non-recoverable error using factory method
+var criticalError = ComponentError.CreateNonRecoverable(
+    deviceId: deviceId,
+    errorCode: "HARDWARE_FAILURE",
+    message: "Critical hardware failure detected",
+    severity: ErrorSeverity.Critical,
+    source: ErrorSource.Device
+);
+
+// Create a transient error using factory method
+var transientError = ComponentError.CreateTransient(
+    deviceId: deviceId,
+    errorCode: "COMM_TIMEOUT",
+    message: "Communication timeout occurred",
+    severity: ErrorSeverity.Warning,
+    source: ErrorSource.Communication
+);
+```
+
 ### Publishing Errors as Events
 
 ```csharp
@@ -464,6 +506,31 @@ eventBus.SubscribeToRecoveryEvents(
             Console.WriteLine($"Recovery failed for device {deviceId}, error {errorCode}: {message}");
         }
     });
+```
+
+### Working with ComponentError Features
+
+```csharp
+// Check if recovery can be attempted
+if (componentError.CanAttemptRecovery())
+{
+    // Attempt recovery
+    var success = await recoveryOrchestrator.AttemptRecoveryAsync(componentError);
+    
+    // Record the recovery attempt
+    componentError.RecordRecoveryAttempt();
+    
+    // Check exponential backoff interval before next attempt
+    var backoffInterval = componentError.RecoveryBackoffInterval;
+    Console.WriteLine($"Next recovery attempt allowed after {backoffInterval.TotalSeconds} seconds");
+}
+
+// Check if error is unrecoverable
+if (componentError.IsUnrecoverable)
+{
+    // Take alternative actions for unrecoverable errors
+    await NotifyAdministratorAsync(componentError);
+}
 ```
 
 ## Creating New Components

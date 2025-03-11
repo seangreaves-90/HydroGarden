@@ -11,13 +11,16 @@ This document provides comprehensive guidance on using the HydroGarden Error Han
    - [Error Monitoring](#error-monitoring)
    - [Error Event Transformation](#error-event-transformation)
 4. [Recovery Orchestration](#recovery-orchestration)
-   - [Creating Recovery Plans](#creating-recovery-plans)
-   - [Executing Recovery](#executing-recovery)
-   - [Managing Recovery Strategies](#managing-recovery-strategies)
-   - [Recovery Analytics](#recovery-analytics)
+   - [Using the Recovery Orchestrator](#using-the-recovery-orchestrator)
+   - [Working with ComponentError Recovery Features](#working-with-componenterror-recovery-features)
+   - [Creating Custom Recovery Strategies](#creating-custom-recovery-strategies)
+   - [Monitoring Recovery Attempts](#monitoring-recovery-attempts)
 5. [Integration Examples](#integration-examples)
 6. [Best Practices](#best-practices)
 7. [Advanced Usage](#advanced-usage)
+   - [Error Categorization](#error-categorization)
+   - [Recovery Backoff and Retry Limiting](#recovery-backoff-and-retry-limiting)
+   - [Recovery Context Management](#recovery-context-management)
 
 ## Overview
 
@@ -25,26 +28,23 @@ The Error Handling and Recovery Orchestration system provides a comprehensive so
 
 - **Error Monitoring**: Tracks and logs errors throughout the system
 - **Error Event Transformation**: Converts errors to events for routing through the EventBus
-- **Recovery Orchestration**: Plans and executes recovery strategies based on error characteristics
-- **Error Taxonomy**: Sophisticated categorization system for precise recovery planning
+- **Recovery Orchestration**: Coordinates recovery strategies based on error characteristics
+- **ComponentError**: Enhanced error representation with recovery tracking capabilities
 
 ## Key Components
 
 ### Error Handling Components
 
+- `IApplicationError`: Interface for representing application errors
+- `ComponentError`: Enhanced error implementation with recovery tracking
 - `IErrorMonitor`: Interface for reporting and monitoring errors
-- `ComponentErrorMonitorService`: Implementation that tracks component-specific errors
 - `ErrorEventTransformationService`: Converts errors to events and vice versa
-- `ComponentError`: Class representing a component-specific error
 
 ### Recovery Orchestration Components
 
-- `IRecoveryOrchestrationService`: Main interface for recovery orchestration
-- `RecoveryOrchestrationService`: Implementation that plans and executes recovery operations
-- `IRecoveryStrategy`: Interface for recovery strategy implementations
-- `RecoveryStrategyBase`: Base class for implementing recovery strategies
-- `RecoveryPlan`: Represents a plan for recovering from errors
-- `RecoveryStatus`: Contains information about recovery attempts
+- `RecoveryOrchestrator`: Coordinates error recovery using multiple strategies
+- `IRecoveryStrategy`: Interface for implementing recovery strategies
+- `ComponentError`: Error implementation with built-in recovery features
 
 ## Error Handling
 
@@ -64,15 +64,39 @@ public MyComponent(IErrorMonitor errorMonitor)
 // Report an error
 private async Task HandleFailureAsync()
 {
-    var error = new ComponentError
-    {
-        ErrorCode = "PUMP_FAILURE",
-        Message = "Pump has failed to start",
-        DeviceId = _deviceId,
-        Severity = ErrorSeverity.Critical,
-        CorrelationId = Guid.NewGuid(),
-        Source = "PumpController"
-    };
+    // Create an error with full constructor
+    var error = new ComponentError(
+        deviceId: _deviceId,
+        errorCode: "PUMP_FAILURE",
+        message: "Pump has failed to start",
+        severity: ErrorSeverity.Critical,
+        isRecoverable: true,
+        source: ErrorSource.Device,
+        isTransient: false,
+        context: new Dictionary<string, object>
+        {
+            { "LastRunTime", DateTime.UtcNow.AddHours(-2) },
+            { "PowerLevel", 85 }
+        },
+        exception: new Exception("Motor stalled")
+    );
+    
+    // Or use factory methods for common scenarios
+    var nonRecoverableError = ComponentError.CreateNonRecoverable(
+        deviceId: _deviceId,
+        errorCode: "PUMP_HARDWARE_FAILURE",
+        message: "Pump hardware failure detected",
+        severity: ErrorSeverity.Critical,
+        source: ErrorSource.Device
+    );
+    
+    var transientError = ComponentError.CreateTransient(
+        deviceId: _deviceId,
+        errorCode: "PUMP_COMMUNICATION_ERROR",
+        message: "Temporary communication error with pump",
+        severity: ErrorSeverity.Error,
+        source: ErrorSource.Communication
+    );
     
     await _errorMonitor.ReportErrorAsync(error);
 }
@@ -113,112 +137,126 @@ var recoveredError = _transformationService.TransformEventToError(errorEvent);
 
 ## Recovery Orchestration
 
-### Creating Recovery Plans
+The Recovery Orchestration system provides streamlined error recovery capabilities through the RecoveryOrchestrator class and associated strategies.
 
-Recovery plans can be created manually or automatically by the service:
-
-```csharp
-// Inject the recovery orchestration service
-private readonly IRecoveryOrchestrationService _recoveryService;
-
-// Create a recovery plan for an error
-var plan = await _recoveryService.CreateRecoveryPlanAsync(error);
-
-// Customize the plan if needed
-plan.MaxAttemptsPerStrategy = 5;
-plan.Timeout = TimeSpan.FromMinutes(10);
-```
-
-### Executing Recovery
-
-To execute recovery operations:
+### Using the Recovery Orchestrator
 
 ```csharp
-// Attempt recovery for a specific error
-var status = await _recoveryService.AttemptRecoveryAsync(error);
+// Create a recovery orchestrator with strategies
+var recoveryOrchestrator = new RecoveryOrchestrator(
+    logger,
+    errorMonitor,
+    new List<IRecoveryStrategy>
+    {
+        new RestartDeviceStrategy(logger),
+        new ResetConfigurationStrategy(logger)
+    });
 
-// Execute a custom recovery plan
-var status = await _recoveryService.ExecuteRecoveryPlanAsync(plan);
+// Attempt to recover from an error
+var success = await recoveryOrchestrator.AttemptRecoveryAsync(error);
 
-// Recover an entire device (all its errors)
-var status = await _recoveryService.RecoverDeviceAsync(deviceId);
-
-// Check recovery status
-if (status.IsSuccessful)
+if (success)
 {
-    Console.WriteLine($"Recovery successful using {status.SuccessfulStrategy}");
+    Console.WriteLine("Recovery successful");
 }
 else
 {
-    Console.WriteLine($"Recovery failed after {status.AttemptCount} attempts");
+    Console.WriteLine("Recovery failed");
 }
 ```
 
-### Managing Recovery Strategies
-
-To register custom recovery strategies:
+### Working with ComponentError Recovery Features
 
 ```csharp
-// Create a custom recovery strategy
-public class MyCustomRecoveryStrategy : RecoveryStrategyBase
+// Check if recovery can be attempted based on backoff interval and max attempts
+if (componentError.CanAttemptRecovery())
 {
-    public MyCustomRecoveryStrategy(ILogger logger) : base(logger) { }
-    
-    public override string Name => "CustomStrategy";
-    
-    public override int Priority => 50; // Lower numbers run first
-    
-    public override ErrorTaxonomy.RecoveryComplexity ComplexityLevel 
-        => ErrorTaxonomy.RecoveryComplexity.Moderate;
-    
-    public override ErrorTaxonomy.RootCause[] SupportedRootCauses 
-        => new[] { ErrorTaxonomy.RootCause.ConfigurationIssue };
-    
-    public override bool CanRecover(IApplicationError error)
-    {
-        // Custom logic to determine if this strategy can recover the error
-        return base.CanRecover(error) && error.ErrorCode.StartsWith("CONFIG_");
-    }
-    
-    protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
-    {
-        // Custom recovery logic
-        Logger.Log($"Executing custom recovery for {error.ErrorCode}");
-        
-        // Perform recovery steps
-        await Task.Delay(1000, ct); // Simulated recovery operation
-        
-        return true; // Indicate if recovery was successful
-    }
+    // Attempt recovery
+    await recoveryOrchestrator.AttemptRecoveryAsync(componentError);
 }
 
-// Register the strategy with the service
-_recoveryService.RegisterStrategy(new MyCustomRecoveryStrategy(_logger));
+// Check recovery status
+if (componentError.IsUnrecoverable)
+{
+    Console.WriteLine("Error cannot be recovered automatically");
+}
+
+// Get exponential backoff delay for next attempt
+var backoffDelay = componentError.RecoveryBackoffInterval;
+Console.WriteLine($"Next recovery attempt in {backoffDelay.TotalSeconds} seconds");
 ```
 
-### Recovery Analytics
-
-To track recovery operations and analytics:
+### Creating Custom Recovery Strategies
 
 ```csharp
-// Get recovery history for a device
-var history = await _recoveryService.GetRecoveryHistoryAsync(deviceId, 20);
-
-// Get recovery statistics 
-var metrics = await _recoveryService.GetRecoveryStatisticsAsync(DateTimeOffset.UtcNow.AddDays(-7));
-
-foreach (var entry in metrics)
+public class CustomRecoveryStrategy : IRecoveryStrategy
 {
-    Console.WriteLine($"Error code: {entry.Key}");
-    Console.WriteLine($"  Success rate: {entry.Value.SuccessRate}%");
-    Console.WriteLine($"  Attempts: {entry.Value.TotalAttempts}");
-    Console.WriteLine($"  Most successful strategy: {entry.Value.MostSuccessfulStrategy}");
-    Console.WriteLine($"  Average recovery time: {entry.Value.AverageRecoveryTimeMs}ms");
+    private readonly ILogger _logger;
+    private readonly IMyService _service;
+    
+    public CustomRecoveryStrategy(ILogger logger, IMyService service)
+    {
+        _logger = logger;
+        _service = service;
+    }
+    
+    public string Name => "Custom Recovery Strategy";
+    
+    public bool CanRecover(IApplicationError error)
+    {  
+        // Determine if this strategy can handle this error type
+        return error.ErrorCode == "CUSTOM_ERROR_CODE" || 
+               error.ErrorCode?.StartsWith("CONFIG_") == true;
+    }
+    
+    public async Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default)
+    {
+        try
+        {
+            _logger.Log($"Attempting recovery for {error.ErrorCode} using {Name}");
+            
+            // Implement recovery logic
+            await _service.FixIssueAsync(error.DeviceId, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(ex, "Custom recovery failed");
+            return false;
+        }
+    }
 }
 
-// Check active recoveries
-var activeRecoveries = await _recoveryService.GetActiveRecoveriesAsync();
-bool isRecovering = _recoveryService.IsDeviceRecovering(deviceId);
+// Add the strategy to the orchestrator
+var orchestrator = new RecoveryOrchestrator(
+    logger, 
+    errorMonitor,
+    new List<IRecoveryStrategy>
+    {
+        new CustomRecoveryStrategy(logger, myService)
+    });
+```
+
+### Monitoring Recovery Attempts
+
+```csharp
+// Using the error monitor to track recovery attempts
+await errorMonitor.RegisterRecoveryAttemptAsync(
+    deviceId,
+    "DEVICE_OFFLINE",
+    isSuccessful: true);
+
+// Check device status
+var activeErrors = await errorMonitor.GetActiveErrorsForDeviceAsync(deviceId);
+if (activeErrors.Count > 0)
+{
+    Console.WriteLine($"Device has {activeErrors.Count} active errors");
+    foreach (var error in activeErrors)
+    {
+        Console.WriteLine($"{error.ErrorCode}: {error.Message}");
+        Console.WriteLine($"Recovery attempts: {(error as ComponentError)?.RecoveryAttemptCount ?? 0}");
+    }
+}
 ```
 
 ## Integration Examples
@@ -229,15 +267,15 @@ bool isRecovering = _recoveryService.IsDeviceRecovering(deviceId);
 public class PumpController : HydroGardenComponentBase
 {
     private readonly IErrorMonitor _errorMonitor;
-    private readonly IRecoveryOrchestrationService _recoveryService;
+    private readonly RecoveryOrchestrator _recoveryOrchestrator;
     
     public PumpController(
         IEventBus eventBus,
         IErrorMonitor errorMonitor,
-        IRecoveryOrchestrationService recoveryService) : base(eventBus)
+        RecoveryOrchestrator recoveryOrchestrator) : base(eventBus)
     {
         _errorMonitor = errorMonitor;
-        _recoveryService = recoveryService;
+        _recoveryOrchestrator = recoveryOrchestrator;
     }
     
     public async Task StartPumpAsync()
@@ -249,26 +287,38 @@ public class PumpController : HydroGardenComponentBase
         }
         catch (Exception ex)
         {
-            // Create and report the error
-            var error = new ComponentError
-            {
-                ErrorCode = "PUMP_START_FAILURE",
-                Message = ex.Message,
-                DeviceId = DeviceId,
-                Severity = ErrorSeverity.Critical,
-                Exception = ex,
-                Source = "PumpController"
-            };
+            // Create an error using the factory method
+            var error = ComponentError.CreateTransient(
+                deviceId: DeviceId,
+                errorCode: "PUMP_START_FAILURE",
+                message: ex.Message,
+                severity: ErrorSeverity.Critical,
+                source: ErrorSource.Device,
+                context: new Dictionary<string, object>
+                {
+                    { "AttemptCount", 1 },
+                    { "LastSuccessful", DateTime.UtcNow.AddDays(-1) }
+                },
+                exception: ex
+            );
             
             await _errorMonitor.ReportErrorAsync(error);
             
-            // Attempt recovery
-            var status = await _recoveryService.AttemptRecoveryAsync(error);
-            
-            if (status.IsSuccessful)
+            // Attempt recovery if possible
+            if (error.CanAttemptRecovery())
             {
-                // Retry the operation
-                await StartPumpAsync();
+                var success = await _recoveryOrchestrator.AttemptRecoveryAsync(error);
+                
+                if (success)
+                {
+                    // Retry the operation
+                    await StartPumpAsync();
+                }
+                else
+                {
+                    // Propagate the exception
+                    throw new DeviceOperationException("Failed to start pump after recovery attempts", ex);
+                }
             }
             else
             {
@@ -316,80 +366,174 @@ public class ErrorNotificationService
 
 ## Best Practices
 
-1. **Use Specific Error Codes**: Define clear, specific error codes for better classification and recovery.
+1. **Use Specific Error Codes**: Define clear, specific error codes with prefixes that help categorization:
+   - `DEVICE_*`: For hardware/physical device issues
+   - `SERVICE_*`: For software service issues
+   - `COMM_*`: For communication and networking issues
+   - `EVENT_*`: For event system issues
+   - `STORAGE_*`: For data persistence issues
+   - `RECOVERY_*`: For issues during recovery operations
 
 2. **Set Appropriate Severity Levels**: Use ErrorSeverity correctly to prioritize handling:
-   - `Critical`: System cannot function, immediate attention required
-   - `Error`: Significant issue affecting functionality but not system-wide
-   - `Warning`: Potential issue that may need attention
-   - `Information`: Non-problematic information
+   - `Catastrophic`: System stability is at risk, immediate action required
+   - `Critical`: Component needs external intervention
+   - `Error`: Operation failed but component can recover
+   - `Warning`: Operation can continue but attention may be needed
 
-3. **Provide Context in Errors**: Include relevant context in errors (device info, component state, etc.).
+3. **Provide Rich Context**: Include relevant context in errors to aid in diagnosis and recovery:
+   - Device state information
+   - Recent values and readings
+   - Connection status and history
+   - Previous recovery attempts
 
-4. **Implement Custom Recovery Strategies**: Create domain-specific recovery strategies for specialized components.
+4. **Classify Recoverability**: Correctly identify which errors can be automatically recovered:
+   - Use `isRecoverable` parameter appropriately
+   - Use factory methods (`CreateTransient()`, `CreateNonRecoverable()`) for common cases
+   - Consider `IsTransient` flag for errors that may resolve themselves
 
-5. **Maintain Error Correlation**: Use CorrelationId to track related errors across components.
+5. **Implement Strategic Recovery**: Develop targeted recovery strategies:
+   - Create specialized strategies for different error categories
+   - Order strategies by priority (simplest/least disruptive first)
+   - Respect backoff periods between recovery attempts
 
-6. **Monitor Recovery Statistics**: Regularly check recovery metrics to identify recurring issues.
+6. **Maintain Error Correlation**: Use CorrelationId to track related errors across components
 
-7. **Handle Unrecoverable Errors**: Have fallback plans for errors that cannot be automatically recovered.
+7. **Utilize Exponential Backoff**: Respect the backoff mechanism to avoid overwhelming components:
+   - Check `CanAttemptRecovery()` before attempting recovery
+   - Call `RecordRecoveryAttempt()` to update attempt counts
+   - Use `RecoveryBackoffInterval` to determine appropriate wait times
 
-8. **Set Reasonable Timeouts**: Configure appropriate timeouts for recovery operations based on complexity.
+8. **Handle Unrecoverable Errors**: Have fallback plans for errors that cannot be automatically recovered:
+   - Check `IsUnrecoverable` property to determine when to escalate
+   - Create alerts for human intervention when needed
+   - Document manual recovery procedures for operations staff
 
 ## Advanced Usage
 
-### Custom Error Taxonomy
+### Error Categorization
 
-The system includes a sophisticated error taxonomy system. To use it effectively:
+The system provides error categorization to help with diagnosis and recovery:
 
 ```csharp
-// Create an error profile for better recovery planning
-var errorProfile = ErrorTaxonomy.CreateErrorProfile(error);
+// Create an error with categorization
+var error = new ComponentError(
+    deviceId: deviceId,
+    errorCode: "DEVICE_OFFLINE",
+    message: "Device not responding",
+    severity: ErrorSeverity.Error,
+    isRecoverable: true,
+    source: ErrorSource.Device,
+    isTransient: true
+);
 
-// Manually set taxonomy attributes
-errorProfile[ErrorTaxonomy.ROOT_CAUSE] = ErrorTaxonomy.RootCause.HardwareFailure;
-errorProfile[ErrorTaxonomy.SYSTEM_IMPACT] = ErrorTaxonomy.SystemImpact.ComponentLevel;
-errorProfile[ErrorTaxonomy.RECOVERY_COMPLEXITY] = ErrorTaxonomy.RecoveryComplexity.Complex;
-errorProfile[ErrorTaxonomy.TIME_SENSITIVITY] = ErrorTaxonomy.TimeSensitivity.Urgent;
+// The error category is automatically derived from the error code prefix
+// DEVICE_* → ErrorCategory.Device
+// SERVICE_* → ErrorCategory.Service
+// COMM_* → ErrorCategory.Communication
+// EVENT_* → ErrorCategory.EventSystem
+// STORAGE_* → ErrorCategory.Storage
+// RECOVERY_* → ErrorCategory.Recovery
 
-// Analyze a specific aspect of an error
-var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
+// Access the derived category
+Console.WriteLine($"Error category: {error.Category}");
+
+// Use the category for filtering or specialized handling
+if (error.Category == ErrorCategory.Device)
+{
+    // Apply device-specific recovery processes
+}
 ```
 
-### Circuit Breaker Integration
+### Recovery Backoff and Retry Limiting
 
-Recovery strategies incorporate circuit breaker patterns:
+The system includes built-in support for exponential backoff and retry limiting:
 
 ```csharp
-// The circuit breaker is managed internally by the RecoveryOrchestrationService
-// It will automatically track failures and open the circuit after multiple failures
+// ComponentError implements exponential backoff with a cap at 10 minutes
+// The backoff formula: min(600, 2^min(attempts, 9)) seconds
 
-// Check if a strategy is being blocked by the circuit breaker
-var activeRecoveries = await _recoveryService.GetActiveRecoveriesAsync();
-var blockedByCircuit = activeRecoveries.Any(r => 
-    r.DeviceId == deviceId && 
-    r.Error.ErrorCode == errorCode && 
-    string.IsNullOrEmpty(r.CurrentStrategy));
+// Example backoff intervals:
+// Attempt 1: 2 seconds
+// Attempt 2: 4 seconds
+// Attempt 3: 8 seconds
+// Attempt 4: 16 seconds
+// And so on, capped at 600 seconds (10 minutes)
+
+// Get the current backoff interval
+var backoffInterval = componentError.RecoveryBackoffInterval;
+Console.WriteLine($"Wait time before next attempt: {backoffInterval.TotalSeconds} seconds");
+
+// Check if recovery should be attempted based on backoff and max attempts
+if (componentError.CanAttemptRecovery())
+{
+    await recoveryOrchestrator.AttemptRecoveryAsync(componentError);
+    componentError.RecordRecoveryAttempt();
+}
+else
+{
+    Console.WriteLine("Cannot attempt recovery: backoff period not elapsed or max attempts reached");
+}
 ```
 
-### Manual Recovery Plan Execution
+### Recovery Context Management
 
-For more control over recovery:
+The system supports rich context for errors and recovery operations:
 
 ```csharp
-// Create a recovery plan
-var plan = await _recoveryService.CreateRecoveryPlanAsync(error);
+// Create an error with context data
+var contextData = new Dictionary<string, object>
+{
+    { "DeviceType", "TemperatureSensor" },
+    { "LastReading", 24.5 },
+    { "ConnectionAttempts", 3 },
+    { "LastSeenTimestamp", DateTime.UtcNow.AddMinutes(-5) }
+};
 
-// Customize the plan
-plan.Strategies.Clear();
-plan.Strategies.Add(new RestartComponentStrategy(_logger));
-plan.Strategies.Add(new ReinitializeConfigurationStrategy(_logger));
-plan.MaxAttemptsPerStrategy = 2;
-plan.Timeout = TimeSpan.FromMinutes(1);
-plan.ContinueAfterSuccess = true; // Try all strategies even after one succeeds
+var error = new ComponentError(
+    deviceId: deviceId,
+    errorCode: "SENSOR_OFFLINE",
+    message: "Temperature sensor not responding",
+    severity: ErrorSeverity.Error,
+    isRecoverable: true,
+    source: ErrorSource.Device,
+    isTransient: true,
+    context: contextData
+);
 
-// Execute the customized plan
-var status = await _recoveryService.ExecuteRecoveryPlanAsync(plan);
+// The ComponentError automatically enriches the context with additional data:
+// - Timestamp
+// - ErrorId (CorrelationId)
+// - DeviceId
+// - ErrorCode
+// - ErrorCategory
+// - ExceptionType and InnerExceptionType if an exception is provided
+// - StackTraceHash if a stack trace is available
+
+// Access context data during recovery
+public class SensorRecoveryStrategy : IRecoveryStrategy
+{
+    // Implementation details omitted for brevity
+    
+    public async Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct)
+    {
+        // Extract context information to guide recovery
+        var deviceType = error.Context.TryGetValue("DeviceType", out var type) 
+            ? type.ToString() 
+            : "Unknown";
+            
+        var lastSeen = error.Context.TryGetValue("LastSeenTimestamp", out var timestamp)
+            ? (DateTime)timestamp
+            : DateTime.MinValue;
+            
+        // Use context to customize recovery approach
+        if (deviceType == "TemperatureSensor")
+        {
+            // Apply temperature sensor specific recovery
+        }
+        
+        return true;
+    }
+}
 ```
 
 This completes the usage guide for the Error Handling and Recovery Orchestration system. For more information, refer to the XML documentation in the code or contact the development team.

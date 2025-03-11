@@ -129,11 +129,16 @@ New component added in Phase 1 that handles bidirectional conversion between err
 - Event to error conversion
 - Correlation tracking
 - Error publishing as events
+- Error categorization and classification
 
 **Main Interfaces:**
 - `IErrorEventTransformationService`: Core transformation functionality
-- `ErrorEvent`: Model representing an error that can be converted to an event
-- `RecoveryEvent`: Model representing a recovery attempt
+- `IApplicationError`: Interface representing an application error
+- `IErrorMonitor`: Interface for error reporting and monitoring
+
+**Key Implementations:**
+- `ComponentError`: Enhanced error representation with recovery tracking
+- `ErrorMonitorBase`: Base implementation for error monitoring services
 
 **Event Classes:**
 - `ErrorOccurredEvent`: Event published when an error occurs
@@ -221,46 +226,52 @@ New component added in Phase 3 that orchestrates error recovery operations acros
 
 **Features:**
 - Coordinates recovery efforts using multiple strategies
-- Creates recovery plans based on error characteristics
+- Prioritizes recovery strategies based on error characteristics
 - Tracks recovery state and history
-- Provides analytics on recovery success rates
+- Prevents concurrent recovery attempts for the same device
 - Integrates with the Error-Event transformation service
 
 **Main Interfaces:**
-- `IRecoveryOrchestrationService`: Core recovery orchestration functionality
-- `RecoveryPlan`: Defines a plan for recovering from errors
-- `RecoveryStatus`: Reports outcome of recovery operations
-- `RecoveryMetrics`: Provides analytics about recovery effectiveness
+- `IRecoveryStrategy`: Interface for implementing recovery strategies
+- `RecoveryStrategyBase`: Base class for common recovery strategy functionality
 
-**Recovery Models:**
-- `ErrorTaxonomy`: Sophisticated error categorization system
-- `RecoveryRecord`: Historical record of recovery attempts
-- `ActiveRecoveryOperation`: Represents a recovery in progress
+**Key Implementations:**
+- `RecoveryOrchestrator`: Core orchestration logic for recovery operations
+- `ComponentError`: Enhanced error representation with recovery capabilities
+
+**Recovery Features:**
+- Exponential backoff for recovery attempts
+- Recovery attempt tracking and limiting
+- Prioritized strategy execution
+- Async/await pattern throughout recovery process
 
 **Recovery Strategies:**
-- `RestartComponentStrategy`: Recovers devices through restart cycles
-- `ReinitializeConfigurationStrategy`: Resets device configuration
-- Additional custom strategies can be implemented and registered
+- Priority-based strategy selection
+- Custom strategy support through IRecoveryStrategy interface
+- Strategy filtering based on error characteristics
 
 **Example Usage:**
 ```csharp
-// Attempt to recover from an error
-var recoveryStatus = await recoveryOrchestrationService.AttemptRecoveryAsync(error);
+// Create and configure the recovery orchestrator
+var recoveryOrchestrator = new RecoveryOrchestrator(
+    logger,
+    errorMonitor,
+    new List<IRecoveryStrategy>
+    {
+        new RestartDeviceStrategy(logger),
+        new ResetConfigurationStrategy(logger)
+    });
 
-if (recoveryStatus.IsSuccessful)
+// Attempt to recover from an error
+var success = await recoveryOrchestrator.AttemptRecoveryAsync(error);
+
+if (success)
 {
-    logger.Log($"Recovery successful using strategy: {recoveryStatus.SuccessfulStrategy}");
+    logger.Log("Recovery successful");
 }
 else
 {
     logger.Log("All recovery strategies failed");
-}
-
-// Get recovery statistics
-var metrics = await recoveryOrchestrationService.GetRecoveryStatisticsAsync(DateTime.UtcNow.AddDays(-7));
-foreach (var (errorCode, metric) in metrics)
-{
-    logger.Log($"Error {errorCode}: {metric.SuccessRate}% success rate");
 }
 ```
 

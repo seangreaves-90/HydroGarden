@@ -4,6 +4,57 @@ This document provides a comprehensive reference for the APIs provided by the Hy
 
 ## Core Interfaces
 
+### Error Handling Interfaces
+
+### IApplicationError
+
+Interface representing an application error that can be tracked and recovered from.
+
+```csharp
+public interface IApplicationError
+{
+    Guid DeviceId { get; }
+    string? ErrorCode { get; }
+    string Message { get; }
+    ErrorSeverity Severity { get; }
+    IDictionary<string, object> Context { get; }
+    DateTimeOffset Timestamp { get; }
+    Exception? Exception { get; }
+    Guid CorrelationId { get; }
+    ErrorSource Source { get; }
+    bool IsTransient { get; }
+    void RecordRecoveryAttempt();
+}
+```
+
+### IErrorMonitor
+
+Interface for reporting and monitoring errors throughout the system.
+
+```csharp
+public interface IErrorMonitor
+{
+    Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
+    Task<IReadOnlyCollection<IApplicationError>> GetActiveErrorsForDeviceAsync(Guid deviceId, CancellationToken ct = default);
+    Task<bool> HasActiveErrorsAsync(ErrorSeverity minSeverity = ErrorSeverity.Error, CancellationToken ct = default);
+    Task<IReadOnlyCollection<IApplicationError>> GetRecentErrorsAsync(int count = 20, CancellationToken ct = default);
+    Task RegisterRecoveryAttemptAsync(Guid deviceId, string errorCode, bool isSuccessful, CancellationToken ct = default);
+}
+```
+
+### IRecoveryStrategy
+
+Interface for implementing error recovery strategies.
+
+```csharp
+public interface IRecoveryStrategy
+{
+    string Name { get; }
+    bool CanRecover(IApplicationError error);
+    Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default);
+}
+```
+
 ### IHydroGardenComponent
 
 The base interface for all components in the system.
@@ -237,7 +288,57 @@ public interface IHydroGardenAlertEvent : IHydroGardenEvent
 }
 ```
 
-## Enumerations
+## Error Handling Enumerations
+
+### ErrorSeverity
+
+Represents the severity level of an error.
+
+```csharp
+public enum ErrorSeverity
+{
+    Warning,        // Operation can continue
+    Error,          // Operation failed but component can recover
+    Critical,       // Component needs external intervention
+    Catastrophic    // System stability is at risk
+}
+```
+
+### ErrorSource
+
+Classifies the source of an error.
+
+```csharp
+public enum ErrorSource
+{
+    Device,        // Hardware/IoT device errors
+    Service,       // Service/application logic errors
+    Communication, // Network/communication errors
+    UI,            // User interface errors
+    Database,      // Data persistence errors
+    Unknown        // Uncategorized errors
+}
+```
+
+### ErrorCategory
+
+Categorizes errors for better grouping and analysis.
+
+```csharp
+public enum ErrorCategory
+{
+    Unknown = 0,
+    Device = 10,
+    Service = 20,
+    Communication = 30,
+    EventSystem = 40,
+    Storage = 50,
+    Recovery = 60,
+    Security = 70
+}
+```
+
+## Component Enumerations
 
 ### ComponentState
 
