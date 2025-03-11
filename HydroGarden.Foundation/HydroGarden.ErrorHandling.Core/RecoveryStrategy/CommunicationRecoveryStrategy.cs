@@ -1,21 +1,4 @@
-                    // Try device's built-in recovery method first
-                    try
-                    {
-                        Logger.Log($"Attempting device's built-in recovery for {device.Id}");
-                        bool recoveryResult = await device.TryRecoverAsync(ct);
-                        
-                        if (recoveryResult)
-                        {
-                            Logger.Log($"Communication recovery successful for device {device.Id}");
-                            return true;
-                        }
-                        
-                        Logger.Log($"Failed to recover communication using device's built-in recovery");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log(ex, $"Error during communication recovery for device {device.Id}");
-                    }﻿using System.Net.NetworkInformation;
+﻿using System.Net.NetworkInformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
@@ -128,10 +111,32 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                     }
                 
                     Logger.Log($"Network connectivity verified for {ipAddress}");
-                
+                    
+                    // Try device's built-in recovery method first
+                    try
+                    {
+                        Logger.Log($"Attempting device's built-in recovery for {device.Id}");
+                        bool recoveryResult = await device.TryRecoverAsync(ct);
+                        
+                        if (recoveryResult)
+                        {
+                            Logger.Log($"Communication recovery successful for device {device.Id}");
+                            return true;
+                        }
+                        
+                        Logger.Log($"Failed to recover communication using device's built-in recovery");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log(ex, $"Error during communication recovery for device {device.Id}");
+                    }
+                    
+                    // If built-in recovery failed, try manual reset
+                    Logger.Log($"Attempting manual communication recovery for device {device.Id}");
+                    
                     // Step 2: Reset communication channel
                     await ResetCommunicationChannelAsync(device, ct);
-                
+                    
                     // Step 3: Test device communication
                     bool commTestSuccess = await TestDeviceCommunicationAsync(device, ct);
                     if (!commTestSuccess)
