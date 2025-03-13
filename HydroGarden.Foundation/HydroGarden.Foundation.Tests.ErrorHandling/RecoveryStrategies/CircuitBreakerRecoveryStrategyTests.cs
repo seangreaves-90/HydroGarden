@@ -41,6 +41,10 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             _mockServiceProvider.Setup(sp => sp.GetService(typeof(IResiliencePolicy)))
                 .Returns(_mockResiliencePolicy.Object);
                 
+            // Setup service provider to handle GetServices<object>()
+            _mockServiceProvider.Setup(sp => sp.GetServices(typeof(object)))
+                .Returns(new List<object>());
+                
             _strategy = new CircuitBreakerRecoveryStrategy(_mockLogger.Object, _mockServiceProvider.Object);
         }
 
@@ -125,8 +129,9 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 ErrorSource.Device,
                 false);
 
-            // Configure context to contain the service key
+            // Configure context to contain the service key and circuit breaker type
             error.Context["ServiceKey"] = "TestService";
+            error.Context["CircuitBreakerType"] = "TestCircuitBreaker";
 
             // Create a mock middleware that transitions to HalfOpen when reset
             var mockMiddleware = new Mock<ICircuitBreakerMiddleware>();
@@ -142,8 +147,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             
             // Replace the middleware in the service provider
             _mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t == typeof(TestableCircuitBreakerMiddleware) || 
-                                                                 t == typeof(CircuitBreakerMiddleware) ||
-                                                                 t == typeof(ICircuitBreakerMiddleware))))
+                                                                   t == typeof(CircuitBreakerMiddleware) ||
+                                                                   t == typeof(ICircuitBreakerMiddleware))))
                 .Returns(mockMiddleware.Object);
 
             // Act
@@ -193,8 +198,9 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 ErrorSource.Device,
                 false);
 
-            // Configure context to contain the service key
+            // Configure context to contain the service key and circuit breaker type
             error.Context["ServiceKey"] = "TestService";
+            error.Context["CircuitBreakerType"] = "TestCircuitBreaker";
 
             // For this test, create a mocked middleware that doesn't change state on reset
             // Create a stubborn middleware that stays in Open state
@@ -237,8 +243,9 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 ErrorSource.Device,
                 false);
 
-            // Configure context to contain the service key
+            // Configure context to contain the service key and circuit breaker type
             error.Context["ServiceKey"] = "TestService";
+            error.Context["CircuitBreakerType"] = "TestCircuitBreaker";
 
             // Configure a middleware that transitions to HalfOpen on reset
             var transitioningMiddleware = new Mock<TestableCircuitBreakerMiddleware>() { CallBase = true };
@@ -254,7 +261,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 
             // Replace the middleware in the service provider
             _mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t == typeof(TestableCircuitBreakerMiddleware) || 
-                                                                   t == typeof(CircuitBreakerMiddleware))))
+                                                                   t == typeof(CircuitBreakerMiddleware) ||
+                                                                   t == typeof(ICircuitBreakerMiddleware))))
                 .Returns(transitioningMiddleware.Object);
 
             // Act
@@ -280,8 +288,9 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 ErrorSource.Device,
                 false);
 
-            // Configure context to contain the service key
+            // Configure context to contain the service key and circuit breaker type
             error.Context["ServiceKey"] = "TestService";
+            error.Context["CircuitBreakerType"] = "TestCircuitBreaker";
 
             // Configure middleware to throw exception
             var throwingMiddleware = new Mock<ICircuitBreakerMiddleware>();
@@ -293,7 +302,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
                 
             // Replace the middleware in the service provider
             _mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t == typeof(TestableCircuitBreakerMiddleware) || 
-                                                                   t == typeof(CircuitBreakerMiddleware))))
+                                                                   t == typeof(CircuitBreakerMiddleware) ||
+                                                                   t == typeof(ICircuitBreakerMiddleware))))
                 .Returns(throwingMiddleware.Object);
 
             // Act

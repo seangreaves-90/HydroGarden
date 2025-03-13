@@ -46,5 +46,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Models
         /// Gets or sets additional details about the recovery operation.
         /// </summary>
         public string? Details { get; set; }
+
+        public bool IsRecovering { get; set; }
     }
 }

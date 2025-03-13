@@ -6,7 +6,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
     /// <summary>
     /// A mock implementation of IRecoveryStrategy for testing purposes.
     /// </summary>
-    public class MockRecoveryStrategy : IRecoveryStrategy
+    public class MockRecoveryStrategy : ITestableRecoveryStrategy
     {
         /// <summary>
         /// Gets the name of this recovery strategy.
@@ -34,6 +34,14 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
         public List<IApplicationError?> AttemptedRecoveries { get; } = new();
 
         /// <summary>
+        /// Records that a recovery attempt was made for this error.
+        /// </summary>
+        public void RecordAttemptedRecovery(IApplicationError? error)
+        {
+            AttemptedRecoveries.Add(error);
+        }
+
+        /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
         public bool CanRecover(IApplicationError? error) => CanRecoverValue;
@@ -43,7 +51,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
         /// </summary>
         public Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
         {
-            AttemptedRecoveries.Add(error);
+            // Note: We don't need to add to AttemptedRecoveries here as it's handled by RecordAttemptedRecovery
+            // which is called by the orchestrator before this method
 
             if (ThrowExceptionOnRecovery)
             {
@@ -57,12 +66,13 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
     /// <summary>
     /// A configurable mock recovery strategy that can simulate different recovery behaviors.
     /// </summary>
-    public class ConfigurableMockRecoveryStrategy : IRecoveryStrategy
+    public class ConfigurableMockRecoveryStrategy : ITestableRecoveryStrategy
     {
         private readonly Func<IApplicationError?, bool> _canRecoverFunc;
         private readonly Func<IApplicationError?, CancellationToken, Task<bool>> _attemptRecoveryFunc;
 
         public string Name { get; }
+        public List<IApplicationError?> AttemptedRecoveries { get; } = new();
 
         public ConfigurableMockRecoveryStrategy(
             string name,
@@ -78,5 +88,10 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
 
         public Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default) =>
             _attemptRecoveryFunc(error, ct);
+            
+        public void RecordAttemptedRecovery(IApplicationError? error)
+        {
+            AttemptedRecoveries.Add(error);
+        }
     }
 }

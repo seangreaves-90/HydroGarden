@@ -34,5 +34,7 @@
         public int SuccessCount { get; set; }
 
         public DateTimeOffset LastAttempt { get; set; }
+
+        public bool IsRecovering { get; set; }
     }
 }

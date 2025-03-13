@@ -54,7 +54,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
     /// </summary>
     public override bool CanRecover(IApplicationError? error)
     {
-        if (!base.CanRecover(error) || error == null)
+        if (error == null || !base.CanRecover(error))
             return false;
             
         // Handle specific circuit breaker error codes
@@ -105,16 +105,18 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
             // Handle circuit breaker for testing
             if (!string.IsNullOrEmpty(serviceKey))
             {
-                var testCircuitBreaker = _serviceProvider.GetService<ICircuitBreakerMiddleware>();
+                var testCircuitBreaker = _serviceProvider.GetService(typeof(ICircuitBreakerMiddleware)) as ICircuitBreakerMiddleware;
                 if (testCircuitBreaker != null)
                 {
                     Logger.Log($"Attempting to reset circuit for service {serviceKey}");
-                    var state = testCircuitBreaker.GetCircuitState(serviceKey).ToString();
+                    var stateObj = testCircuitBreaker.GetCircuitState(serviceKey);
+                    var state = stateObj.ToString();
                     Logger.Log($"Current circuit state for {serviceKey}: {state}");
                     
                     testCircuitBreaker.ResetCircuit(serviceKey);
                     
-                    var newState = testCircuitBreaker.GetCircuitState(serviceKey).ToString();
+                    var newStateObj = testCircuitBreaker.GetCircuitState(serviceKey);
+                    var newState = newStateObj.ToString();
                     Logger.Log($"New circuit state for {serviceKey}: {newState}");
                     
                     return !newState.Contains("Open") || newState.Contains("HalfOpen");
@@ -178,7 +180,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
         try
         {
             // Try to get the circuit breaker middleware from the service provider
-            var circuitBreaker = _serviceProvider.GetService<ICircuitBreakerMiddleware>();
+            var circuitBreaker = _serviceProvider.GetService(typeof(ICircuitBreakerMiddleware)) as ICircuitBreakerMiddleware;
             if (circuitBreaker == null)
             {
                 // Try the real implementation
@@ -216,7 +218,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
             if (!string.IsNullOrEmpty(eventType) && Enum.TryParse<EventType>(eventType, true, out var parsedEventType))
             {
                 var stateVal = circuitBreaker.GetCircuitState(parsedEventType.ToString());
-                var currentState = stateVal.ToString();
+                var currentState = stateVal?.ToString() ?? "Unknown";
                 
                 // In test cases, state is returned as an enum, in real implementation as a string
                 if (currentState.Contains("Open"))
@@ -225,7 +227,8 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
                     circuitBreaker.ResetCircuit(parsedEventType.ToString());
                     
                     // Check if state changed
-                    var newState = circuitBreaker.GetCircuitState(parsedEventType.ToString()).ToString();
+                    var newStateObj = circuitBreaker.GetCircuitState(parsedEventType.ToString());
+                    var newState = newStateObj?.ToString() ?? "Unknown";
                     Logger.Log($"Circuit state after reset for event type {eventType}: {newState}");
                     return !newState.Contains("Open") || newState.Contains("HalfOpen");
                 }
@@ -239,7 +242,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
             foreach (EventType commonType in Enum.GetValues(typeof(EventType)))
             {
                 var stateVal = circuitBreaker.GetCircuitState(commonType.ToString());
-                var state = stateVal.ToString();
+                var state = stateVal?.ToString() ?? "Unknown";
                 
                 if (state.Contains("Open"))
                 {
@@ -247,7 +250,8 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
                     circuitBreaker.ResetCircuit(commonType.ToString());
                     
                     // Check if state changed
-                    var newState = circuitBreaker.GetCircuitState(commonType.ToString()).ToString();
+                    var newStateObj = circuitBreaker.GetCircuitState(commonType.ToString());
+                    var newState = newStateObj?.ToString() ?? "Unknown";
                     anyReset = !newState.Contains("Open") || newState.Contains("HalfOpen");
                 }
             }

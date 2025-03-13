@@ -46,21 +46,18 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
     /// <returns>True if this strategy can recover from the error, false otherwise.</returns>
     public virtual bool CanRecover(IApplicationError? error)
     {
-        switch (error)
-        {
-            case null:
-            // Check if it's a non-recoverable error
-            case ComponentError { IsUnrecoverable: true }:
-                return false;
-            default:
-            {
-                // Get the root cause
-                var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
-        
-                // Check if this strategy supports the root cause
-                return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
-            }
-        }
+        // Check for null or unrecoverable errors
+        if (error == null)
+            return false;
+            
+        if (error is ComponentError componentError && componentError.IsUnrecoverable)
+            return false;
+            
+        // Get the root cause
+        var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
+
+        // Check if this strategy supports the root cause
+        return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
     }
 
     /// <summary>
@@ -138,7 +135,7 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Exception during recovery for device {error.DeviceId} using strategy '{Name}'");
-                        Logger.Log(ex, $"Exception during recovery attempt");
+                Logger.Log(ex, $"Exception during recovery attempt");
                 return false;
             }
         }

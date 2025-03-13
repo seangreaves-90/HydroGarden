@@ -89,7 +89,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (device == null)
                 {
                     Logger.Log($"Device {error.DeviceId} not found");
-                    Logger.Log($"Device not found for configuration reset: {error.DeviceId}");
+                    Logger.Log($"Device not found");
                     return false;
                 }
                 
@@ -143,6 +143,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             }
             catch (Exception ex)
             {
+                Logger.Log(ex, $"Error during configuration reset");
                 Logger.Log(ex, $"Error during configuration recovery for device {error.DeviceId}");
                 Logger.Log(ex, $"Error during configuration reset");
                 return false;
