@@ -58,37 +58,37 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// </summary>
         public override bool SupportsErrorType(IApplicationError? error)
         {
-        if (error == null)
-            return false;
+            if (error == null)
+                return false;
         
-        // We can handle certain configuration errors even if they're marked as unrecoverable
-        if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
-            error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
-            return true;
+            // We can handle certain configuration errors
+            if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
+                error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
+                return true;
         
-        // For other errors, check against supported root causes
-        var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
-        return SupportedRootCauses.Contains(rootCause);
-    }
+            // For other errors, check against supported root causes
+            var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
+            return SupportedRootCauses.Contains(rootCause);
+        }
 
         public override bool CanRecover(IApplicationError? error)
         {
-        if (error == null)
-            return false;
+            if (error == null)
+                return false;
                 
-        // We can handle certain configuration errors even if they're marked as unrecoverable
-        if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
-            error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
-            return true;
+            // We can handle configuration errors even if normally unrecoverable
+            if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
+                error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
+                return true;
                 
-        // For other errors, check if it's unrecoverable
-        if (error is ComponentError componentError && componentError.IsUnrecoverable)
-            return false;
+            // For other errors, check if it's unrecoverable
+            if (error is ComponentError componentError && componentError.IsUnrecoverable)
+                return false;
                 
-        // Root cause from taxonomy analysis
-        var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
-        return SupportedRootCauses.Contains(rootCause);
-    }
+            // Root cause from taxonomy analysis
+            var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
+            return SupportedRootCauses.Contains(rootCause);
+        }
 
         /// <summary>
         /// Attempts to reinitialize the device configuration to recover from the error.

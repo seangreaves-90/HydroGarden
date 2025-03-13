@@ -173,10 +173,8 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
             status.AttemptCount++;
             status.LastAttempt = DateTimeOffset.UtcNow;
 
-            if (error is ComponentError errorComp)
-            {
-                errorComp.RecordRecoveryAttempt();
-            }
+            // Note: We already recorded an attempt directly on the error object earlier
+            // No need to do it twice
 
             Logger.Log($"Attempting recovery for device {error.DeviceId} using strategy '{Name}' (attempt {status.AttemptCount})");
 

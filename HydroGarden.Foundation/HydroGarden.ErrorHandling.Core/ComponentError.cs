@@ -162,9 +162,9 @@ namespace HydroGarden.Foundation.ErrorHandling
 
         /// <summary>
         /// Reports if the error is unrecoverable, meaning no recovery should be attempted.
-        /// This property is maintained for backward compatibility.
+        /// This includes explicitly unrecoverable errors and those that have reached max attempts.
         /// </summary>
-        public bool IsUnrecoverable => !IsRecoverable || ErrorCodes.IsUnrecoverable(ErrorCode);
+        public bool IsUnrecoverable => !IsRecoverable || ErrorCodes.IsUnrecoverable(ErrorCode) || RecoveryAttemptCount >= MaxRecoveryAttempts;
 
         /// <summary>
         /// Enriches the context with additional diagnostic information.

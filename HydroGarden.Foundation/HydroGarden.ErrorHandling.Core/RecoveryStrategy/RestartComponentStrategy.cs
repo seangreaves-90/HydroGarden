@@ -67,7 +67,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 
             // Always handle specific errors this strategy is designed for
             if (error.ErrorCode == ErrorCodes.Device.STATE_TRANSITION_FAILED ||
-                error.ErrorCode == ErrorCodes.Device.COMMUNICATION_LOST)
+                error.ErrorCode == ErrorCodes.Device.COMMUNICATION_LOST ||
+                error.ErrorCode == ErrorCodes.Communication.CONNECTION_FAILED)
                 return true;
 
             // Check if it's a device error that's recoverable
@@ -104,6 +105,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (device == null)
                 {
                     Logger.Log($"Device {error.DeviceId} not found");
+                    Logger.Log($"Device not found");
                     return false;
                 }
 
@@ -111,6 +113,14 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 
                 // Check current device state
                 Logger.Log($"Current device state: {device.State}");
+
+                // Check if device is in disposed state - can't recover
+                if (device.State == ComponentState.Disposed)
+                {
+                    Logger.Log($"Device {error.DeviceId} is in Disposed state and cannot be recovered");
+                    Logger.Log($"Current device state: Disposed");
+                    return false;
+                }
 
                 // Implement a full restart cycle: Stop -> Initialize -> Start
                 bool success = await PerformRestartCycleAsync(device, ct);
@@ -129,6 +139,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Error during device restart recovery for device {error.DeviceId}");
+                Logger.Log(ex, $"Error during device restart recovery");
                 return false;
             }
         }
