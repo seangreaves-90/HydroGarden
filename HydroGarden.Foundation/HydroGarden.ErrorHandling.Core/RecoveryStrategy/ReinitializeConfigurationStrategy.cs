@@ -89,7 +89,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (device == null)
                 {
                     Logger.Log($"Device {error.DeviceId} not found");
-                    Logger.Log($"Device not found");
+                    Logger.Log("Device not found");
                     return false;
                 }
                 
@@ -135,17 +135,17 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 Logger.Log($"Restarting device {device.Id} after configuration reset");
                 await device.StartAsync(ct);
                 
-                // Check if device started successfully
-                bool success = device.State == ComponentState.Running;
+                // Check if device is in a valid state
+                bool success = device.State == ComponentState.Running || device.State == ComponentState.Ready;
                 
                 Logger.Log($"Configuration reset successful");
-                return true;
+                return success;
             }
             catch (Exception ex)
             {
-                Logger.Log(ex, $"Error during configuration reset");
+                Logger.Log(ex, "Error during configuration reset");
                 Logger.Log(ex, $"Error during configuration recovery for device {error.DeviceId}");
-                Logger.Log(ex, $"Error during configuration reset");
+                Logger.Log(ex, "Error during configuration reset");
                 return false;
             }
         }

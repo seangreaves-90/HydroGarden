@@ -1,5 +1,6 @@
 using HydroGarden.Foundation.ErrorHandling.Exceptions;
 using HydroGarden.Foundation.ErrorHandling.Interfaces;
+using System.Collections.Generic;
 
 namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
 {

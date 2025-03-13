@@ -41,8 +41,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             _mockServiceProvider.Setup(sp => sp.GetService(typeof(IResiliencePolicy)))
                 .Returns(_mockResiliencePolicy.Object);
                 
-            // Setup service provider to handle GetServices<object>()
-            _mockServiceProvider.Setup(sp => sp.GetServices(typeof(object)))
+            // Create a method to handle GetServices (needed to avoid extension method mocking issues)
+            _mockServiceProvider.Setup(sp => sp.GetService(typeof(IEnumerable<object>)))
                 .Returns(new List<object>());
                 
             _strategy = new CircuitBreakerRecoveryStrategy(_mockLogger.Object, _mockServiceProvider.Object);

@@ -74,7 +74,7 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
         if (error is ComponentError componentError && !componentError.CanAttemptRecovery())
         {
             Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed or max attempts reached");
-            Logger.Log($"Cannot attempt recovery");
+            Logger.Log("Cannot attempt recovery");
             return false;
         }
 
