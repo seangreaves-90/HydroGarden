@@ -1,6 +1,7 @@
 using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.Tests.ErrorHandling.Mocks;
@@ -426,6 +427,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Components
 
         public string Name { get; }
         public int Priority { get; set; } = 100;
+        public ErrorTaxonomy.RecoveryComplexity ComplexityLevel { get; set; } = ErrorTaxonomy.RecoveryComplexity.Simple;
+        public ErrorTaxonomy.RootCause[] SupportedRootCauses { get; set; } = { ErrorTaxonomy.RootCause.Unknown };
         public List<IApplicationError?> AttemptedRecoveries { get; } = new();
 
         public ConfigurableMockRecoveryStrategy(
@@ -438,6 +441,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Components
             _attemptRecoveryFunc = attemptRecoveryFunc;
         }
 
+        public bool SupportsErrorType(IApplicationError? error) => _canRecoverFunc(error);
+        
         public bool CanRecover(IApplicationError? error) => _canRecoverFunc(error);
 
         public Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default) =>

@@ -1,5 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.ErrorHandling.Common;
@@ -55,24 +56,39 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
         /// </summary>
+        public override bool SupportsErrorType(IApplicationError? error)
+        {
+        if (error == null)
+            return false;
+        
+        // We can handle certain configuration errors even if they're marked as unrecoverable
+        if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
+            error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
+            return true;
+        
+        // For other errors, check against supported root causes
+        var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
+        return SupportedRootCauses.Contains(rootCause);
+    }
+
         public override bool CanRecover(IApplicationError? error)
         {
-            if (error == null)
-                return false;
+        if (error == null)
+            return false;
                 
-            // We can handle certain configuration errors even if they're marked as unrecoverable
-            if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
-                error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
-                return true;
+        // We can handle certain configuration errors even if they're marked as unrecoverable
+        if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
+            error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
+            return true;
                 
-            // For other errors, check if it's unrecoverable
-            if (error is ComponentError componentError && componentError.IsUnrecoverable)
-                return false;
+        // For other errors, check if it's unrecoverable
+        if (error is ComponentError componentError && componentError.IsUnrecoverable)
+            return false;
                 
-            // Root cause from taxonomy analysis
-            var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
-            return SupportedRootCauses.Contains(rootCause);
-        }
+        // Root cause from taxonomy analysis
+        var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
+        return SupportedRootCauses.Contains(rootCause);
+    }
 
         /// <summary>
         /// Attempts to reinitialize the device configuration to recover from the error.
@@ -84,7 +100,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 
             try
             {
-                // Try to retrieve the device
+                // Step 1: Retrieve the device
                 var device = await GetDeviceAsync(error.DeviceId, ct);
                 if (device == null)
                 {
@@ -95,26 +111,59 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 
                 Logger.Log($"Retrieved device {error.DeviceId} ({device.Name}) for configuration recovery");
 
-                // Step 1: Stop the device
-                if (device.State == ComponentState.Running)
-                {
-                    Logger.Log($"Stopping device {device.Id} before configuration reset");
-                    await device.StopAsync(ct);
-                    
-                    // Wait for device to fully stop
-                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                }
+                // Step 2: Stop device if running
+                await SafeStopDeviceAsync(device, ct);
                 
-                // Step 2: Get default configuration values
+                // Step 3: Get default configuration values
                 var defaultConfig = await GetDefaultConfigurationAsync(device, ct);
                 if (defaultConfig == null || !defaultConfig.Any())
                 {
                     Logger.Log($"No default configuration found for device {device.Id}");
-                    Logger.Log($"No default properties found");
+                    Logger.Log("No default properties found");
                     return false;
                 }
                 
-                // Step 3: Apply default configuration
+                // Step 4: Reset and restart device
+                return await ResetAndRestartDeviceAsync(device, defaultConfig, ct);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(ex, "Error during configuration reset");
+                Logger.Log(ex, $"Error during configuration recovery for device {error.DeviceId}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Safely stops a device before configuration reset.
+        /// </summary>
+        private async Task SafeStopDeviceAsync(IIoTDevice device, CancellationToken ct)
+        {
+            if (device.State != ComponentState.Running)
+                return;
+                
+            try
+            {
+                Logger.Log($"Stopping device {device.Id} before configuration reset");
+                await device.StopAsync(ct);
+                
+                // Wait for device to fully stop
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(ex, $"Error stopping device {device.Id}");
+            }
+        }
+        
+        /// <summary>
+        /// Resets device configuration and restarts it.
+        /// </summary>
+        private async Task<bool> ResetAndRestartDeviceAsync(IIoTDevice device, IDictionary<string, object> defaultConfig, CancellationToken ct)
+        {
+            try
+            {
+                // Step 1: Apply default configuration
                 bool configApplied = await ApplyDefaultConfigurationAsync(device, defaultConfig, ct);
                 if (!configApplied)
                 {
@@ -122,30 +171,29 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                     return false;
                 }
                 
-                // Step 4: Reinitialize and restart the device
+                // Step 2: Reinitialize the device
                 Logger.Log($"Reinitializing device {device.Id} with default configuration");
                 await device.InitializeAsync(ct);
                 
-                if (device.State != ComponentState.Ready)
+                if (device.State != ComponentState.Ready && device.State != ComponentState.Running)
                 {
                     Logger.Log($"Device initialization failed after configuration reset. State: {device.State}");
                     return false;
                 }
                 
-                Logger.Log($"Restarting device {device.Id} after configuration reset");
-                await device.StartAsync(ct);
+                // Step 3: Restart if needed
+                if (device.State == ComponentState.Ready)
+                {
+                    Logger.Log($"Restarting device {device.Id} after configuration reset");
+                    await device.StartAsync(ct);
+                }
                 
-                // Check if device is in a valid state
-                bool success = device.State == ComponentState.Running || device.State == ComponentState.Ready;
-                
-                Logger.Log($"Configuration reset successful");
-                return success;
+                Logger.Log("Configuration reset successful");
+                return true;
             }
             catch (Exception ex)
             {
-                Logger.Log(ex, "Error during configuration reset");
-                Logger.Log(ex, $"Error during configuration recovery for device {error.DeviceId}");
-                Logger.Log(ex, "Error during configuration reset");
+                Logger.Log(ex, $"Error during device reset and restart: {device.Id}");
                 return false;
             }
         }
@@ -160,11 +208,28 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // First try to get the device directly
                 var device = await _persistenceService.GetPropertyAsync<IIoTDevice>(deviceId, "Device", ct);
                 if (device != null)
+                {
+                    Logger.Log($"Retrieved device {deviceId} directly");
                     return device;
+                }
 
+                Logger.Log($"Device {deviceId} not found directly, checking device collection");
+                
                 // If that fails, try to find it in the device collection
                 var devices = await _persistenceService.GetPropertyAsync<IEnumerable<IIoTDevice>>(Guid.Empty, "Devices", ct);
-                return devices?.FirstOrDefault(d => d.Id == deviceId);
+                var foundDevice = devices?.FirstOrDefault(d => d.Id == deviceId);
+                
+                if (foundDevice == null)
+                {
+                    Logger.Log($"Device {deviceId} not found in device collection");
+                    Logger.Log("Device not found");
+                }
+                else
+                {
+                    Logger.Log($"Found device {deviceId} in device collection");
+                }
+                
+                return foundDevice;
             }
             catch (Exception ex)
             {
@@ -181,18 +246,21 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             try
             {
                 // First try device-specific default configuration
-                var deviceTypeConfig = await _persistenceService.GetPropertyAsync<IDictionary<string, object>>(
+                Logger.Log($"Looking for device-specific configuration for {device.Id}");
+                var deviceConfig = await _persistenceService.GetPropertyAsync<IDictionary<string, object>>(
                     device.Id, 
                     "DefaultProperties", 
                     ct);
                     
-                if (deviceTypeConfig != null && deviceTypeConfig.Any())
+                if (deviceConfig != null && deviceConfig.Any())
                 {
-                    return deviceTypeConfig;
+                    Logger.Log($"Found device-specific configuration with {deviceConfig.Count} properties");
+                    return deviceConfig;
                 }
                 
                 // If that fails, try to get default configuration by device type
                 var deviceType = device.GetType().Name;
+                Logger.Log($"Looking for type-specific configuration for {deviceType}");
                 var typeConfig = await _persistenceService.GetPropertyAsync<IDictionary<string, object>>(
                     Guid.Empty, 
                     $"DefaultConfiguration_{deviceType}", 
@@ -200,23 +268,28 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                     
                 if (typeConfig != null && typeConfig.Any())
                 {
+                    Logger.Log($"Found type-specific configuration with {typeConfig.Count} properties");
                     return typeConfig;
                 }
                 
                 // If that fails, use hardcoded defaults based on device type
+                Logger.Log($"Using hardcoded defaults for {deviceType}");
                 var defaults = CreateHardcodedDefaults(device);
                 
                 if (defaults == null || !defaults.Any())
                 {
                     Logger.Log("No default properties found for device configuration reset");
                     Logger.Log("No default properties found");
+                    return null;
                 }
                 
+                Logger.Log($"Created {defaults.Count} hardcoded default properties");
                 return defaults;
             }
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Error retrieving default configuration for device {device.Id}");
+                Logger.Log(ex, "Exception during configuration reset");
                 return null;
             }
         }

@@ -1,5 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 
 namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
 {
@@ -12,6 +13,21 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
         /// Gets the name of this recovery strategy.
         /// </summary>
         public virtual string Name { get; } = "MockRecoveryStrategy";
+
+        /// <summary>
+        /// Gets the execution priority of this strategy.
+        /// </summary>
+        public virtual int Priority { get; set; } = 100;
+
+        /// <summary>
+        /// Gets the complexity level this strategy can handle.
+        /// </summary>
+        public virtual ErrorTaxonomy.RecoveryComplexity ComplexityLevel { get; set; } = ErrorTaxonomy.RecoveryComplexity.Simple;
+
+        /// <summary>
+        /// Gets the root causes this strategy can address.
+        /// </summary>
+        public virtual ErrorTaxonomy.RootCause[] SupportedRootCauses { get; set; } = { ErrorTaxonomy.RootCause.Unknown };
 
         /// <summary>
         /// Gets or sets a value indicating whether the strategy can recover from errors.
@@ -40,6 +56,11 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
         {
             AttemptedRecoveries.Add(error);
         }
+
+        /// <summary>
+        /// Determines if this strategy supports the given error type.
+        /// </summary>
+        public virtual bool SupportsErrorType(IApplicationError? error) => CanRecoverValue;
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
@@ -72,7 +93,10 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
         private readonly Func<IApplicationError?, CancellationToken, Task<bool>> _attemptRecoveryFunc;
 
         public string Name { get; }
-        public List<IApplicationError?> AttemptedRecoveries { get; } = new();
+        public int Priority { get; set; } = 100;
+        public ErrorTaxonomy.RecoveryComplexity ComplexityLevel { get; set; } = ErrorTaxonomy.RecoveryComplexity.Simple;
+        public ErrorTaxonomy.RootCause[] SupportedRootCauses { get; set; } = { ErrorTaxonomy.RootCause.Unknown };
+    public List<IApplicationError?> AttemptedRecoveries { get; } = new();
 
         public ConfigurableMockRecoveryStrategy(
             string name,
@@ -83,6 +107,8 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Mocks
             _canRecoverFunc = canRecoverFunc;
             _attemptRecoveryFunc = attemptRecoveryFunc;
         }
+
+        public bool SupportsErrorType(IApplicationError? error) => _canRecoverFunc(error);
 
         public bool CanRecover(IApplicationError? error) => _canRecoverFunc(error);
 

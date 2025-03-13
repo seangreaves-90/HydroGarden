@@ -1,5 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
@@ -45,14 +46,14 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// <summary>
         /// Root causes this strategy can address.
         /// </summary>
-        public override ErrorTaxonomy.RootCause[] SupportedRootCauses => new[]
-        {
+        public override ErrorTaxonomy.RootCause[] SupportedRootCauses =>
+        [
             ErrorTaxonomy.RootCause.InvalidState,
             ErrorTaxonomy.RootCause.ConnectionTimeout,
             ErrorTaxonomy.RootCause.NetworkFailure,
             ErrorTaxonomy.RootCause.MemoryExhaustion,
             ErrorTaxonomy.RootCause.ResourceExhaustion
-        };
+        ];
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.

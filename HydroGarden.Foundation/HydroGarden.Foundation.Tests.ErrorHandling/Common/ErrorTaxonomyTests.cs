@@ -1,5 +1,6 @@
 using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using Xunit;
@@ -17,16 +18,16 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
         public void AnalyzeRootCause_WithValidErrorCode_ShouldReturnCorrectCause()
         {
             // Arrange & Act & Assert - Test various error codes
-            ErrorTaxonomy.AnalyzeRootCause(ErrorCodes.Device.HARDWARE_FAILURE)
+            ErrorTaxonomyExtensions.AnalyzeRootCause(ErrorCodes.Device.HARDWARE_FAILURE)
                 .Should().Be(ErrorTaxonomy.RootCause.HardwareFailure);
 
-            ErrorTaxonomy.AnalyzeRootCause(ErrorCodes.Device.SENSOR_MALFUNCTION)
+            ErrorTaxonomyExtensions.AnalyzeRootCause(ErrorCodes.Device.SENSOR_MALFUNCTION)
                 .Should().Be(ErrorTaxonomy.RootCause.SensorMalfunction);
 
-            ErrorTaxonomy.AnalyzeRootCause(ErrorCodes.Communication.CONNECTION_FAILED)
+            ErrorTaxonomyExtensions.AnalyzeRootCause(ErrorCodes.Communication.CONNECTION_FAILED)
                 .Should().Be(ErrorTaxonomy.RootCause.NetworkFailure);
 
-            ErrorTaxonomy.AnalyzeRootCause(ErrorCodes.Communication.TIMEOUT)
+            ErrorTaxonomyExtensions.AnalyzeRootCause(ErrorCodes.Communication.TIMEOUT)
                 .Should().Be(ErrorTaxonomy.RootCause.ConnectionTimeout);
         }
 
@@ -34,47 +35,47 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
         public void AnalyzeRootCause_WithNullOrEmptyErrorCode_ShouldReturnUnknown()
         {
             // Arrange & Act & Assert
-            ErrorTaxonomy.AnalyzeRootCause(null).Should().Be(ErrorTaxonomy.RootCause.Unknown);
-            ErrorTaxonomy.AnalyzeRootCause(string.Empty).Should().Be(ErrorTaxonomy.RootCause.Unknown);
+            ErrorTaxonomyExtensions.AnalyzeRootCause(null).Should().Be(ErrorTaxonomy.RootCause.Unknown);
+            ErrorTaxonomyExtensions.AnalyzeRootCause(string.Empty).Should().Be(ErrorTaxonomy.RootCause.Unknown);
         }
 
         [Fact]
         public void AnalyzeRootCause_WithUnrecognizedErrorCode_ShouldReturnUnknown()
         {
             // Arrange & Act & Assert
-            ErrorTaxonomy.AnalyzeRootCause("UNRECOGNIZED_ERROR_CODE").Should().Be(ErrorTaxonomy.RootCause.Unknown);
+            ErrorTaxonomyExtensions.AnalyzeRootCause("UNRECOGNIZED_ERROR_CODE").Should().Be(ErrorTaxonomy.RootCause.Unknown);
         }
 
         [Fact]
         public void DetermineSystemImpact_ShouldConsiderSeverityAndErrorCode()
         {
             // Arrange & Act & Assert - Catastrophic severity always returns Complete impact
-            ErrorTaxonomy.DetermineSystemImpact("ANY_CODE", ErrorSeverity.Catastrophic)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Complete);
+            ErrorTaxonomyExtensions.DetermineSystemImpact("ANY_CODE", ErrorSeverity.Catastrophic)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Complete);
 
             // Critical severity returns Significant impact
-            ErrorTaxonomy.DetermineSystemImpact("ANY_CODE", ErrorSeverity.Critical)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Significant);
+            ErrorTaxonomyExtensions.DetermineSystemImpact("ANY_CODE", ErrorSeverity.Critical)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Significant);
 
             // Hardware failure has Complete impact regardless of severity (except already tested Catastrophic)
-            ErrorTaxonomy.DetermineSystemImpact(ErrorCodes.Device.HARDWARE_FAILURE, ErrorSeverity.Error)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Complete);
+            ErrorTaxonomyExtensions.DetermineSystemImpact(ErrorCodes.Device.HARDWARE_FAILURE, ErrorSeverity.Error)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Complete);
 
             // Connection failure has Significant impact
-            ErrorTaxonomy.DetermineSystemImpact(ErrorCodes.Communication.CONNECTION_FAILED, ErrorSeverity.Error)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Significant);
+            ErrorTaxonomyExtensions.DetermineSystemImpact(ErrorCodes.Communication.CONNECTION_FAILED, ErrorSeverity.Error)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Significant);
 
             // Sensor malfunction has Partial impact
-            ErrorTaxonomy.DetermineSystemImpact(ErrorCodes.Device.SENSOR_MALFUNCTION, ErrorSeverity.Error)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Partial);
+            ErrorTaxonomyExtensions.DetermineSystemImpact(ErrorCodes.Device.SENSOR_MALFUNCTION, ErrorSeverity.Error)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Partial);
 
             // Error severity with unrecognized code has Partial impact
-            ErrorTaxonomy.DetermineSystemImpact("UNRECOGNIZED_CODE", ErrorSeverity.Error)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Partial);
+            ErrorTaxonomyExtensions.DetermineSystemImpact("UNRECOGNIZED_CODE", ErrorSeverity.Error)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Partial);
 
             // Warning severity with unrecognized code has Minimal impact
-            ErrorTaxonomy.DetermineSystemImpact("UNRECOGNIZED_CODE", ErrorSeverity.Warning)
-                .Should().Be(ErrorTaxonomy.SystemImpact.Minimal);
+            ErrorTaxonomyExtensions.DetermineSystemImpact("UNRECOGNIZED_CODE", ErrorSeverity.Warning)
+                .Should().Be(ErrorTaxonomyExtensions.SystemImpact.Minimal);
         }
 
         [Fact]
@@ -87,7 +88,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
                 "Unrecoverable hardware failure");
 
             // Act
-            var complexity = ErrorTaxonomy.AssessRecoveryComplexity(error);
+            var complexity = ErrorTaxonomyExtensions.AssessRecoveryComplexity(error);
 
             // Assert
             complexity.Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
@@ -130,10 +131,10 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
                 true);
 
             // Act & Assert
-            ErrorTaxonomy.AssessRecoveryComplexity(hardwareFailureError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
-            ErrorTaxonomy.AssessRecoveryComplexity(configError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
-            ErrorTaxonomy.AssessRecoveryComplexity(networkError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Moderate);
-            ErrorTaxonomy.AssessRecoveryComplexity(timeoutError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Simple);
+            ErrorTaxonomyExtensions.AssessRecoveryComplexity(hardwareFailureError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
+            ErrorTaxonomyExtensions.AssessRecoveryComplexity(configError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
+            ErrorTaxonomyExtensions.AssessRecoveryComplexity(networkError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Moderate);
+            ErrorTaxonomyExtensions.AssessRecoveryComplexity(timeoutError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Simple);
         }
 
         [Fact]
@@ -177,62 +178,62 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
                 false);
 
             // Act & Assert
-            ErrorTaxonomy.AssessTimeSensitivity(catastrophicError).Should().Be(ErrorTaxonomy.TimeSensitivity.Realtime);
-            ErrorTaxonomy.AssessTimeSensitivity(criticalError).Should().Be(ErrorTaxonomy.TimeSensitivity.Critical);
-            ErrorTaxonomy.AssessTimeSensitivity(sensingError).Should().Be(ErrorTaxonomy.TimeSensitivity.High);
-            ErrorTaxonomy.AssessTimeSensitivity(communicationError).Should().Be(ErrorTaxonomy.TimeSensitivity.High);
+            ErrorTaxonomyExtensions.AssessTimeSensitivity(catastrophicError).Should().Be(ErrorTaxonomyExtensions.TimeSensitivity.Realtime);
+            ErrorTaxonomyExtensions.AssessTimeSensitivity(criticalError).Should().Be(ErrorTaxonomyExtensions.TimeSensitivity.Critical);
+            ErrorTaxonomyExtensions.AssessTimeSensitivity(sensingError).Should().Be(ErrorTaxonomyExtensions.TimeSensitivity.High);
+            ErrorTaxonomyExtensions.AssessTimeSensitivity(communicationError).Should().Be(ErrorTaxonomyExtensions.TimeSensitivity.High);
         }
 
         [Fact]
         public void AssessDataIntegrity_ShouldReturnCorrectStatusBasedOnErrorCode()
         {
             // Act & Assert
-            ErrorTaxonomy.AssessDataIntegrity(ErrorCodes.Storage.DATA_CORRUPTION)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.RecoverableCorruption);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(ErrorCodes.Storage.DATA_CORRUPTION)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.RecoverableCorruption);
 
-            ErrorTaxonomy.AssessDataIntegrity(ErrorCodes.Storage.TRANSACTION_FAILED)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.PartialLoss);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(ErrorCodes.Storage.TRANSACTION_FAILED)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.PartialLoss);
 
-            ErrorTaxonomy.AssessDataIntegrity(ErrorCodes.Storage.SERIALIZATION_ERROR)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.RecoverableCorruption);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(ErrorCodes.Storage.SERIALIZATION_ERROR)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.RecoverableCorruption);
 
-            ErrorTaxonomy.AssessDataIntegrity(ErrorCodes.Device.SENSOR_MALFUNCTION)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.Intact);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(ErrorCodes.Device.SENSOR_MALFUNCTION)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.Intact);
 
-            ErrorTaxonomy.AssessDataIntegrity(null)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.Unknown);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(null)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.Unknown);
 
-            ErrorTaxonomy.AssessDataIntegrity(string.Empty)
-                .Should().Be(ErrorTaxonomy.DataIntegrityStatus.Unknown);
+            ErrorTaxonomyExtensions.AssessDataIntegrity(string.Empty)
+                .Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.Unknown);
         }
 
         [Fact]
         public void DetermineAffectedOperation_ShouldReturnCorrectOperationBasedOnErrorCode()
         {
             // Act & Assert
-            ErrorTaxonomy.DetermineAffectedOperation(ErrorCodes.Communication.CONNECTION_FAILED)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Communication);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(ErrorCodes.Communication.CONNECTION_FAILED)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Communication);
 
-            ErrorTaxonomy.DetermineAffectedOperation(ErrorCodes.Storage.READ_FAILED)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Storage);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(ErrorCodes.Storage.READ_FAILED)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Storage);
 
-            ErrorTaxonomy.DetermineAffectedOperation(ErrorCodes.Event.HANDLER_EXCEPTION)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.DataProcessing);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(ErrorCodes.Event.HANDLER_EXCEPTION)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.DataProcessing);
 
-            ErrorTaxonomy.DetermineAffectedOperation(ErrorCodes.Device.SENSOR_MALFUNCTION)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Sensing);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(ErrorCodes.Device.SENSOR_MALFUNCTION)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Sensing);
 
-            ErrorTaxonomy.DetermineAffectedOperation(ErrorCodes.Device.HARDWARE_FAILURE)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Actuation);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(ErrorCodes.Device.HARDWARE_FAILURE)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Actuation);
 
-            ErrorTaxonomy.DetermineAffectedOperation("DEVICE_SENSOR_CUSTOM")
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Sensing);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation("DEVICE_SENSOR_CUSTOM")
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Sensing);
 
-            ErrorTaxonomy.DetermineAffectedOperation(null)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Unknown);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(null)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Unknown);
 
-            ErrorTaxonomy.DetermineAffectedOperation(string.Empty)
-                .Should().Be(ErrorTaxonomy.AffectedOperation.Unknown);
+            ErrorTaxonomyExtensions.DetermineAffectedOperation(string.Empty)
+                .Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Unknown);
         }
 
         [Fact]
@@ -249,7 +250,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
                 false);
 
             // Act
-            var profile = ErrorTaxonomy.CreateErrorProfile(error);
+            var profile = ErrorTaxonomyExtensions.CreateErrorProfile(error);
 
             // Assert
             profile.Should().ContainKey("RootCause");
@@ -261,11 +262,11 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
             profile.Should().ContainKey("ErrorCategory");
 
             profile["RootCause"].Should().Be(ErrorTaxonomy.RootCause.SensorMalfunction);
-            profile["SystemImpact"].Should().Be(ErrorTaxonomy.SystemImpact.Partial);
+            profile["SystemImpact"].Should().Be(ErrorTaxonomyExtensions.SystemImpact.Partial);
             profile["RecoveryComplexity"].Should().Be(ErrorTaxonomy.RecoveryComplexity.Moderate);
-            profile["DataIntegrityStatus"].Should().Be(ErrorTaxonomy.DataIntegrityStatus.Intact);
-            profile["TimeSensitivity"].Should().Be(ErrorTaxonomy.TimeSensitivity.High);
-            profile["AffectedOperation"].Should().Be(ErrorTaxonomy.AffectedOperation.Sensing);
+            profile["DataIntegrityStatus"].Should().Be(ErrorTaxonomyExtensions.DataIntegrityStatus.Intact);
+            profile["TimeSensitivity"].Should().Be(ErrorTaxonomyExtensions.TimeSensitivity.High);
+            profile["AffectedOperation"].Should().Be(ErrorTaxonomyExtensions.AffectedOperation.Sensing);
             profile["ErrorCategory"].Should().Be(ErrorCategory.Device);
         }
     }

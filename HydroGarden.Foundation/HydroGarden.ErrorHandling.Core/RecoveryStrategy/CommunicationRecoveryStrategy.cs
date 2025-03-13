@@ -1,6 +1,7 @@
 ﻿using System.Net.NetworkInformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
@@ -44,12 +45,12 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
         /// <summary>
         /// Root causes this strategy can address.
         /// </summary>
-        public override ErrorTaxonomy.RootCause[] SupportedRootCauses => new[]
-        {
+        public override ErrorTaxonomy.RootCause[] SupportedRootCauses =>
+        [
             ErrorTaxonomy.RootCause.NetworkFailure,
             ErrorTaxonomy.RootCause.ConnectionTimeout,
             ErrorTaxonomy.RootCause.ProtocolError
-        };
+        ];
 
         /// <summary>
         /// Determines if this strategy can recover from the specified error.
@@ -68,7 +69,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 return true;
                 
             // Check supported root causes from base class
-            var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
+            var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
             if (SupportedRootCauses.Contains(rootCause))
                 return true;
                 

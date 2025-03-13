@@ -1,4 +1,5 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 
 namespace HydroGarden.Foundation.ErrorHandling.Common
 {
@@ -6,56 +7,8 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
     /// Provides a detailed taxonomy for error categorization, enabling precise targeting of recovery strategies.
     /// This taxonomy goes beyond basic error codes to provide a structured classification system.
     /// </summary>
-    public static class ErrorTaxonomy
+    public static class ErrorTaxonomyExtensions
     {
-        /// <summary>
-        /// Root causes of errors for diagnostic purposes.
-        /// </summary>
-        public enum RootCause
-        {
-            Unknown = 0,
-            
-            // Hardware-related causes
-            HardwareFailure = 10,
-            PowerIssue = 11,
-            CalibrationProblem = 12,
-            SensorMalfunction = 13,
-            MemoryExhaustion = 14,
-            
-            // Software-related causes
-            SoftwareBug = 20,
-            ConfigurationError = 21,
-            InvalidState = 22,
-            ValidationFailure = 23,
-            ResourceExhaustion = 24,
-            
-            // Communication-related causes
-            NetworkFailure = 30,
-            ConnectionTimeout = 31,
-            ProtocolError = 32,
-            SerializationError = 33,
-            
-            // External causes
-            ExternalSystemFailure = 40,
-            DependencyUnavailable = 41,
-            ServiceUnavailable = 42,
-            
-            // Environmental causes
-            EnvironmentalCondition = 50,
-            TemperatureExcursion = 51,
-            PowerFluctuation = 52,
-            
-            // User-related causes
-            UserError = 60,
-            InvalidInput = 61,
-            PermissionDenied = 62,
-            
-            // Recovery-related causes
-            RecoveryFailure = 70,
-            RetryExhaustion = 71,
-            CircuitBreakerOpen = 72
-        }
-        
         /// <summary>
         /// Impacts of errors on system operation.
         /// </summary>
@@ -67,18 +20,6 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
             Significant = 3,      // Major functionality affected
             Complete = 4,         // System non-operational
             Cascading = 5         // Affects other systems
-        }
-        
-        /// <summary>
-        /// Recovery complexity levels.
-        /// </summary>
-        public enum RecoveryComplexity
-        {
-            Simple = 0,           // Automatic recovery likely to succeed
-            Moderate = 1,         // Requires specific strategy but likely to succeed
-            Complex = 2,          // Requires multiple strategies or steps
-            VeryComplex = 3,      // Sophisticated recovery plan needed
-            Manual = 4            // Manual intervention required
         }
         
         /// <summary>
@@ -130,43 +71,43 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
         /// </summary>
         /// <param name="errorCode">The error code to analyze.</param>
         /// <returns>The determined root cause.</returns>
-        public static RootCause AnalyzeRootCause(string? errorCode)
+        public static ErrorTaxonomy.RootCause AnalyzeRootCause(string? errorCode)
         {
             if (string.IsNullOrEmpty(errorCode))
-                return RootCause.Unknown;
+                return ErrorTaxonomy.RootCause.Unknown;
                 
             return errorCode switch
             {
-                ErrorCodes.Device.HARDWARE_FAILURE => RootCause.HardwareFailure,
-                ErrorCodes.Device.SENSOR_MALFUNCTION => RootCause.SensorMalfunction,
-                ErrorCodes.Device.CALIBRATION_ERROR => RootCause.CalibrationProblem,
-                ErrorCodes.Device.CONFIGURATION_INVALID => RootCause.ConfigurationError,
-                ErrorCodes.Device.STATE_TRANSITION_FAILED => RootCause.InvalidState,
-                ErrorCodes.Device.RESOURCE_EXHAUSTED => RootCause.ResourceExhaustion,
+                ErrorCodes.Device.HARDWARE_FAILURE => ErrorTaxonomy.RootCause.HardwareFailure,
+                ErrorCodes.Device.SENSOR_MALFUNCTION => ErrorTaxonomy.RootCause.SensorMalfunction,
+                ErrorCodes.Device.CALIBRATION_ERROR => ErrorTaxonomy.RootCause.CalibrationProblem,
+                ErrorCodes.Device.CONFIGURATION_INVALID => ErrorTaxonomy.RootCause.ConfigurationError,
+                ErrorCodes.Device.STATE_TRANSITION_FAILED => ErrorTaxonomy.RootCause.InvalidState,
+                ErrorCodes.Device.RESOURCE_EXHAUSTED => ErrorTaxonomy.RootCause.ResourceExhaustion,
                 
-                ErrorCodes.Service.DEPENDENCY_UNAVAILABLE => RootCause.DependencyUnavailable,
-                ErrorCodes.Service.OPERATION_TIMEOUT => RootCause.ConnectionTimeout,
-                ErrorCodes.Service.CONFIGURATION_INVALID => RootCause.ConfigurationError,
-                ErrorCodes.Service.RESOURCE_EXHAUSTED => RootCause.ResourceExhaustion,
-                ErrorCodes.Service.CONCURRENT_ACCESS_CONFLICT => RootCause.InvalidState,
+                ErrorCodes.Service.DEPENDENCY_UNAVAILABLE => ErrorTaxonomy.RootCause.DependencyUnavailable,
+                ErrorCodes.Service.OPERATION_TIMEOUT => ErrorTaxonomy.RootCause.ConnectionTimeout,
+                ErrorCodes.Service.CONFIGURATION_INVALID => ErrorTaxonomy.RootCause.ConfigurationError,
+                ErrorCodes.Service.RESOURCE_EXHAUSTED => ErrorTaxonomy.RootCause.ResourceExhaustion,
+                ErrorCodes.Service.CONCURRENT_ACCESS_CONFLICT => ErrorTaxonomy.RootCause.InvalidState,
                 
-                ErrorCodes.Communication.CONNECTION_FAILED => RootCause.NetworkFailure,
-                ErrorCodes.Communication.TIMEOUT => RootCause.ConnectionTimeout,
-                ErrorCodes.Communication.PROTOCOL_ERROR => RootCause.ProtocolError,
-                ErrorCodes.Communication.SERIALIZATION_ERROR => RootCause.SerializationError,
+                ErrorCodes.Communication.CONNECTION_FAILED => ErrorTaxonomy.RootCause.NetworkFailure,
+                ErrorCodes.Communication.TIMEOUT => ErrorTaxonomy.RootCause.ConnectionTimeout,
+                ErrorCodes.Communication.PROTOCOL_ERROR => ErrorTaxonomy.RootCause.ProtocolError,
+                ErrorCodes.Communication.SERIALIZATION_ERROR => ErrorTaxonomy.RootCause.SerializationError,
                 
-                ErrorCodes.Event.ROUTING_ERROR => RootCause.SoftwareBug,
-                ErrorCodes.Event.PROCESSING_TIMEOUT => RootCause.ConnectionTimeout,
-                ErrorCodes.Event.HANDLER_EXCEPTION => RootCause.SoftwareBug,
+                ErrorCodes.Event.ROUTING_ERROR => ErrorTaxonomy.RootCause.SoftwareBug,
+                ErrorCodes.Event.PROCESSING_TIMEOUT => ErrorTaxonomy.RootCause.ConnectionTimeout,
+                ErrorCodes.Event.HANDLER_EXCEPTION => ErrorTaxonomy.RootCause.SoftwareBug,
                 
-                ErrorCodes.Storage.DATA_CORRUPTION => RootCause.HardwareFailure,
-                ErrorCodes.Storage.SERIALIZATION_ERROR => RootCause.SerializationError,
+                ErrorCodes.Storage.DATA_CORRUPTION => ErrorTaxonomy.RootCause.HardwareFailure,
+                ErrorCodes.Storage.SERIALIZATION_ERROR => ErrorTaxonomy.RootCause.SerializationError,
                 
-                ErrorCodes.Recovery.STRATEGY_FAILED => RootCause.RecoveryFailure,
-                ErrorCodes.Recovery.ATTEMPT_LIMIT_REACHED => RootCause.RetryExhaustion,
-                ErrorCodes.Recovery.CIRCUIT_OPEN => RootCause.CircuitBreakerOpen,
+                ErrorCodes.Recovery.STRATEGY_FAILED => ErrorTaxonomy.RootCause.RecoveryFailure,
+                ErrorCodes.Recovery.ATTEMPT_LIMIT_REACHED => ErrorTaxonomy.RootCause.RetryExhaustion,
+                ErrorCodes.Recovery.CIRCUIT_OPEN => ErrorTaxonomy.RootCause.CircuitBreakerOpen,
                 
-                _ => RootCause.Unknown
+                _ => ErrorTaxonomy.RootCause.Unknown
             };
         }
         
@@ -204,28 +145,28 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
         /// </summary>
         /// <param name="error">The application error.</param>
         /// <returns>The recovery complexity assessment.</returns>
-        public static RecoveryComplexity AssessRecoveryComplexity(IApplicationError? error)
+        public static ErrorTaxonomy.RecoveryComplexity AssessRecoveryComplexity(IApplicationError? error)
         {
             // Non-recoverable errors require manual intervention
             if (error is ComponentError { IsUnrecoverable: true })
-                return RecoveryComplexity.Manual;
+                return ErrorTaxonomy.RecoveryComplexity.Manual;
                 
             // Consider the root cause
             var rootCause = AnalyzeRootCause(error.ErrorCode);
             
             return rootCause switch
             {
-                RootCause.HardwareFailure => RecoveryComplexity.Manual,
-                RootCause.ConfigurationError => RecoveryComplexity.Complex,
-                RootCause.SensorMalfunction => RecoveryComplexity.Moderate,
-                RootCause.NetworkFailure => RecoveryComplexity.Moderate,
-                RootCause.ConnectionTimeout => RecoveryComplexity.Simple,
-                RootCause.InvalidState => RecoveryComplexity.Moderate,
-                RootCause.ResourceExhaustion => RecoveryComplexity.Moderate,
-                RootCause.RetryExhaustion => RecoveryComplexity.Complex,
-                RootCause.CircuitBreakerOpen => RecoveryComplexity.Simple,
-                RootCause.ProtocolError => RecoveryComplexity.Moderate,
-                _ => RecoveryComplexity.Moderate
+                ErrorTaxonomy.RootCause.HardwareFailure => ErrorTaxonomy.RecoveryComplexity.Manual,
+                ErrorTaxonomy.RootCause.ConfigurationError => ErrorTaxonomy.RecoveryComplexity.Complex,
+                ErrorTaxonomy.RootCause.SensorMalfunction => ErrorTaxonomy.RecoveryComplexity.Moderate,
+                ErrorTaxonomy.RootCause.NetworkFailure => ErrorTaxonomy.RecoveryComplexity.Moderate,
+                ErrorTaxonomy.RootCause.ConnectionTimeout => ErrorTaxonomy.RecoveryComplexity.Simple,
+                ErrorTaxonomy.RootCause.InvalidState => ErrorTaxonomy.RecoveryComplexity.Moderate,
+                ErrorTaxonomy.RootCause.ResourceExhaustion => ErrorTaxonomy.RecoveryComplexity.Moderate,
+                ErrorTaxonomy.RootCause.RetryExhaustion => ErrorTaxonomy.RecoveryComplexity.Complex,
+                ErrorTaxonomy.RootCause.CircuitBreakerOpen => ErrorTaxonomy.RecoveryComplexity.Simple,
+                ErrorTaxonomy.RootCause.ProtocolError => ErrorTaxonomy.RecoveryComplexity.Moderate,
+                _ => ErrorTaxonomy.RecoveryComplexity.Moderate
             };
         }
         
@@ -236,6 +177,9 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
         /// <returns>The time sensitivity assessment.</returns>
         public static TimeSensitivity AssessTimeSensitivity(IApplicationError? error)
         {
+            if (error == null)
+                return TimeSensitivity.Low;
+                
             // Consider severity first
             if (error.Severity == ErrorSeverity.Catastrophic)
                 return TimeSensitivity.Realtime;
@@ -309,12 +253,12 @@ namespace HydroGarden.Foundation.ErrorHandling.Common
         {
             var profile = new Dictionary<string, object>
             {
-                ["RootCause"] = AnalyzeRootCause(error.ErrorCode),
-                ["SystemImpact"] = DetermineSystemImpact(error.ErrorCode, error.Severity),
+                ["RootCause"] = AnalyzeRootCause(error?.ErrorCode),
+                ["SystemImpact"] = DetermineSystemImpact(error?.ErrorCode, error?.Severity ?? ErrorSeverity.Error),
                 ["RecoveryComplexity"] = AssessRecoveryComplexity(error),
-                ["DataIntegrityStatus"] = AssessDataIntegrity(error.ErrorCode),
+                ["DataIntegrityStatus"] = AssessDataIntegrity(error?.ErrorCode),
                 ["TimeSensitivity"] = AssessTimeSensitivity(error),
-                ["AffectedOperation"] = DetermineAffectedOperation(error.ErrorCode),
+                ["AffectedOperation"] = DetermineAffectedOperation(error?.ErrorCode),
                 ["ErrorCategory"] = error is ComponentError compError ? compError.Category : ErrorCategory.Unknown
             };
             

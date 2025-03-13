@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.ErrorHandling.Models;
 using HydroGarden.Foundation.ErrorHandling.Policies;
@@ -110,7 +111,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Services
             _logger.Log($"Creating recovery plan for device {error.DeviceId}, error code: {error.ErrorCode}");
 
             // Create error profile for advanced strategy selection
-            var errorProfile = ErrorTaxonomy.CreateErrorProfile(error);
+            var errorProfile = ErrorTaxonomyExtensions.CreateErrorProfile(error);
 
             List<IRecoveryStrategy> strategies;
             lock (_strategiesLock)

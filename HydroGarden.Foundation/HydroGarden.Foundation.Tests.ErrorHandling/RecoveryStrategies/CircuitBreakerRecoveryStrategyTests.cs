@@ -1,5 +1,6 @@
 using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.ErrorHandling.Exceptions;

@@ -29,9 +29,22 @@
         public Guid CorrelationId { get; }
         public ErrorSource Source { get; }
         public bool IsTransient { get; }
+        public bool IsRecoverable { get; }
+        public int RecoveryAttemptCount { get; }
+        public DateTimeOffset? LastRecoveryAttempt { get; }
+        public int MaxRecoveryAttempts { get; }
+
         /// <summary>
         /// Records the recovery attempt for this error
         /// </summary>
         void RecordRecoveryAttempt();
+
+        /// <summary>
+        /// Determines if recovery can be attempted based on backoff period and max attempts
+        /// </summary>
+        /// <param name="backoffPeriod">Minimum time between recovery attempts</param>
+        /// <param name="maxAttempts">Override for maximum attempts, defaults to error's MaxRecoveryAttempts</param>
+        /// <returns>True if recovery can be attempted now</returns>
+        bool CanAttemptRecoveryNow(TimeSpan backoffPeriod, int? maxAttempts = null);
     }
 }

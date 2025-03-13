@@ -126,18 +126,45 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// </summary>
         public bool CanAttemptRecovery()
         {
-            if (!IsRecoverable) return false;
-            if (RecoveryAttemptCount >= MaxRecoveryAttempts) return false;
-            if (LastRecoveryAttempt == null) return true;
-            return (DateTimeOffset.UtcNow - LastRecoveryAttempt.Value) > RecoveryBackoffInterval;
+            return CanAttemptRecoveryNow(RecoveryBackoffInterval);
+        }
+        
+        /// <summary>
+        /// Determines if recovery can be attempted based on backoff period and max attempts
+        /// </summary>
+        /// <param name="backoffPeriod">Minimum time between recovery attempts</param>
+        /// <param name="maxAttempts">Override for maximum attempts</param>
+        /// <returns>True if recovery can be attempted now</returns>
+        public bool CanAttemptRecoveryNow(TimeSpan backoffPeriod, int? maxAttempts = null)
+        {
+            // Check if the error is recoverable at all
+            if (!IsRecoverable) 
+            {
+                return false;
+            }
+            
+            // Check if we've exceeded the maximum attempts
+            int effectiveMaxAttempts = maxAttempts ?? MaxRecoveryAttempts;
+            if (RecoveryAttemptCount >= effectiveMaxAttempts) 
+            {
+                return false;
+            }
+            
+            // If no previous attempt, we can recover
+            if (LastRecoveryAttempt == null) 
+            {
+                return true;
+            }
+            
+            // Check if backoff period has elapsed
+            return (DateTimeOffset.UtcNow - LastRecoveryAttempt.Value) > backoffPeriod;
         }
 
         /// <summary>
-        /// Reports if the error is unrecoverable.
+        /// Reports if the error is unrecoverable, meaning no recovery should be attempted.
+        /// This property is maintained for backward compatibility.
         /// </summary>
-        public bool IsUnrecoverable => !IsRecoverable ||
-                                       RecoveryAttemptCount >= MaxRecoveryAttempts ||
-                                       ErrorCodes.IsUnrecoverable(ErrorCode);
+        public bool IsUnrecoverable => !IsRecoverable || ErrorCodes.IsUnrecoverable(ErrorCode);
 
         /// <summary>
         /// Enriches the context with additional diagnostic information.

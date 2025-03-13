@@ -1,5 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.RecoveryStrategy;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling.Taxonomy;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 
@@ -39,8 +40,27 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
     public virtual ErrorTaxonomy.RootCause[] SupportedRootCauses => [ErrorTaxonomy.RootCause.Unknown];
 
     /// <summary>
+    /// Determines if this strategy supports the error type (capability check).
+    /// </summary>
+    /// <param name="error">The error to check.</param>
+    /// <returns>True if this strategy supports this error type.</returns>
+    public virtual bool SupportsErrorType(IApplicationError? error)
+    {
+        // Check for null errors
+        if (error == null)
+            return false;
+            
+        // Get the root cause
+        var rootCause = ErrorTaxonomyExtensions.AnalyzeRootCause(error.ErrorCode);
+
+        // Check if this strategy supports the root cause
+        return SupportedRootCauses.Contains(rootCause) || 
+               SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
+    }
+    
+    /// <summary>
+    /// Legacy method maintained for backward compatibility.
     /// Determines if this strategy can recover from the specified error.
-    /// The base implementation checks if the error's root cause is supported by this strategy.
     /// </summary>
     /// <param name="error">The error to check.</param>
     /// <returns>True if this strategy can recover from the error, false otherwise.</returns>
@@ -53,11 +73,8 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
         if (error is ComponentError componentError && componentError.IsUnrecoverable)
             return false;
             
-        // Get the root cause
-        var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
-
-        // Check if this strategy supports the root cause
-        return SupportedRootCauses.Contains(rootCause) || SupportedRootCauses.Contains(ErrorTaxonomy.RootCause.Unknown);
+        // Use the new method but maintain behavior for backward compatibility
+        return SupportsErrorType(error);
     }
 
     /// <summary>
@@ -65,21 +82,70 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
     /// </summary>
     public async Task<bool> AttemptRecoveryAsync(IApplicationError? error, CancellationToken ct = default)
     {
-        if (!CanRecover(error))
+        // Check if error is null
+        if (error == null)
         {
-            Logger.Log($"Strategy '{Name}' cannot recover from error {error?.ErrorCode}");
+            Logger.Log("Cannot attempt recovery: Error is null");
+            Logger.Log("Cannot attempt recovery");
             return false;
         }
-
-        if (error is ComponentError componentError && !componentError.CanAttemptRecovery())
+        
+        // 1. Check if this strategy supports this error type (capability check)
+        if (!SupportsErrorType(error))
         {
-            Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed or max attempts reached");
+            Logger.Log($"Strategy '{Name}' does not support error type {error.ErrorCode}");
+            Logger.Log("Cannot attempt recovery");
+            return false;
+        }
+        
+        // 2. Check if the error is marked as unrecoverable (compatibility check)
+        if (error is ComponentError componentError && componentError.IsUnrecoverable)
+        {
+            Logger.Log($"Strategy '{Name}' cannot recover from unrecoverable error {error.ErrorCode}");
             Logger.Log("Cannot attempt recovery");
             return false;
         }
 
-        // Get or create recovery status
-        if (error != null)
+        // 3. Check if we can attempt recovery based on state
+        TimeSpan backoffPeriod = CalculateBackoffPeriod(error);
+        bool canAttemptNow = true;
+        
+        // Use the specific method if available
+        if (error is ComponentError errorComponent)
+        {
+            canAttemptNow = errorComponent.CanAttemptRecovery();
+        }
+        else if (error.CanAttemptRecoveryNow != null)
+        {
+            canAttemptNow = error.CanAttemptRecoveryNow(backoffPeriod, MaxRecoveryAttempts);
+        }
+        
+        if (!canAttemptNow)
+        {
+            // Check if it's because of max attempts
+            if (error.RecoveryAttemptCount >= MaxRecoveryAttempts)
+            {
+                Logger.Log($"Cannot attempt recovery for error {error.ErrorCode}: Maximum attempts exceeded ({error.RecoveryAttemptCount}/{MaxRecoveryAttempts})");
+            }
+            else if (error.LastRecoveryAttempt.HasValue)
+            {
+                // It's because of backoff period
+                var remainingTime = backoffPeriod - (DateTimeOffset.UtcNow - error.LastRecoveryAttempt.Value);
+                if (remainingTime > TimeSpan.Zero)
+                {
+                    Logger.Log($"Cannot attempt recovery for error {error.ErrorCode}: Backoff period not elapsed (try again in {remainingTime.TotalSeconds:F1}s)");
+                }
+            }
+            
+            Logger.Log("Cannot attempt recovery");
+            return false;
+        }
+
+        // Record the recovery attempt directly on the error
+        error.RecordRecoveryAttempt();
+        Logger.Log($"Attempting recovery for device {error.DeviceId} using strategy '{Name}' (attempt {error.RecoveryAttemptCount})");
+        
+        try
         {
             var status = GetRecoveryStatus(error.DeviceId);
 
@@ -107,9 +173,9 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
             status.AttemptCount++;
             status.LastAttempt = DateTimeOffset.UtcNow;
 
-            if (error is ComponentError compError)
+            if (error is ComponentError errorComp)
             {
-                compError.RecordRecoveryAttempt();
+                errorComp.RecordRecoveryAttempt();
             }
 
             Logger.Log($"Attempting recovery for device {error.DeviceId} using strategy '{Name}' (attempt {status.AttemptCount})");
@@ -139,10 +205,23 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
                 return false;
             }
         }
-
-        return false;
+        catch (Exception ex)
+        {
+            Logger.Log(ex, $"Exception during recovery setup for device {error.DeviceId}");
+            return false;
+        }
     }
 
+    /// <summary>
+    /// Calculates the appropriate backoff period for an error based on attempt count.
+    /// </summary>
+    protected virtual TimeSpan CalculateBackoffPeriod(IApplicationError error)
+    {
+        // Exponential backoff with a cap of 5 minutes
+        double seconds = Math.Min(300, Math.Pow(2, error.RecoveryAttemptCount));
+        return TimeSpan.FromSeconds(seconds);
+    }
+    
     /// <summary>
     /// Executes the recovery logic specific to this strategy.
     /// </summary>
