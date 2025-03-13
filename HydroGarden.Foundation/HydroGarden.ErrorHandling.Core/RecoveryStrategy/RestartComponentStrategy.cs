@@ -71,10 +71,15 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
 
             // Check if it's a device error that's recoverable
             if (error is ComponentError componentError && 
-                error.Source == ErrorSource.Device && 
                 componentError.IsRecoverable &&
                 !ErrorCodes.IsUnrecoverable(error.ErrorCode))
-                return true;
+            {
+                // Only handle device-related errors
+                if (error.Source == ErrorSource.Device)
+                    return true;
+                else
+                    return false;
+            }
                 
             // Check supported root causes from base class
             if (base.CanRecover(error))

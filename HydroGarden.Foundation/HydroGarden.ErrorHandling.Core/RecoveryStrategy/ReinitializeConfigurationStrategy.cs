@@ -60,13 +60,14 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             if (error == null)
                 return false;
                 
-            if (error is ComponentError componentError && componentError.IsUnrecoverable)
-                return false;
-                
-            // Always handle configuration errors
+            // We can handle certain configuration errors even if they're marked as unrecoverable
             if (error.ErrorCode == ErrorCodes.Device.CONFIGURATION_INVALID ||
                 error.ErrorCode == ErrorCodes.Service.CONFIGURATION_INVALID)
                 return true;
+                
+            // For other errors, check if it's unrecoverable
+            if (error is ComponentError componentError && componentError.IsUnrecoverable)
+                return false;
                 
             // Root cause from taxonomy analysis
             var rootCause = ErrorTaxonomy.AnalyzeRootCause(error.ErrorCode);
@@ -88,6 +89,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (device == null)
                 {
                     Logger.Log($"Device {error.DeviceId} not found");
+                    Logger.Log($"Device not found for configuration reset: {error.DeviceId}");
                     return false;
                 }
                 
@@ -108,6 +110,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (defaultConfig == null || !defaultConfig.Any())
                 {
                     Logger.Log($"No default configuration found for device {device.Id}");
+                    Logger.Log($"No default properties found for device {device.Id}");
                     return false;
                 }
                 
@@ -149,6 +152,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Error during configuration recovery for device {error.DeviceId}");
+                Logger.Log(ex, $"Error during configuration reset");
                 return false;
             }
         }
@@ -304,6 +308,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Error during configuration reset for device {device.Id}");
+                Logger.Log(ex, $"Error during configuration reset");
                 return false;
             }
         }

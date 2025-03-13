@@ -63,7 +63,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             if (error.ErrorCode == ErrorCodes.Device.COMMUNICATION_LOST ||
                 error.ErrorCode == ErrorCodes.Communication.CONNECTION_FAILED ||
                 error.ErrorCode == ErrorCodes.Communication.TIMEOUT ||
-                error.ErrorCode == ErrorCodes.Communication.PROTOCOL_ERROR)
+                error.ErrorCode == ErrorCodes.Communication.PROTOCOL_ERROR ||
+                error.ErrorCode == ErrorCodes.Communication.MESSAGE_DELIVERY_FAILED)
                 return true;
                 
             // Check supported root causes from base class

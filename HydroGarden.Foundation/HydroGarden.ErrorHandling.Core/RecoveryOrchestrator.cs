@@ -73,6 +73,13 @@ namespace HydroGarden.Foundation.ErrorHandling
                     .Where(s => s.CanRecover(error))
                     .OrderBy(s => (s as RecoveryStrategyBase)?.Priority ?? 100)
                     .ToList();
+                    
+                // Debug logging for strategy ordering
+                foreach (var strategy in applicableStrategies)
+                {
+                    int priority = (strategy as RecoveryStrategyBase)?.Priority ?? 100;
+                    _logger.Log($"Strategy {strategy.Name} has priority {priority}");
+                }
 
                 if (!applicableStrategies.Any())
                 {
@@ -90,6 +97,7 @@ namespace HydroGarden.Foundation.ErrorHandling
                     if (await strategy.AttemptRecoveryAsync(error, ct))
                     {
                         _logger.Log($"Recovery successful using strategy: {strategy.Name}");
+                        _logger.Log($"Recovery successful for device {error.DeviceId} using {strategy.Name}");
 
                         // Record successful recovery with error monitor
                         if (!string.IsNullOrEmpty(error.ErrorCode))
@@ -119,6 +127,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             catch (Exception ex)
             {
                 _logger.Log(ex, $"Exception during recovery orchestration for device {error.DeviceId}");
+                _logger.Log(ex, $"Exception during recovery orchestration");
                 return false;
             }
             finally

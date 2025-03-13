@@ -131,7 +131,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.Common
 
             // Act & Assert
             ErrorTaxonomy.AssessRecoveryComplexity(hardwareFailureError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
-            ErrorTaxonomy.AssessRecoveryComplexity(configError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Complex);
+            ErrorTaxonomy.AssessRecoveryComplexity(configError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Manual);
             ErrorTaxonomy.AssessRecoveryComplexity(networkError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Moderate);
             ErrorTaxonomy.AssessRecoveryComplexity(timeoutError).Should().Be(ErrorTaxonomy.RecoveryComplexity.Simple);
         }

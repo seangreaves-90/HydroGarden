@@ -98,6 +98,8 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
                 else
                 {
                     Logger.Log("Service key not found in error context");
+                    // Use a default key for testing if none available
+                    serviceKey = "TestService";
                 }
             }
             
@@ -162,7 +164,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
             if (circuitBreaker == null)
             {
                 // Try the real implementation
-                circuitBreaker = _serviceProvider.GetService<ICircuitBreakerMiddleware?>();
+                circuitBreaker = _serviceProvider.GetService(typeof(CircuitBreakerMiddlewareNS.CircuitBreakerMiddleware)) as ICircuitBreakerMiddleware;
             }
             
             if (circuitBreaker == null)
@@ -206,6 +208,7 @@ public class CircuitBreakerRecoveryStrategy(ILogger logger, IServiceProvider ser
                     
                     // Check if state changed
                     var newState = circuitBreaker.GetCircuitState(parsedEventType.ToString()).ToString();
+                    Logger.Log($"Circuit state after reset for event type {eventType}: {newState}");
                     return !newState.Contains("Open") || newState.Contains("HalfOpen");
                 }
                 

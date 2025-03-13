@@ -30,7 +30,7 @@ namespace HydroGarden.Foundation.ErrorHandling
 
         // Recovery backoff with exponential delay capped at 10 minutes
         public TimeSpan RecoveryBackoffInterval => TimeSpan.FromSeconds(
-            Math.Min(600, Math.Pow(2, Math.Min(RecoveryAttemptCount, 9))));
+            Math.Min(600, Math.Pow(2, RecoveryAttemptCount)));
 
         /// <summary>
         /// Creates a new ComponentError with detailed classification.
