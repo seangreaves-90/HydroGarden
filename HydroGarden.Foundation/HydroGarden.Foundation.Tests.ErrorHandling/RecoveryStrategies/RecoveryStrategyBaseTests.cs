@@ -167,8 +167,7 @@ public class RecoveryStrategyBaseTests
 
         // Assert
         result.Should().BeFalse();
-        _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
-            s.Contains("Cannot attempt recovery"))));
+        _mockLogger.Verify(l => l.Log("Cannot attempt recovery"));
         // The message might contain either "backoff period" or "max attempts reached"
         _strategy.ExecuteRecoveryCalled.Should().BeFalse();
     }
@@ -263,7 +262,8 @@ public class RecoveryStrategyBaseTests
         // Assert
         secondResult.Should().BeFalse();
         _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
-            s.Contains("Backoff period not elapsed"))));
+            s.Contains("Cannot attempt recovery for error") && s.Contains(error.ErrorCode))));
+        _mockLogger.Verify(l => l.Log("Cannot attempt recovery"));
     }
 
     [Fact]

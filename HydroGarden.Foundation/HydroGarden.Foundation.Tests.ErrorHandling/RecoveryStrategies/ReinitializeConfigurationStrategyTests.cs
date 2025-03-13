@@ -119,7 +119,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             // Assert
             result.Should().BeFalse();
             _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
-                s.Contains("Device") && s.Contains("not found"))));
+                s.Contains("Device not found"))));
         }
 
         [Fact]
@@ -216,8 +216,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
 
             // Assert
             result.Should().BeFalse();
-            _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
-                s.Contains("No default properties found"))));
+            _mockLogger.Verify(l => l.Log("No default properties found"));
         }
 
         [Fact]
@@ -263,8 +262,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
 
             // Assert
             result.Should().BeFalse();
-            _mockLogger.Verify(l => l.Log(It.IsAny<Exception>(), It.Is<string>(s => 
-                s.Contains("Error during configuration reset"))));
+            _mockLogger.Verify(l => l.Log(It.IsAny<Exception>(), "Error during configuration reset"));
         }
 
         [Fact]

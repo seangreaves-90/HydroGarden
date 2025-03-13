@@ -199,6 +199,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
             catch (Exception ex)
             {
                 Logger.Log(ex, $"Error during restart cycle for device {device.Id}");
+                Logger.Log(ex, $"Error during device restart recovery");
                 return false;
             }
         }

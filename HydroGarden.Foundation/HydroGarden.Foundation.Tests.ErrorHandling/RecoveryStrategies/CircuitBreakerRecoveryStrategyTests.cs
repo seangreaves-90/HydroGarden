@@ -3,12 +3,14 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.ErrorHandling.Exceptions;
+using HydroGarden.Foundation.ErrorHandling.Interfaces;
 using HydroGarden.Foundation.ErrorHandling.RecoveryStrategy;
 using HydroGarden.Foundation.Tests.ErrorHandling.Mocks;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
+using IResiliencePolicy = HydroGarden.Foundation.Tests.ErrorHandling.Mocks.IResiliencePolicy;
 
 namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
 {
@@ -126,15 +128,29 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             // Configure context to contain the service key
             error.Context["ServiceKey"] = "TestService";
 
-            // Configure middleware to be in Open state
-            _testableMiddleware.SetCircuitState("TestService", TestableCircuitBreakerMiddleware.CircuitState.Open);
+            // Create a mock middleware that transitions to HalfOpen when reset
+            var mockMiddleware = new Mock<ICircuitBreakerMiddleware>();
+            var isReset = false;
+            
+            mockMiddleware.Setup(m => m.GetCircuitState("TestService"))
+                .Returns(() => isReset ? 
+                    TestableCircuitBreakerMiddleware.CircuitState.HalfOpen : 
+                    TestableCircuitBreakerMiddleware.CircuitState.Open);
+                    
+            mockMiddleware.Setup(m => m.ResetCircuit("TestService"))
+                .Callback(() => isReset = true);
+            
+            // Replace the middleware in the service provider
+            _mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t == typeof(TestableCircuitBreakerMiddleware) || 
+                                                                 t == typeof(CircuitBreakerMiddleware) ||
+                                                                 t == typeof(ICircuitBreakerMiddleware))))
+                .Returns(mockMiddleware.Object);
 
             // Act
             var result = await _strategy.AttemptRecoveryAsync(error);
 
             // Assert
-            // After reset, middleware should transition to HalfOpen or Closed state
-            _testableMiddleware.GetCircuitState("TestService").Should().Be(TestableCircuitBreakerMiddleware.CircuitState.HalfOpen);
+            mockMiddleware.Verify(m => m.ResetCircuit("TestService"), Times.AtLeastOnce());
             result.Should().BeTrue();
             _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
                 s.Contains("reset circuit") && s.Contains("TestService"))));
@@ -181,23 +197,28 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             error.Context["ServiceKey"] = "TestService";
 
             // For this test, create a mocked middleware that doesn't change state on reset
-            var stubbornMiddleware = new Mock<TestableCircuitBreakerMiddleware>() { CallBase = true };
-            stubbornMiddleware.Setup(m => m.ResetCircuit("TestService"))
-                .Callback(() => { /* Do nothing to keep circuit open */ });
-            stubbornMiddleware.Setup(m => m.GetCircuitState("TestService"))
+            // Create a stubborn middleware that stays in Open state
+            var stubbornMiddleware = new TestableCircuitBreakerMiddleware();
+            stubbornMiddleware.SetCircuitState("TestService", TestableCircuitBreakerMiddleware.CircuitState.Open);
+            
+            // Create a mock to verify method calls
+            var mockedMiddleware = new Mock<ICircuitBreakerMiddleware>();
+            mockedMiddleware.Setup(m => m.ResetCircuit("TestService"));
+            mockedMiddleware.Setup(m => m.GetCircuitState("TestService"))
                 .Returns(TestableCircuitBreakerMiddleware.CircuitState.Open);
-                
+            
             // Replace the middleware in the service provider
             _mockServiceProvider.Setup(sp => sp.GetService(It.Is<Type>(t => t == typeof(TestableCircuitBreakerMiddleware) || 
-                                                                   t == typeof(CircuitBreakerMiddleware))))
-                .Returns(stubbornMiddleware.Object);
+                                                                   t == typeof(CircuitBreakerMiddleware) || 
+                                                                   t == typeof(ICircuitBreakerMiddleware))))
+                .Returns(mockedMiddleware.Object);
 
             // Act
             var result = await _strategy.AttemptRecoveryAsync(error);
 
             // Assert
             // The middleware should have been asked to reset the circuit
-            stubbornMiddleware.Verify(m => m.ResetCircuit("TestService"), Times.AtLeastOnce());
+            mockedMiddleware.Verify(m => m.ResetCircuit("TestService"), Times.AtLeastOnce());
             result.Should().BeFalse();
             _mockLogger.Verify(l => l.Log(It.Is<string>(s => 
                 s.Contains("reset circuit") && s.Contains("TestService"))));
@@ -263,7 +284,7 @@ namespace HydroGarden.Foundation.Tests.ErrorHandling.RecoveryStrategies
             error.Context["ServiceKey"] = "TestService";
 
             // Configure middleware to throw exception
-            var throwingMiddleware = new Mock<TestableCircuitBreakerMiddleware>();
+            var throwingMiddleware = new Mock<ICircuitBreakerMiddleware>();
             throwingMiddleware.Setup(m => m.GetCircuitState("TestService"))
                 .Returns(TestableCircuitBreakerMiddleware.CircuitState.Open);
                 

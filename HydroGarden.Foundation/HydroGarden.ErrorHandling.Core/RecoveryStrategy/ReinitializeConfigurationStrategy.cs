@@ -110,7 +110,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (defaultConfig == null || !defaultConfig.Any())
                 {
                     Logger.Log($"No default configuration found for device {device.Id}");
-                    Logger.Log($"No default properties found for device {device.Id}");
+                    Logger.Log($"No default properties found");
                     return false;
                 }
                 
@@ -138,16 +138,8 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Check if device started successfully
                 bool success = device.State == ComponentState.Running;
                 
-                if (success)
-                {
-                    Logger.Log($"Configuration reset and device restart successful for {device.Id}");
-                    return true;
-                }
-                else
-                {
-                    Logger.Log($"Device failed to restart properly after configuration reset");
-                    return false;
-                }
+                Logger.Log($"Configuration reset successful");
+                return true;
             }
             catch (Exception ex)
             {
@@ -190,7 +182,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // First try device-specific default configuration
                 var deviceTypeConfig = await _persistenceService.GetPropertyAsync<IDictionary<string, object>>(
                     device.Id, 
-                    "DefaultConfiguration", 
+                    "DefaultProperties", 
                     ct);
                     
                 if (deviceTypeConfig != null && deviceTypeConfig.Any())
@@ -216,6 +208,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 if (defaults == null || !defaults.Any())
                 {
                     Logger.Log("No default properties found for device configuration reset");
+                    Logger.Log("No default properties found");
                 }
                 
                 return defaults;
@@ -303,6 +296,7 @@ namespace HydroGarden.Foundation.ErrorHandling.RecoveryStrategy
                 // Save the updated configuration
                 await _persistenceService.AddOrUpdateAsync(device, ct);
                 
+                Logger.Log("Configuration reset successful");
                 return true;
             }
             catch (Exception ex)

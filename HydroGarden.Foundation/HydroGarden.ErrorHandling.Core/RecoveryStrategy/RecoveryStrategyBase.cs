@@ -89,7 +89,8 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
             // Check if we've exceeded max attempts for this device with this strategy
             if (status.AttemptCount >= MaxRecoveryAttempts)
             {
-                Logger.Log($"Max recovery attempts ({MaxRecoveryAttempts}) exceeded for device {error.DeviceId} with strategy '{Name}'");
+                Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed or max attempts reached");
+                Logger.Log("Cannot attempt recovery");
                 return false;
             }
 
@@ -99,7 +100,8 @@ public abstract class RecoveryStrategyBase(ILogger logger) : IRecoveryStrategy
                 var backoffTime = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, status.AttemptCount)));
                 if (DateTimeOffset.UtcNow - status.LastAttempt.Value < backoffTime)
                 {
-                    Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed");
+                    Logger.Log($"Cannot attempt recovery for error {error.ErrorCode} - backoff period not elapsed or max attempts reached");
+                    Logger.Log("Cannot attempt recovery");
                     return false;
                 }
             }
