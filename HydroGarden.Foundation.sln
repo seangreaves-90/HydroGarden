@@ -27,8 +27,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.Erro
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Logger", "HydroGarden.Foundation\HydroGarden.Logger\HydroGarden.Logger.csproj", "{A1F8CD26-6BFD-4F34-AF91-894CB524804A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HydroGarden.Foundation.Tests.ErrorHandling", "HydroGarden.Foundation\HydroGarden.Foundation.Tests.ErrorHandling\HydroGarden.Foundation.Tests.ErrorHandling.csproj", "{F756BFD8-0DFD-408B-8721-17EA7759002A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,10 +65,6 @@ Global
 		{A1F8CD26-6BFD-4F34-AF91-894CB524804A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1F8CD26-6BFD-4F34-AF91-894CB524804A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1F8CD26-6BFD-4F34-AF91-894CB524804A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F756BFD8-0DFD-408B-8721-17EA7759002A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F756BFD8-0DFD-408B-8721-17EA7759002A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F756BFD8-0DFD-408B-8721-17EA7759002A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F756BFD8-0DFD-408B-8721-17EA7759002A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

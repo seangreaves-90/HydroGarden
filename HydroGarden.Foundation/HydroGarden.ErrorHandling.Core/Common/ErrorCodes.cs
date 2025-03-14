@@ -59,31 +59,5 @@
             public const string DATA_CORRUPTION = "STORAGE_DATA_CORRUPT";
             public const string SERIALIZATION_ERROR = "STORAGE_SERIAL_ERROR";
         }
-
-        // Recovery-related error codes
-        public static class Recovery
-        {
-            public const string STRATEGY_FAILED = "RECOVERY_STRATEGY_FAILED";
-            public const string ATTEMPT_LIMIT_REACHED = "RECOVERY_LIMIT_EXCEEDED";
-            public const string CIRCUIT_OPEN = "RECOVERY_CIRCUIT_OPEN";
-            public const string DEPENDENCY_UNRECOVERABLE = "RECOVERY_DEP_FAILED";
-        }
-
-        // Helper method to check if an error is unrecoverable based on its code
-        public static bool IsUnrecoverable(string? errorCode)
-        {
-            if (string.IsNullOrEmpty(errorCode))
-                return false;
-
-            return errorCode switch
-            {
-                Device.HARDWARE_FAILURE => true,
-                Device.CONFIGURATION_INVALID => true,
-                Recovery.ATTEMPT_LIMIT_REACHED => true,
-                Recovery.DEPENDENCY_UNRECOVERABLE => true,
-                Storage.DATA_CORRUPTION => true,
-                _ => false
-            };
-        }
     }
 }

@@ -16,4 +16,9 @@
 		<ProjectReference Include="..\HydroGarden.Foundation.Common\HydroGarden.Foundation.Common.csproj" />
 		<ProjectReference Include="..\HydroGarden.Logger\HydroGarden.Logger.csproj" />
 	</ItemGroup>
+
+
+	<ItemGroup>
+	  <Folder Include="Exceptions\" />
+	</ItemGroup>
 </Project>

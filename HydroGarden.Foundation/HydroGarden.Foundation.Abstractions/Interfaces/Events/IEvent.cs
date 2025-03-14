@@ -92,6 +92,11 @@
         Timer,
 
         /// <summary>
+        /// Error events indicating problems in the system
+        /// </summary>
+        Error,
+
+        /// <summary>
         /// Custom event types defined by device implementations
         /// </summary>
         Custom

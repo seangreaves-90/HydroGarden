@@ -1,36 +1,41 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Common;
 
 namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
-    /// Enhanced error representation for IoT components with improved classification,
-    /// context capture, and recovery tracking capabilities.
+    /// Error representation for IoT components with improved classification and context capture.
     /// </summary>
     public class ComponentError : IApplicationError
     {
-        // Core properties from IApplicationError
+        /// <inheritdoc />
         public Guid DeviceId { get; }
+        
+        /// <inheritdoc />
         public string? ErrorCode { get; }
+        
+        /// <inheritdoc />
         public string Message { get; }
+        
+        /// <inheritdoc />
         public ErrorSeverity Severity { get; }
-        public Guid CorrelationId { get; } = Guid.NewGuid();
+        
+        /// <inheritdoc />
+        public Guid CorrelationId { get; }
+        
+        /// <inheritdoc />
         public ErrorSource Source { get; }
-        public bool IsTransient { get; }
+        
+        /// <inheritdoc />
         public IDictionary<string, object> Context { get; }
-        public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
+        
+        /// <inheritdoc />
+        public DateTimeOffset Timestamp { get; }
+        
+        /// <inheritdoc />
         public Exception? Exception { get; }
-
-        // Enhanced recovery properties
-        public bool IsRecoverable { get; }
-        public int RecoveryAttemptCount { get; private set; }
-        public DateTimeOffset? LastRecoveryAttempt { get; private set; }
-        public int MaxRecoveryAttempts { get; } = 5;
+        
+        /// <inheritdoc />
         public ErrorCategory Category { get; }
-
-        // Recovery backoff with exponential delay capped at 10 minutes
-        public TimeSpan RecoveryBackoffInterval => TimeSpan.FromSeconds(
-            Math.Min(600, Math.Pow(2, RecoveryAttemptCount)));
 
         /// <summary>
         /// Creates a new ComponentError with detailed classification.
@@ -40,9 +45,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string? errorCode,
             string message,
             ErrorSeverity severity,
-            bool isRecoverable,
             ErrorSource source,
-            bool isTransient,
             IDictionary<string, object>? context = null,
             Exception? exception = null,
             ErrorCategory? category = null)
@@ -51,52 +54,27 @@ namespace HydroGarden.Foundation.ErrorHandling
             ErrorCode = errorCode;
             Message = message;
             Severity = severity;
-            IsRecoverable = isRecoverable && !ErrorCodes.IsUnrecoverable(errorCode);
             Source = source;
-            IsTransient = isTransient;
             Exception = exception;
+            CorrelationId = Guid.NewGuid();
+            Timestamp = DateTimeOffset.UtcNow;
 
             // Derive category from error code if not provided
             Category = category ?? DeriveCategory(errorCode);
 
-            // Enhanced context capture
+            // Initialize and enrich context
             Context = new Dictionary<string, object>(context ?? new Dictionary<string, object>());
             EnrichContext(exception);
         }
 
         /// <summary>
-        /// Creates a non-recoverable error with appropriate classification.
+        /// Creates an error for device failures.
         /// </summary>
-        public static ComponentError CreateNonRecoverable(
-            Guid deviceId,
-            string errorCode,
-            string message,
-            ErrorSeverity severity = ErrorSeverity.Critical,
-            ErrorSource source = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
-            Exception? exception = null)
-        {
-            return new ComponentError(
-                deviceId,
-                errorCode,
-                message,
-                severity,
-                false,
-                source,
-                false,
-                context,
-                exception);
-        }
-
-        /// <summary>
-        /// Creates a transient error that can be retried.
-        /// </summary>
-        public static ComponentError CreateTransient(
+        public static ComponentError CreateDeviceError(
             Guid deviceId,
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
-            ErrorSource source = ErrorSource.Unknown,
             IDictionary<string, object>? context = null,
             Exception? exception = null)
         {
@@ -105,66 +83,55 @@ namespace HydroGarden.Foundation.ErrorHandling
                 errorCode,
                 message,
                 severity,
-                true,
-                source,
-                true,
+                ErrorSource.Device,
                 context,
-                exception);
+                exception,
+                ErrorCategory.Device);
         }
 
         /// <summary>
-        /// Records an attempt to recover from this error.
+        /// Creates an error for service failures.
         /// </summary>
-        public void RecordRecoveryAttempt()
+        public static ComponentError CreateServiceError(
+            Guid deviceId,
+            string errorCode,
+            string message,
+            ErrorSeverity severity = ErrorSeverity.Error,
+            IDictionary<string, object>? context = null,
+            Exception? exception = null)
         {
-            RecoveryAttemptCount++;
-            LastRecoveryAttempt = DateTimeOffset.UtcNow;
+            return new ComponentError(
+                deviceId,
+                errorCode,
+                message,
+                severity,
+                ErrorSource.Service,
+                context,
+                exception,
+                ErrorCategory.Service);
         }
 
         /// <summary>
-        /// Determines if recovery can be attempted based on attempt count and backoff.
+        /// Creates an error for communication failures.
         /// </summary>
-        public bool CanAttemptRecovery()
+        public static ComponentError CreateCommunicationError(
+            Guid deviceId,
+            string errorCode,
+            string message,
+            ErrorSeverity severity = ErrorSeverity.Error,
+            IDictionary<string, object>? context = null,
+            Exception? exception = null)
         {
-            return CanAttemptRecoveryNow(RecoveryBackoffInterval);
+            return new ComponentError(
+                deviceId,
+                errorCode,
+                message,
+                severity,
+                ErrorSource.Communication,
+                context,
+                exception,
+                ErrorCategory.Communication);
         }
-        
-        /// <summary>
-        /// Determines if recovery can be attempted based on backoff period and max attempts
-        /// </summary>
-        /// <param name="backoffPeriod">Minimum time between recovery attempts</param>
-        /// <param name="maxAttempts">Override for maximum attempts</param>
-        /// <returns>True if recovery can be attempted now</returns>
-        public bool CanAttemptRecoveryNow(TimeSpan backoffPeriod, int? maxAttempts = null)
-        {
-            // Check if the error is recoverable at all
-            if (!IsRecoverable) 
-            {
-                return false;
-            }
-            
-            // Check if we've exceeded the maximum attempts
-            int effectiveMaxAttempts = maxAttempts ?? MaxRecoveryAttempts;
-            if (RecoveryAttemptCount >= effectiveMaxAttempts) 
-            {
-                return false;
-            }
-            
-            // If no previous attempt, we can recover
-            if (LastRecoveryAttempt == null) 
-            {
-                return true;
-            }
-            
-            // Check if backoff period has elapsed
-            return (DateTimeOffset.UtcNow - LastRecoveryAttempt.Value) > backoffPeriod;
-        }
-
-        /// <summary>
-        /// Reports if the error is unrecoverable, meaning no recovery should be attempted.
-        /// This includes explicitly unrecoverable errors and those that have reached max attempts.
-        /// </summary>
-        public bool IsUnrecoverable => !IsRecoverable || ErrorCodes.IsUnrecoverable(ErrorCode) || RecoveryAttemptCount >= MaxRecoveryAttempts;
 
         /// <summary>
         /// Enriches the context with additional diagnostic information.
@@ -219,8 +186,6 @@ namespace HydroGarden.Foundation.ErrorHandling
                 return ErrorCategory.EventSystem;
             if (errorCode.StartsWith("STORAGE_"))
                 return ErrorCategory.Storage;
-            if (errorCode.StartsWith("RECOVERY_"))
-                return ErrorCategory.Recovery;
 
             return ErrorCategory.Unknown;
         }
@@ -230,22 +195,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// </summary>
         public override string ToString()
         {
-            return $"[{Severity}] [{ErrorCode}] {Message} - DeviceId: {DeviceId}, RecoveryAttempts: {RecoveryAttemptCount}, Timestamp: {Timestamp}";
+            return $"[{Severity}] [{ErrorCode}] {Message} - DeviceId: {DeviceId}, Timestamp: {Timestamp}";
         }
-    }
-
-    /// <summary>
-    /// Categorizes errors for better grouping and analysis.
-    /// </summary>
-    public enum ErrorCategory
-    {
-        Unknown = 0,
-        Device = 10,
-        Service = 20,
-        Communication = 30,
-        EventSystem = 40,
-        Storage = 50,
-        Recovery = 60,
-        Security = 70
     }
 }

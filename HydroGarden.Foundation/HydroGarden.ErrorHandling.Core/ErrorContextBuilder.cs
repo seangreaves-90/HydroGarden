@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
 namespace HydroGarden.Foundation.ErrorHandling
 {
@@ -14,6 +15,21 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// Creates a new error context builder.
         /// </summary>
         public static ErrorContextBuilder Create() => new();
+
+        /// <summary>
+        /// Adds device information to the context.
+        /// </summary>
+        public ErrorContextBuilder WithDevice(Guid deviceId, string? deviceName = null)
+        {
+            _context["DeviceId"] = deviceId;
+            
+            if (!string.IsNullOrEmpty(deviceName))
+            {
+                _context["DeviceName"] = deviceName;
+            }
+            
+            return this;
+        }
 
         /// <summary>
         /// Adds source information about the component that experienced the error.
@@ -54,9 +70,48 @@ namespace HydroGarden.Foundation.ErrorHandling
 
             if (parameters != null)
             {
-                _context["OperationParameters"] = parameters;
+                // Handle parameters without storing sensitive or large data
+                try
+                {
+                    // If parameters is a dictionary or collection, extract a summary
+                    if (parameters is IDictionary<string, object> dict)
+                    {
+                        _context["OperationParameterCount"] = dict.Count;
+                        _context["OperationParameterKeys"] = string.Join(",", dict.Keys);
+                    }
+                    else if (parameters is ICollection collection)
+                    {
+                        _context["OperationParameterCount"] = collection.Count;
+                    }
+                    else
+                    {
+                        // For simple objects, just store the type
+                        _context["OperationParameterType"] = parameters.GetType().Name;
+                    }
+                }
+                catch
+                {
+                    // If anything goes wrong during parameter processing, just store the type
+                    _context["OperationParameterType"] = parameters.GetType().Name;
+                }
             }
 
+            return this;
+        }
+
+        /// <summary>
+        /// Adds error classification information to the context.
+        /// </summary>
+        public ErrorContextBuilder WithErrorClassification(
+            string errorCode,
+            ErrorSeverity severity,
+            ErrorSource source,
+            ErrorCategory category)
+        {
+            _context["ErrorCode"] = errorCode;
+            _context["ErrorSeverity"] = severity.ToString();
+            _context["ErrorSource"] = source.ToString();
+            _context["ErrorCategory"] = category.ToString();
             return this;
         }
 
@@ -90,10 +145,17 @@ namespace HydroGarden.Foundation.ErrorHandling
             _context["ExceptionType"] = exception.GetType().Name;
             _context["ExceptionMessage"] = exception.Message;
 
-            if (exception.InnerException != null)
+            // Add exception details recursively for inner exceptions
+            var innerException = exception.InnerException;
+            int depth = 1;
+            
+            while (innerException != null && depth <= 3) // Limit depth to avoid excessive nesting
             {
-                _context["InnerExceptionType"] = exception.InnerException.GetType().Name;
-                _context["InnerExceptionMessage"] = exception.InnerException.Message;
+                _context[$"InnerExceptionType{depth}"] = innerException.GetType().Name;
+                _context[$"InnerExceptionMessage{depth}"] = innerException.Message;
+                
+                innerException = innerException.InnerException;
+                depth++;
             }
 
             // Only create a hash of the stack trace to avoid storing full traces
@@ -102,6 +164,18 @@ namespace HydroGarden.Foundation.ErrorHandling
                 _context["StackTraceHash"] = exception.StackTrace.GetHashCode().ToString();
             }
 
+            // Add HResult for system exceptions
+            _context["HResult"] = exception.HResult;
+
+            return this;
+        }
+
+        /// <summary>
+        /// Adds correlation information for tracking related events.
+        /// </summary>
+        public ErrorContextBuilder WithCorrelation(Guid correlationId)
+        {
+            _context["CorrelationId"] = correlationId;
             return this;
         }
 
@@ -110,7 +184,9 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// </summary>
         public Dictionary<string, object> Build()
         {
+            // Add timestamp information
             _context["ContextCreatedAt"] = DateTimeOffset.UtcNow.ToString("o");
+            
             return new Dictionary<string, object>(_context);
         }
     }

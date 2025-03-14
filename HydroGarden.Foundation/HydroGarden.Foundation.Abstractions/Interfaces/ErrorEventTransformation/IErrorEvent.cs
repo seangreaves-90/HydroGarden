@@ -2,66 +2,64 @@
 
 namespace HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation
 {
+    /// <summary>
+    /// Defines the contract for error events that can be published on the event bus.
+    /// </summary>
     public interface IErrorEvent
     {
         /// <summary>
-        /// Gets or sets the unique identifier for this error event.
+        /// Gets the unique identifier for this error event.
         /// </summary>
-        public Guid Id { get; set; }
+        public Guid Id { get; }
 
         /// <summary>
-        /// Gets or sets the device ID associated with this error.
+        /// Gets the device ID associated with this error.
         /// </summary>
-        public Guid DeviceId { get; set; }
+        public Guid DeviceId { get; }
 
         /// <summary>
-        /// Gets or sets the error code.
+        /// Gets the error code.
         /// </summary>
-        public string ErrorCode { get; set; }
+        public string ErrorCode { get; }
 
         /// <summary>
-        /// Gets or sets the error message.
+        /// Gets the error message.
         /// </summary>
-        public string Message { get; set; }
+        public string Message { get; }
 
         /// <summary>
-        /// Gets or sets the timestamp when the error occurred.
+        /// Gets the timestamp when the error occurred.
         /// </summary>
-        public DateTimeOffset Timestamp { get; set; }
+        public DateTimeOffset Timestamp { get; }
 
         /// <summary>
-        /// Gets or sets the severity level of the error.
+        /// Gets the severity level of the error.
         /// </summary>
-        public ErrorSeverity Severity { get; set; }
+        public ErrorSeverity Severity { get; }
 
         /// <summary>
-        /// Gets or sets the source of the error.
+        /// Gets the source of the error.
         /// </summary>
-        public ErrorSource Source { get; set; }
+        public ErrorSource Source { get; }
 
         /// <summary>
-        /// Gets or sets the exception details.
+        /// Gets the exception details.
         /// </summary>
-        public string ExceptionDetails { get; set; }
+        public string? ExceptionDetails { get; }
 
         /// <summary>
-        /// Gets or sets the correlation identifier for tracing.
+        /// Gets the correlation identifier for tracing.
         /// </summary>
-        public Guid CorrelationId { get; set; }
+        public Guid CorrelationId { get; }
 
         /// <summary>
-        /// Gets or sets additional contextual information about the error.
+        /// Gets additional contextual information about the error.
         /// </summary>
-        public Dictionary<string, object>? Context { get; set; }
+        public IDictionary<string, object> Context { get; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether the error is transient.
+        /// Gets the type of the original exception.
         /// </summary>
-        public bool IsTransient { get; set; }
-
-        /// <summary>
-        /// Gets or sets the type of the original exception.
-        /// </summary>
-        public string? ExceptionType { get; set; }
+        public string? ExceptionType { get; }
     }
 }
