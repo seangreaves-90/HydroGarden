@@ -62,9 +62,16 @@ namespace HydroGarden.Foundation.ErrorHandling
             // Derive category from error code if not provided
             Category = category ?? DeriveCategory(errorCode);
 
-            // Initialize and enrich context
-            Context = new Dictionary<string, object>(context ?? new Dictionary<string, object>());
-            EnrichContext(exception);
+            // Initialize context from provided context or create an empty one
+            Context = context != null 
+                ? new Dictionary<string, object>(context) 
+                : new Dictionary<string, object>();
+                
+            // Only enrich the context if we're given an exception or the context isn't empty
+            if (exception != null || context != null)
+            {
+                EnrichContext(exception);
+            }
         }
 
         /// <summary>

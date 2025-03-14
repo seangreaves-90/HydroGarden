@@ -79,7 +79,7 @@ namespace HydroGarden.Foundation.ErrorHandling
                         _context["OperationParameterCount"] = dict.Count;
                         _context["OperationParameterKeys"] = string.Join(",", dict.Keys);
                     }
-                    else if (parameters is ICollection collection)
+                    else if (parameters is System.Collections.ICollection collection)
                     {
                         _context["OperationParameterCount"] = collection.Count;
                     }
@@ -158,11 +158,10 @@ namespace HydroGarden.Foundation.ErrorHandling
                 depth++;
             }
 
-            // Only create a hash of the stack trace to avoid storing full traces
-            if (!string.IsNullOrEmpty(exception.StackTrace))
-            {
-                _context["StackTraceHash"] = exception.StackTrace.GetHashCode().ToString();
-            }
+            // Always add a stack trace hash, empty string if no stack trace is available
+            _context["StackTraceHash"] = !string.IsNullOrEmpty(exception.StackTrace) 
+                ? exception.StackTrace.GetHashCode().ToString()
+                : string.Empty.GetHashCode().ToString();
 
             // Add HResult for system exceptions
             _context["HResult"] = exception.HResult;
