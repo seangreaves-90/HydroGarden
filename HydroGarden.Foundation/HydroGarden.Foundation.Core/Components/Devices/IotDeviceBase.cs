@@ -1,5 +1,6 @@
 ﻿
 using System.Collections.Concurrent;
+using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
@@ -242,19 +243,20 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             // Check if we've exceeded the maximum number of consecutive recovery attempts
             if (_consecutiveRecoveryFailures >= _maxRecoveryAttempts)
             {
-                await ErrorMonitor.ReportDeviceErrorAsync(
-                    Id,
-                    "DEVICE_RECOVERY_LIMIT_REACHED",
-                    $"Device recovery failed after {_maxRecoveryAttempts} attempts",
-                    ErrorSeverity.Critical,
-                    null,
-                    ErrorContextBuilder.Create()
+                await ErrorHandlingExtensions.ReportDeviceErrorAsync(
+                    monitor: ErrorMonitor,
+                    deviceId: Id,
+                    errorCode: "DEVICE_RECOVERY_LIMIT_REACHED",
+                    message: $"Device recovery failed after {_maxRecoveryAttempts} attempts",
+                    severity: ErrorSeverity.Critical,
+                    exception: null,
+                    context: ErrorContextBuilder.Create()
                         .WithSource(this)
                         .WithOperation("TryRecover")
                         .WithProperty("MaxAttempts", _maxRecoveryAttempts)
                         .WithProperty("ConsecutiveFailures", _consecutiveRecoveryFailures)
                         .Build(),
-                    ct);
+                    ct: ct);
 
                 return false;
             }

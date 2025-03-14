@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling;

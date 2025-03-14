@@ -20,7 +20,8 @@
         Service,       // Service/application logic errors
         Communication, // Network/communication errors
         UI,            // User interface errors
-        Database,      // Data persistence errors
+        Database,      // Data persistence errors,
+        System,        // System-level errors
         Unknown        // Uncategorized errors
     }
     

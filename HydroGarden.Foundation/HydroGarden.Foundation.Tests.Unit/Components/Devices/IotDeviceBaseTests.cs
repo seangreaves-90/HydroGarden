@@ -205,7 +205,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         public async Task InitializeAsync_OnInitializeException_ShouldSetStateToError()
         {
             // Arrange - use a mock for direct interface access
-            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object, null, 3) { CallBase = true };
+            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object, 3) { CallBase = true };
 
             // Setup the method to throw
             mockDevice.Protected()
@@ -239,7 +239,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         public async Task StartAsync_OnStartException_ShouldSetStateToError()
         {
             // Arrange - use a mock that allows the base implementation
-            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object) { CallBase = true };
+            var mockDevice = new Mock<IoTDeviceBase>(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object, 3) { CallBase = true };
 
             // Setup InitializeAsync to work normally
             await ((IIoTDevice)mockDevice.Object).InitializeAsync();

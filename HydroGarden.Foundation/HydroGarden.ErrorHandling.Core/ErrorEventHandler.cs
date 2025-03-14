@@ -1,4 +1,5 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.ErrorHandling.Core;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.ErrorHandling.Events;
 using HydroGarden.Logger.Abstractions;
@@ -40,7 +41,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             _logger.Log($"Processing error event: {errorData.ErrorCode} - {errorData.Message}");
 
             // Create a component error from the error event
-            var componentError = new ComponentError(
+            var componentError = new  ComponentError(
                 errorData.DeviceId,
                 errorData.ErrorCode,
                 errorData.Message,

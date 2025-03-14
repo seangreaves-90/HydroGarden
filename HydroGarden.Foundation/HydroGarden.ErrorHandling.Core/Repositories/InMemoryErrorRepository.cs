@@ -1,12 +1,8 @@
 ﻿using HydroGarden.ErrorHandling.Core.Models;
-using HydroGarden.Foundation.Abstractions.Interfaces.Errors;
 using HydroGarden.Logger.Abstractions;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.ErrorHandling.Core;
 
 namespace HydroGarden.ErrorHandling.Core.Repositories
 {

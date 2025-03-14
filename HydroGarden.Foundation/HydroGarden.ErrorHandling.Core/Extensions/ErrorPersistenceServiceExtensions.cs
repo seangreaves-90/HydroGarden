@@ -1,4 +1,5 @@
 ﻿using HydroGarden.ErrorHandling.Core.Repositories;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;

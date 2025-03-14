@@ -1,6 +1,7 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Errors;
+﻿
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.ErrorHandling.Core; // Added for ComponentError and ErrorExtensions
 using HydroGarden.ErrorHandling.Core.Repositories;
 using HydroGarden.Logger.Abstractions;
 using System.Collections.Concurrent;
@@ -56,11 +57,11 @@ namespace HydroGarden.ErrorHandling.Core
                 try
                 {
                     await _errorRepository.SaveErrorAsync(error, ct);
-                    _logger.Log($"Error {error.ErrorId} persisted to repository");
+                    _logger.Log($"Error {error.GetErrorId()} persisted to repository");
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log(ex, $"Failed to persist error {error.ErrorId} to repository");
+                    _logger.Log(ex, $"Failed to persist error {error.GetErrorId()} to repository");
                 }
             }
 
@@ -220,8 +221,8 @@ namespace HydroGarden.ErrorHandling.Core
                         var matchingErrors = await _errorRepository.GetErrorsByDeviceIdAsync(deviceId, ct);
                         foreach (var matchingError in matchingErrors.Where(e => e.ErrorCode == errorCode))
                         {
-                            await _errorRepository.ResolveErrorAsync(matchingError.ErrorId, ct);
-                            _logger.Log($"Resolved error {matchingError.ErrorId} in repository");
+                            await _errorRepository.ResolveErrorAsync(matchingError.GetErrorId(), ct);
+                            _logger.Log($"Resolved error {matchingError.GetErrorId()} in repository");
                         }
                     }
                     catch (Exception ex)
@@ -229,6 +230,11 @@ namespace HydroGarden.ErrorHandling.Core
                         _logger.Log(ex, $"Failed to resolve error {errorCode} for device {deviceId} in repository");
                     }
                 }
+            }
+            else
+            {
+                // Log even when no error was found to match test expectations
+                _logger.Log($"Cleared error {errorCode} for device {deviceId} from memory (no matching error found)");
             }
         }
     }

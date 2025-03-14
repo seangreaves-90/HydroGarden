@@ -397,7 +397,7 @@ namespace HydroGarden.Foundation.Common.Events
         private async Task HandleEventWithErrorCaptureAsync(
             object sender,
             IEvent evt,
-            EventSubscription subscription,
+            IEventSubscription subscription,
             PublishResult result,
             CancellationToken ct)
         {
