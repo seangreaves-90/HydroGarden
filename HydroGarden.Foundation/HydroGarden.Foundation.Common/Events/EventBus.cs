@@ -1,5 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events.Pipeline;
 using HydroGarden.Logger.Abstractions;
@@ -16,6 +17,7 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly ILogger _logger;
         private readonly ConcurrentDictionary<Guid, EventSubscription> _subscriptions = new();
         private readonly ConcurrentDictionary<EventType, List<EventSubscription>> _subscriptionsByType = new();
+        private readonly IEventRouter _router;
         private readonly ITopologyService? _topologyService;
         private readonly IEventStore? _eventStore;
         private readonly IEventRetryPolicy? _retryPolicy;
@@ -28,31 +30,27 @@ namespace HydroGarden.Foundation.Common.Events
         /// Initializes a new instance of the <see cref="EventBus"/> class with optional services.
         /// </summary>
         /// <param name="logger">The logger to use.</param>
+        /// <param name="router">The event router to use for subscription matching.</param>
         /// <param name="topologyService">Optional topology service for event routing based on component relationships.</param>
         /// <param name="eventStore">Optional event store for persisting events.</param>
         /// <param name="retryPolicy">Optional retry policy for failed events.</param>
         /// <param name="transformer">Optional event transformer.</param>
         public EventBus(
             ILogger logger,
+            IEventRouter router,
             ITopologyService? topologyService = null,
             IEventStore? eventStore = null,
             IEventRetryPolicy? retryPolicy = null,
             IEventTransformer? transformer = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _router = router ?? throw new ArgumentNullException(nameof(router));
             _topologyService = topologyService;
             _eventStore = eventStore;
             _retryPolicy = retryPolicy;
             _transformer = transformer;
             
-            if (_topologyService != null)
-            {
-                _logger.Log("EventBus initialized with topology service");
-            }
-            else
-            {
-                _logger.Log("EventBus initialized without topology service (routing limited to direct targets)");
-            }
+            _logger.Log("EventBus initialized with router: " + _router.GetType().Name);
         }
 
         /// <inheritdoc/>
@@ -224,7 +222,7 @@ namespace HydroGarden.Foundation.Common.Events
                     SuccessCount = 0
                 };
 
-                // Find matching subscriptions
+                // Find matching subscriptions using the router
                 var matchingSubscriptions = await GetMatchingSubscriptionsAsync(evt, ct);
                 result.HandlerCount = matchingSubscriptions.Count;
 
@@ -377,147 +375,20 @@ namespace HydroGarden.Foundation.Common.Events
         }
 
         /// <summary>
-        /// Gets matching subscriptions for an event based on event type, source ID, and topology.
+        /// Gets matching subscriptions for an event using the EventRouter.
         /// </summary>
-        private async Task<List<EventSubscription>> GetMatchingSubscriptionsAsync(
+        private Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
             IEvent evt,
             CancellationToken ct = default)
         {
-            var results = new List<EventSubscription>();
-
-            // Check if we have subscriptions for this event type
+            // Get all subscriptions for this event type as a performance optimization
             if (!_subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions))
             {
-                return results;
+                return Task.FromResult<IReadOnlyList<IEventSubscription>>(Array.Empty<IEventSubscription>());
             }
 
-            // Check if the event has specific targets
-            if (evt.RoutingData?.TargetIds.Length > 0)
-            {
-                // The event has explicit targets, only deliver to those
-                var targetSet = new HashSet<Guid>(evt.RoutingData.TargetIds);
-
-                foreach (var subscription in typeSubscriptions)
-                {
-                    // Check if any subscription source ID matches a target
-                    if (subscription.Options.SourceIds.Length > 0)
-                    {
-                        foreach (var sourceId in subscription.Options.SourceIds)
-                        {
-                            if (targetSet.Contains(sourceId))
-                            {
-                                // Apply custom filter if specified
-                                if (subscription.Options.Filter != null && !subscription.Options.Filter(evt))
-                                {
-                                    continue;
-                                }
-
-                                results.Add(subscription);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                return results;
-            }
-
-            // No explicit targets, use standard subscription filtering
-            foreach (var subscription in typeSubscriptions)
-            {
-                // Check source ID filter
-                if (subscription.Options.SourceIds.Length > 0)
-                {
-                    bool sourceMatch = subscription.Options.SourceIds.Contains(evt.SourceId);
-
-                    if (!sourceMatch)
-                    {
-                        // If not a direct match and we shouldn't include connected sources, skip
-                        if (!subscription.Options.IncludeConnectedSources)
-                        {
-                            continue;
-                        }
-
-                        // Check topology connections if we have a topology service
-                        if (_topologyService != null)
-                        {
-                            bool connected = await CheckTopologyConnectionAsync(
-                                evt.SourceId,
-                                subscription.Options.SourceIds,
-                                ct);
-
-                            if (!connected)
-                            {
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            // No topology service but we need it, so no match
-                            continue;
-                        }
-                    }
-                }
-
-                // Apply custom filter if specified
-                if (subscription.Options.Filter != null && !subscription.Options.Filter(evt))
-                {
-                    continue;
-                }
-
-                results.Add(subscription);
-            }
-
-            return results;
-        }
-
-        /// <summary>
-        /// Checks if the source is connected to any of the target IDs via the topology.
-        /// </summary>
-        private async Task<bool> CheckTopologyConnectionAsync(
-            Guid sourceId,
-            Guid[] targetIds,
-            CancellationToken ct)
-        {
-            if (_topologyService == null)
-            {
-                return false;
-            }
-
-            foreach (var targetId in targetIds)
-            {
-                try
-                {
-                    if (sourceId == targetId)
-                    {
-                        return true; // Self-connection is always true
-                    }
-
-                    // Check for direct connection
-                    var connections = await _topologyService.GetConnectionsForSourceAsync(sourceId, ct);
-                    foreach (var connection in connections)
-                    {
-                        if (!connection.IsEnabled)
-                            continue;
-
-                        if (connection.TargetId == targetId)
-                        {
-                            // Evaluate condition if present
-                            if (string.IsNullOrEmpty(connection.Condition) || 
-                                await _topologyService.EvaluateConnectionConditionAsync(connection, ct))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Log(ex, $"Error checking topology connection between {sourceId} and {targetId}");
-                }
-            }
-
-            return false;
+            // Delegate subscription matching to the router
+            return _router.GetMatchingSubscriptionsAsync(evt, typeSubscriptions, ct);
         }
 
         /// <summary>
