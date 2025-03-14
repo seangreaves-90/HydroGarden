@@ -355,3 +355,6 @@ ASALocalRun/
 /docs/developers
 /docs/handoffs
 /HydroGarden.Foundation/testlog
+/docs/error_handling_implementation.md
+/docs/error_handling_refactoring_summary.md
+/docs/error_handling_usage.md
