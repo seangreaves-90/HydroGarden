@@ -3,144 +3,72 @@
 namespace HydroGarden.Foundation.Common.Events
 {
     /// <summary>
-    /// Contains routing information for events
+    /// Represents routing data for events.
     /// </summary>
     public class EventRoutingData : IEventRoutingData
     {
-        /// <inheritdoc />
-        public Guid[] TargetIds { get; set; }
-
-        /// <inheritdoc />
-        public bool Persist { get; set; }
-
-        /// <inheritdoc />
-        public EventPriority Priority { get; set; }
-
-        /// <inheritdoc />
-        public bool RequiresAcknowledgment { get; set; }
-
-        /// <inheritdoc />
-        public TimeSpan? Timeout { get; set; }
-
         /// <summary>
-        /// Creates a new instance of EventRoutingData with default values.
+        /// Initializes a new instance of the <see cref="EventRoutingData"/> class.
         /// </summary>
-        public EventRoutingData()
+        /// <param name="targetIds">The target IDs for the event.</param>
+        /// <param name="persist">Whether the event should be persisted.</param>
+        /// <param name="priority">The priority of the event.</param>
+        /// <param name="requiresAcknowledgment">Whether the event requires acknowledgment.</param>
+        /// <param name="timeout">The timeout for processing the event.</param>
+        public EventRoutingData(
+            Guid[]? targetIds = null,
+            bool persist = false,
+            EventPriority priority = EventPriority.Normal,
+            bool requiresAcknowledgment = false,
+            TimeSpan? timeout = null)
         {
-            TargetIds = [];
-            Persist = false;
-            Priority = EventPriority.Normal;
-            RequiresAcknowledgment = false;
-            Timeout = null;
+            TargetIds = targetIds ?? Array.Empty<Guid>();
+            Persist = persist;
+            Priority = priority;
+            RequiresAcknowledgment = requiresAcknowledgment;
+            Timeout = timeout;
         }
 
         /// <summary>
-        /// Creates a new instance of EventRoutingData with the specified target IDs.
+        /// Initializes a new instance of the <see cref="EventRoutingData"/> class with a single target.
         /// </summary>
-        public EventRoutingData(params Guid[] targetIds)
+        /// <param name="targetId">The target ID for the event.</param>
+        /// <param name="persist">Whether the event should be persisted.</param>
+        /// <param name="priority">The priority of the event.</param>
+        /// <param name="requiresAcknowledgment">Whether the event requires acknowledgment.</param>
+        /// <param name="timeout">The timeout for processing the event.</param>
+        public EventRoutingData(
+            Guid targetId,
+            bool persist = false,
+            EventPriority priority = EventPriority.Normal,
+            bool requiresAcknowledgment = false,
+            TimeSpan? timeout = null)
+            : this(new[] { targetId }, persist, priority, requiresAcknowledgment, timeout)
         {
-            TargetIds = targetIds;
-            Persist = false;
-            Priority = EventPriority.Normal;
-            RequiresAcknowledgment = false;
-            Timeout = null;
         }
 
+        /// <inheritdoc/>
+        public Guid[] TargetIds { get; }
+
+        /// <inheritdoc/>
+        public bool Persist { get; }
+
+        /// <inheritdoc/>
+        public EventPriority Priority { get; }
+
+        /// <inheritdoc/>
+        public bool RequiresAcknowledgment { get; }
+
+        /// <inheritdoc/>
+        public TimeSpan? Timeout { get; }
+
         /// <summary>
-        /// Creates a builder for fluent configuration of event routing data.
+        /// Creates a new instance of the <see cref="EventRoutingDataBuilder"/> class for building routing data with a fluent interface.
         /// </summary>
+        /// <returns>A new builder for creating EventRoutingData.</returns>
         public static EventRoutingDataBuilder CreateBuilder()
         {
             return new EventRoutingDataBuilder();
         }
     }
-
-    /// <summary>
-    /// Builder class for fluent configuration of event routing data.
-    /// </summary>
-    public class EventRoutingDataBuilder
-    {
-        private readonly EventRoutingData _data = new();
-
-        /// <summary>
-        /// Configures the specific target component IDs that should receive this event.
-        /// </summary>
-        public EventRoutingDataBuilder WithTargets(params Guid[] targetIds)
-        {
-            _data.TargetIds = targetIds;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures whether the event should be persisted.
-        /// </summary>
-        public EventRoutingDataBuilder WithPersistence(bool persist = true)
-        {
-            _data.Persist = persist;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures the priority of the event which affects the order of processing.
-        /// </summary>
-        public EventRoutingDataBuilder WithPriority(EventPriority priority)
-        {
-            _data.Priority = priority;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures the event as critical priority.
-        /// </summary>
-        public EventRoutingDataBuilder AsCritical()
-        {
-            _data.Priority = EventPriority.Critical;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures the event as high priority.
-        /// </summary>
-        public EventRoutingDataBuilder AsHighPriority()
-        {
-            _data.Priority = EventPriority.High;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures the event as low priority.
-        /// </summary>
-        public EventRoutingDataBuilder AsLowPriority()
-        {
-            _data.Priority = EventPriority.Low;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures whether the publisher requires acknowledgment of event delivery.
-        /// </summary>
-        public EventRoutingDataBuilder WithAcknowledgment(bool requiresAcknowledgment = true)
-        {
-            _data.RequiresAcknowledgment = requiresAcknowledgment;
-            return this;
-        }
-
-        /// <summary>
-        /// Configures the maximum time to wait for event processing to complete when
-        /// RequiresAcknowledgment is true.
-        /// </summary>
-        public EventRoutingDataBuilder WithTimeout(TimeSpan timeout)
-        {
-            _data.Timeout = timeout;
-            return this;
-        }
-
-        /// <summary>
-        /// Builds and returns the configured event routing data.
-        /// </summary>
-        public EventRoutingData Build()
-        {
-            return _data;
-        }
-    }
-    }
+}

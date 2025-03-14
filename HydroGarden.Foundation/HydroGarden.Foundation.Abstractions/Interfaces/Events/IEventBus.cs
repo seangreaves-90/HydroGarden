@@ -5,13 +5,8 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Interface for the event bus service
     /// </summary>
-    public interface IEventBus
+    public interface IEventBus : ITopologyAware
     {
-        /// <summary>
-        /// Sets the topology service for the event bus
-        /// </summary>
-        /// <param name="topologyService">The tology service</param>
-        void SetTopologyService(ITopologyService topologyService);
         /// <summary>
         /// Subscribes to events with the given handler and options
         /// </summary>

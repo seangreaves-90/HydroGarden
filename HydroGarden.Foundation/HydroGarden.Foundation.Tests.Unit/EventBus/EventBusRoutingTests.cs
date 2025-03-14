@@ -291,7 +291,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             eventBus.Subscribe(mockHandler2.Object, options2);
 
             // Create routing data that specifies only targetId1
-            var routingData = new EventRoutingData(targetId1);
+            var routingData = new EventRoutingData(new[] { targetId1 });
 
             // Create an event with specific routing
             var propertyEvent = new HydroGardenPropertyChangedEvent(
@@ -513,7 +513,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Events
             });
 
             // Create routing data with multiple targets
-            var routingData = new EventRoutingData(targetId1, targetId2); // Only targets 1 and 2
+            var routingData = new EventRoutingData(new[] { targetId1, targetId2 }); // Only targets 1 and 2
 
             // Create an event with multiple targets
             var propertyEvent = new HydroGardenPropertyChangedEvent(

@@ -51,7 +51,7 @@ namespace HydroGarden.Foundation.ErrorHandling
                 var publishableEvent = TransformToPublishableEvent(errorEvent);
                 
                 // Publish the event
-                await _eventBus.PublishAsync(publishableEvent, cancellationToken);
+                await _eventBus.PublishAsync(this, publishableEvent, cancellationToken);
                 
                 _logger.Log($"Published error as event: {error.ErrorCode}, DeviceId: {error.DeviceId}, Severity: {error.Severity}");
             }

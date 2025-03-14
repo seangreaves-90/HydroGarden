@@ -4,7 +4,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using System.Threading.Channels;
-using HydroGarden.Foundation.ErrorHandling.Extensions;
+using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -119,7 +119,8 @@ namespace HydroGarden.Foundation.Core.Services
 
         public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
         {
-            await this.ExecuteWithErrorHandlingAsync(
+            var success = await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync(
+                this,
                 _errorMonitor,
                 async () =>
                 {
@@ -158,7 +159,13 @@ namespace HydroGarden.Foundation.Core.Services
                 {
                     ["EventType"] = evt.EventType.ToString(),
                     ["SourceId"] = evt.SourceId
-                }, ct: ct);
+                }, 
+                ct);
+
+            if (!success)
+            {
+                _logger.Log($"[ERROR] Failed to handle event of type {evt.GetType().Name}");
+            }
         }
 
         public async Task ProcessPendingEventsAsync()

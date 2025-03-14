@@ -29,15 +29,10 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 .Returns<IEvent>(e => e);
         }
 
-        protected EventBus CreateTestEventBus()
+        protected Common.Events.EventBus CreateTestEventBus()
         {
             var eventBus = new Common.Events.EventBus(
-                MockLogger.Object,
-                MockStore.Object,
-                MockRetryPolicy.Object,
-                MockTransformer.Object,
-                MockErrorMonitor.Object,
-                1);
+                MockLogger.Object);
             eventBus.SetTopologyService(MockTopologyService.Object);
             return eventBus;
         }

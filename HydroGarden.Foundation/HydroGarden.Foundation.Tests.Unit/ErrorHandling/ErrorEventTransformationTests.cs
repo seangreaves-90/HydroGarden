@@ -68,12 +68,9 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
                 ErrorSeverity.Critical,
                 ErrorSource.Device,
                 context,
-                exception);
-
-            // Override correlation ID for testing
-            var privateField = typeof(ComponentError).GetField("_correlationId", 
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            privateField?.SetValue(error, correlationId);
+                exception,
+                null,      // category
+                correlationId);  // Use the specific correlationId
 
             // Act
             var errorEvent = _transformationService.TransformErrorToEvent(error);

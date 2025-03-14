@@ -6,7 +6,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.ErrorHandling.Extensions;
+using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Components
@@ -66,7 +66,8 @@ namespace HydroGarden.Foundation.Core.Components
         /// <inheritdoc/>
         public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)
         {
-            await this.ExecuteWithErrorHandlingAsync(
+            var success = await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync(
+                this,
                 ErrorMonitor,
                 async () =>
                 {
@@ -100,6 +101,11 @@ namespace HydroGarden.Foundation.Core.Components
                     ["PropertyName"] = name,
                     ["PropertyType"] = value?.GetType().Name ?? "null"
                 });
+            
+            if (!success)
+            {
+                Logger.Log($"Failed to update property '{name}'");
+            }
         }
 
         public virtual async Task<bool> UpdatePropertyOptimisticAsync<T>(string name, Func<T?, T> updateFunc)

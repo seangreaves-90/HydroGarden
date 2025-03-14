@@ -48,7 +48,8 @@ namespace HydroGarden.Foundation.ErrorHandling
             ErrorSource source,
             IDictionary<string, object>? context = null,
             Exception? exception = null,
-            ErrorCategory? category = null)
+            ErrorCategory? category = null,
+            Guid? correlationId = null)
         {
             DeviceId = deviceId;
             ErrorCode = errorCode;
@@ -56,7 +57,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             Severity = severity;
             Source = source;
             Exception = exception;
-            CorrelationId = Guid.NewGuid();
+            CorrelationId = correlationId ?? Guid.NewGuid();
             Timestamp = DateTimeOffset.UtcNow;
 
             // Derive category from error code if not provided
@@ -83,7 +84,8 @@ namespace HydroGarden.Foundation.ErrorHandling
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             IDictionary<string, object>? context = null,
-            Exception? exception = null)
+            Exception? exception = null,
+            Guid? correlationId = null)
         {
             return new ComponentError(
                 deviceId,
@@ -93,7 +95,8 @@ namespace HydroGarden.Foundation.ErrorHandling
                 ErrorSource.Device,
                 context,
                 exception,
-                ErrorCategory.Device);
+                ErrorCategory.Device,
+                correlationId);
         }
 
         /// <summary>
@@ -105,7 +108,8 @@ namespace HydroGarden.Foundation.ErrorHandling
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             IDictionary<string, object>? context = null,
-            Exception? exception = null)
+            Exception? exception = null,
+            Guid? correlationId = null)
         {
             return new ComponentError(
                 deviceId,
@@ -115,7 +119,8 @@ namespace HydroGarden.Foundation.ErrorHandling
                 ErrorSource.Service,
                 context,
                 exception,
-                ErrorCategory.Service);
+                ErrorCategory.Service,
+                correlationId);
         }
 
         /// <summary>
@@ -127,7 +132,8 @@ namespace HydroGarden.Foundation.ErrorHandling
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             IDictionary<string, object>? context = null,
-            Exception? exception = null)
+            Exception? exception = null,
+            Guid? correlationId = null)
         {
             return new ComponentError(
                 deviceId,
@@ -137,7 +143,8 @@ namespace HydroGarden.Foundation.ErrorHandling
                 ErrorSource.Communication,
                 context,
                 exception,
-                ErrorCategory.Communication);
+                ErrorCategory.Communication,
+                correlationId);
         }
 
         /// <summary>

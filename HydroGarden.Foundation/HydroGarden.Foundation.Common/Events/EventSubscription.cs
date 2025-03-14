@@ -23,11 +23,11 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="id">Unique identifier</param>
         /// <param name="handler">Event handler</param>
         /// <param name="options">Subscription options</param>
-        public EventSubscription(Guid id, IEventHandler handler, IEventSubscriptionOptions? options)
+        public EventSubscription(Guid id, IEventHandler handler, IEventSubscriptionOptions options)
         {
             Id = id;
             Handler = handler ?? throw new ArgumentNullException(nameof(handler));
-            Options = (EventSubscriptionOptions)(options ?? new EventSubscriptionOptions());
+            Options = options ?? throw new ArgumentNullException(nameof(options));
         }
     }
 

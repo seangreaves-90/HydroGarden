@@ -24,7 +24,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         public ErrorEventRoutingData()
         {
             // Set default values
-            TargetIds = Array.Empty<Guid>();
+            TargetIds = [];
             Persist = true;
             Priority = EventPriority.High;
             RequiresAcknowledgment = false;

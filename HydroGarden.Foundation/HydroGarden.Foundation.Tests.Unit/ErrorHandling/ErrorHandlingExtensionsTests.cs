@@ -10,12 +10,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
 {
     public class ErrorHandlingExtensionsTests
     {
-        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
-
-        public ErrorHandlingExtensionsTests()
-        {
-            _mockErrorMonitor = new Mock<IErrorMonitor>();
-        }
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor = new();
 
         [Fact]
         public async Task ReportExceptionAsync_ShouldBuildContextAndReportError()
@@ -25,14 +20,18 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         var exception = new InvalidOperationException("Test exception");
         var errorCode = "TEST_ERROR";
         var message = "Test error message";
-        var capturedError = (IApplicationError)null;
 
         _mockErrorMonitor
-        .Setup(m => m.ReportErrorAsync(
-        It.IsAny<IApplicationError>(),
-        It.IsAny<CancellationToken>()))
-        .Callback<IApplicationError, CancellationToken>((e, _) => capturedError = e)
-        .Returns(Task.CompletedTask);
+            .Setup(m => m.ReportExceptionAsync(
+                It.IsAny<object>(),
+                It.IsAny<Exception>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<ErrorSeverity>(),
+                It.IsAny<ErrorSource>(),
+                It.IsAny<IDictionary<string, object>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         // Act
         await ErrorHandlingExtensions.ReportExceptionAsync(
@@ -43,17 +42,19 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         message);
 
         // Assert
-        _mockErrorMonitor.Verify(m => m.ReportErrorAsync(
-            It.IsAny<IApplicationError>(),
-            It.IsAny<CancellationToken>()), 
+        _mockErrorMonitor.Verify(m => m.ReportExceptionAsync(
+            It.Is<object>(o => o == source),
+            It.Is<Exception>(e => e == exception),
+            It.Is<string>(s => s == errorCode),
+            It.Is<string>(s => s == message),
+            It.IsAny<ErrorSeverity>(),
+            It.IsAny<ErrorSource>(),
+            It.Is<IDictionary<string, object>>(d => 
+                d.ContainsKey("SourceType") && 
+                d.ContainsKey("CallSite") &&
+                d.ContainsKey("ExceptionType")),
+            It.IsAny<CancellationToken>()),
             Times.Once);
-        
-        capturedError.Should().NotBeNull();
-        capturedError.ErrorCode.Should().Be(errorCode);
-        capturedError.Message.Should().Be(message);
-        capturedError.Exception.Should().BeSameAs(exception);
-        capturedError.Context.Should().ContainKey("SourceType");
-        capturedError.Context["SourceType"].Should().Be(source.GetType().FullName);
         }
 
         [Fact]
@@ -207,7 +208,9 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         .Returns(Task.CompletedTask);
 
         // Act
-        await _mockErrorMonitor.Object.ReportDeviceCommunicationErrorAsync(deviceId,
+        await ErrorHandlingExtensions.ReportDeviceCommunicationErrorAsync(
+            _mockErrorMonitor.Object,
+            deviceId,
             message);
 
         // Assert

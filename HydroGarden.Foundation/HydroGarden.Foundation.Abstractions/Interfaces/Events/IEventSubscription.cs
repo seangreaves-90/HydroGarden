@@ -1,20 +1,23 @@
 ﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
+    /// <summary>
+    /// Represents a subscription to events in the event bus.
+    /// </summary>
     public interface IEventSubscription
     {
         /// <summary>
-        /// Unique identifier for this subscription
+        /// Gets the unique identifier for this subscription.
         /// </summary>
-        public Guid Id { get; }
+        Guid Id { get; }
 
         /// <summary>
-        /// The event handler for this subscription
+        /// Gets the event handler for this subscription.
         /// </summary>
-        public IEventHandler Handler { get; }
+        IEventHandler Handler { get; }
 
         /// <summary>
-        /// Options that control how events are routed to this subscription
+        /// Gets the options for this subscription.
         /// </summary>
-        public IEventSubscriptionOptions Options { get; }
+        IEventSubscriptionOptions Options { get; }
     }
 }
