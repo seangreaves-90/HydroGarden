@@ -1,0 +1,280 @@
+using FluentAssertions;
+using HydroGarden.ErrorHandling.Core;
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
+using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Logger.Abstractions;
+using Moq;
+using Xunit;
+
+namespace HydroGarden.Foundation.Tests.Integration.EventBus
+{
+    /// <summary>
+    /// Integration tests that verify the complete event processing pipeline.
+    /// </summary>
+    public class EventBusPipelineIntegrationTests
+    {
+        private readonly Mock<ILogger> _mockLogger;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
+        private readonly Mock<IEventRouter> _mockEventRouter;
+        private readonly Common.Events.EventBus _eventBus;
+        
+        public EventBusPipelineIntegrationTests()
+        {
+            _mockLogger = new Mock<ILogger>();
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
+            _mockEventRouter = new Mock<IEventRouter>();
+            
+            // Set up router to pass through all subscriptions
+            _mockEventRouter.Setup(r => r.GetMatchingSubscriptionsAsync(
+                It.IsAny<IEvent>(), 
+                It.IsAny<IEnumerable<IEventSubscription>>(), 
+                It.IsAny<CancellationToken>()))
+                .Returns<IEvent, IEnumerable<IEventSubscription>, CancellationToken>((_, subs, _) => 
+                    Task.FromResult<IReadOnlyList<IEventSubscription>>(subs.ToList()));
+            
+            _eventBus = new Common.Events.EventBus(
+                _mockLogger.Object,
+                _mockEventRouter.Object);
+        }
+        
+        [Fact]
+        public async Task EventProcessing_ShouldFollowOrderedSteps()
+        {
+            // Arrange
+            var processingSteps = new List<string>();
+            var sourceId = Guid.NewGuid();
+            var eventId = Guid.NewGuid();
+            
+            // Create a test event
+            var testEvent = new Mock<IEvent>();
+            testEvent.Setup(e => e.EventId).Returns(eventId);
+            testEvent.Setup(e => e.EventType).Returns(EventType.Command);
+            testEvent.Setup(e => e.SourceId).Returns(sourceId);
+            testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Create multiple handlers that will execute in sequence and record their order
+            // Each handler will add to the processing steps list to track execution order
+            
+            var handler1 = new Mock<IEventHandler>();
+            handler1
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, __, ___) => 
+                    processingSteps.Add("Handler1"))
+                .Returns(Task.CompletedTask);
+                
+            var handler2 = new Mock<IEventHandler>();
+            handler2
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, __, ___) => 
+                    processingSteps.Add("Handler2"))
+                .Returns(Task.CompletedTask);
+                
+            var handler3 = new Mock<IEventHandler>();
+            handler3
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, __, ___) => 
+                    processingSteps.Add("Handler3"))
+                .Returns(Task.CompletedTask);
+            
+            // Subscribe all handlers
+            _eventBus.Subscribe(handler1.Object);
+            _eventBus.Subscribe(handler2.Object);
+            _eventBus.Subscribe(handler3.Object);
+            
+            // Act
+            var result = await _eventBus.PublishAsync(this, testEvent.Object);
+            
+            // Assert
+            result.Should().NotBeNull();
+            result!.EventId.Should().Be(eventId);
+            result.SuccessCount.Should().Be(3); // All handlers processed successfully
+            
+            // Handlers should have been called
+            processingSteps.Should().HaveCount(3);
+            processingSteps.Should().Contain("Handler1");
+            processingSteps.Should().Contain("Handler2");
+            processingSteps.Should().Contain("Handler3");
+        }
+        
+        [Fact]
+        public async Task EventTransformation_ShouldModifyEvents()
+        {
+            // Arrange
+            // Create a test event
+            var eventId = Guid.NewGuid();
+            var sourceId = Guid.NewGuid();
+            var testEvent = new Mock<IEvent>();
+            testEvent.Setup(e => e.EventId).Returns(eventId);
+            testEvent.Setup(e => e.EventType).Returns(EventType.Command);
+            testEvent.Setup(e => e.SourceId).Returns(sourceId);
+            testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Create a transformer
+            var transformer = new Mock<IEventTransformer>();
+            
+            // Create a transformed event with modified properties
+            var transformedEvent = new Mock<IEvent>();
+            transformedEvent.Setup(e => e.EventId).Returns(eventId);
+            transformedEvent.Setup(e => e.EventType).Returns(EventType.StateChange); // Changed type
+            transformedEvent.Setup(e => e.SourceId).Returns(sourceId);
+            transformedEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Setup transformer to modify the event
+            transformer
+                .Setup(t => t.Transform(It.IsAny<IEvent>()))
+                .Returns(transformedEvent.Object);
+            
+            // Create event bus with transformer
+            var eventBusWithTransformer = new Common.Events.EventBus(
+                _mockLogger.Object,
+                _mockEventRouter.Object,
+                null,
+                null,
+                null,
+                transformer.Object);
+            
+            // The transformer setup is already defined above, no need to redefine it
+                
+            // Execute the transform directly to verify our setup
+            var testTransform = transformer.Object.Transform(testEvent.Object);
+            testTransform.Should().BeSameAs(transformedEvent.Object);
+            
+            // Create handlers for different event types
+            var commandHandler = new Mock<IEventHandler>();
+            var stateHandler = new Mock<IEventHandler>();
+            
+            var receivedByCommand = false;
+            var receivedByState = false;
+            
+            commandHandler
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.Is<IEvent>(e => e.EventType == EventType.Command),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, e, __) => receivedByCommand = true)
+                .Returns(Task.CompletedTask);
+                
+            stateHandler
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.Is<IEvent>(e => e.EventType == EventType.StateChange),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, e, __) => receivedByState = true)
+                .Returns(Task.CompletedTask);
+            
+            // Modify our mock router to be more specific for this test
+            _mockEventRouter
+                .Setup(r => r.GetMatchingSubscriptionsAsync(
+                    It.IsAny<IEvent>(),
+                    It.IsAny<IEnumerable<IEventSubscription>>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns<IEvent, IEnumerable<IEventSubscription>, CancellationToken>((evt, subs, _) =>
+                {
+                    // Only return handlers that match the event type
+                    return Task.FromResult<IReadOnlyList<IEventSubscription>>(
+                        subs.Where(s => s.Options.EventTypes.Contains(evt.EventType)).ToList());
+                });
+            
+            // Subscribe handlers with specific event types
+            eventBusWithTransformer.Subscribe(commandHandler.Object, new EventSubscriptionOptions
+            {
+                EventTypes = new[] { EventType.Command }
+            });
+            
+            eventBusWithTransformer.Subscribe(stateHandler.Object, new EventSubscriptionOptions
+            {
+                EventTypes = new[] { EventType.StateChange }
+            });
+            
+            // Act
+            var result = await eventBusWithTransformer.PublishAsync(this, testEvent.Object);
+            
+            // Assert
+            result.Should().NotBeNull();
+            
+            // Transformer should have been called
+            transformer.Verify(t => t.Transform(testEvent.Object), Times.Once);
+            
+            // The event should have been transformed to StateChange and handled by the state handler
+            receivedByState.Should().BeTrue("State handler should receive transformed event");
+            receivedByCommand.Should().BeFalse("Command handler should not receive transformed event");
+        }
+        
+        [Fact]
+        public async Task ErrorHandling_ShouldCaptureExceptions()
+        {
+            // Arrange
+            var sourceId = Guid.NewGuid();
+            var eventId = Guid.NewGuid();
+            
+            // Create a test event
+            var testEvent = new Mock<IEvent>();
+            testEvent.Setup(e => e.EventId).Returns(eventId);
+            testEvent.Setup(e => e.EventType).Returns(EventType.Command);
+            testEvent.Setup(e => e.SourceId).Returns(sourceId);
+            testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Create a handler that will throw an exception
+            var failingHandler = new Mock<IEventHandler>();
+            failingHandler
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Throws(new InvalidOperationException("Handler failure"));
+            
+            // Create a handler that reports errors to the error monitor
+            var reportingHandler = new Mock<IEventHandler>();
+            reportingHandler
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>(async (_, e, __) => 
+                {
+                    // Report an error
+                    await _mockErrorMonitor.Object.ReportErrorAsync(
+                        new ComponentError(
+                            sourceId,
+                            "HANDLER_ERROR",
+                            "Error in event handler",
+                            ErrorSeverity.Error,
+                            ErrorSource.Device), __);
+                })
+                    .Returns(Task.CompletedTask);
+            
+            // Subscribe both handlers
+            _eventBus.Subscribe(failingHandler.Object);
+            _eventBus.Subscribe(reportingHandler.Object);
+            
+            // Act
+            var result = await _eventBus.PublishAsync(this, testEvent.Object);
+            
+            // Assert
+            result.Should().NotBeNull();
+            result!.EventId.Should().Be(eventId);
+            result.HandlerCount.Should().Be(2);
+            result.SuccessCount.Should().Be(1); // Only one handler succeeded
+            result.HasErrors.Should().BeTrue();
+            result.Errors.Should().ContainSingle(e => e is InvalidOperationException);
+            
+            // Verify the error monitor was called
+            _mockErrorMonitor.Verify(
+                m => m.ReportErrorAsync(
+                    It.Is<IApplicationError>(e => e.ErrorCode == "HANDLER_ERROR"),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+    }
+}

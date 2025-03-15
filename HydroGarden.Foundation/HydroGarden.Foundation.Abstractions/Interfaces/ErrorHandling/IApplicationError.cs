@@ -36,7 +36,8 @@
         Communication = 30,
         EventSystem = 40,
         Storage = 50,
-        Security = 60
+        Security = 60,
+        System = 70
     }
     
     /// <summary>

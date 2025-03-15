@@ -99,6 +99,8 @@
         /// <summary>
         /// Custom event types defined by device implementations
         /// </summary>
-        Custom
+        Custom,
+
+        StateChange
     }
 }

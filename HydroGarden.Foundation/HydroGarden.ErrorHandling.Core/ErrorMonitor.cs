@@ -5,6 +5,7 @@ using HydroGarden.ErrorHandling.Core; // Added for ComponentError and ErrorExten
 using HydroGarden.ErrorHandling.Core.Repositories;
 using HydroGarden.Logger.Abstractions;
 using System.Collections.Concurrent;
+using HydroGarden.Foundation.ErrorHandling;
 
 namespace HydroGarden.ErrorHandling.Core
 {
@@ -17,6 +18,8 @@ namespace HydroGarden.ErrorHandling.Core
         private readonly IErrorEventTransformationService _transformationService;
         private readonly IErrorRepository? _errorRepository;
         private readonly ConcurrentDictionary<string, IApplicationError> _activeErrors = new();
+        private readonly ConcurrentDictionary<string, ErrorRateInfo> _errorRates = new();
+        private readonly ConcurrentDictionary<Guid, List<IApplicationError>> _correlatedErrors = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ErrorMonitor"/> class.
@@ -48,6 +51,38 @@ namespace HydroGarden.ErrorHandling.Core
             // Store the error in active errors
             string errorKey = $"{error.DeviceId}:{error.ErrorCode}";
             _activeErrors[errorKey] = error;
+            
+            // Track error rates
+            _errorRates.AddOrUpdate(
+                error.ErrorCode,
+                _ => new ErrorRateInfo {
+                    ErrorCode = error.ErrorCode,
+                    Count = 1,
+                    FirstOccurrence = error.Timestamp,
+                    LastOccurrence = error.Timestamp,
+                    MaxSeverity = error.Severity,
+                    DeviceIds = new HashSet<Guid> { error.DeviceId }
+                },
+                (_, existing) => {
+                    existing.Count++;
+                    existing.LastOccurrence = error.Timestamp;
+                    existing.DeviceIds.Add(error.DeviceId);
+                    if (error.Severity > existing.MaxSeverity)
+                        existing.MaxSeverity = error.Severity;
+                    return existing;
+                });
+                
+            // Track correlated errors
+            if (error.CorrelationId != Guid.Empty)
+            {
+                _correlatedErrors.AddOrUpdate(
+                    error.CorrelationId,
+                    _ => new List<IApplicationError> { error },
+                    (_, existing) => {
+                        existing.Add(error);
+                        return existing;
+                    });
+            }
 
             _logger.Log($"Error reported: {error}");
             
@@ -200,6 +235,61 @@ namespace HydroGarden.ErrorHandling.Core
         }
 
         /// <inheritdoc/>
+        /// <summary>
+        /// Gets information about error rates by error code.
+        /// </summary>
+        /// <returns>Dictionary mapping error codes to error rate information.</returns>
+        public IDictionary<string, ErrorRateInfo> GetErrorRates()
+        {
+            return new Dictionary<string, ErrorRateInfo>(_errorRates);
+        }
+        
+        /// <summary>
+        /// Gets the alert status based on error rates.
+        /// </summary>
+        /// <returns>The current alert status.</returns>
+        public AlertStatus GetAlertStatus()
+        {
+            var alerts = new List<ErrorAlert>();
+            
+            // For now, just create alerts for critical errors
+            foreach (var rate in _errorRates.Values)
+            {
+                if (rate.MaxSeverity == ErrorSeverity.Critical || rate.Count >= 3)
+                {
+                    alerts.Add(new ErrorAlert
+                    {
+                        ErrorCode = rate.ErrorCode,
+                        Count = rate.Count,
+                        Severity = rate.MaxSeverity,
+                        FirstOccurrence = rate.FirstOccurrence,
+                        LastOccurrence = rate.LastOccurrence
+                    });
+                }
+            }
+            
+            return new AlertStatus
+            {
+                HasActiveAlerts = alerts.Count > 0,
+                Alerts = alerts
+            };
+        }
+        
+        /// <summary>
+        /// Gets all errors with the specified correlation ID.
+        /// </summary>
+        /// <param name="correlationId">The correlation ID to filter by.</param>
+        /// <returns>Collection of errors with the given correlation ID.</returns>
+        public IReadOnlyCollection<IApplicationError> GetCorrelatedErrors(Guid correlationId)
+        {
+            if (_correlatedErrors.TryGetValue(correlationId, out var errors))
+            {
+                return errors.AsReadOnly();
+            }
+            
+            return Array.Empty<IApplicationError>();
+        }
+        
         public async Task ClearErrorAsync(
             Guid deviceId, 
             string errorCode, 

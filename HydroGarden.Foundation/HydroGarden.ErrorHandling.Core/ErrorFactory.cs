@@ -295,6 +295,48 @@ namespace HydroGarden.Foundation.ErrorHandling
         }
 
         /// <summary>
+        /// Creates an error with a given context.
+        /// </summary>
+        /// <param name="deviceId">The device ID.</param>
+        /// <param name="errorCode">The error code.</param>
+        /// <param name="message">The error message.</param>
+        /// <param name="severity">The error severity.</param>
+        /// <param name="source">The error source.</param>
+        /// <param name="context">The context information.</param>
+        /// <param name="exception">The exception that caused the error, if any.</param>
+        /// <returns>An application error.</returns>
+        public static IApplicationError CreateWithContext(
+            Guid deviceId,
+            string errorCode,
+            string message,
+            ErrorSeverity severity,
+            ErrorSource source,
+            IDictionary<string, object> context,
+            Exception? exception = null)
+        {
+            // Determine appropriate category based on source
+            ErrorCategory category = source switch
+            {
+                ErrorSource.Device => ErrorCategory.Device,
+                ErrorSource.Service => ErrorCategory.Service,
+                ErrorSource.Communication => ErrorCategory.Communication,
+                ErrorSource.Database => ErrorCategory.Storage,
+                ErrorSource.System => ErrorCategory.System,
+                _ => ErrorCategory.Unknown
+            };
+            
+            return new ComponentError(
+                deviceId,
+                errorCode,
+                message,
+                severity,
+                source,
+                context,
+                exception,
+                category);
+        }
+        
+        /// <summary>
         /// Attempts to derive an appropriate error severity from an exception type.
         /// </summary>
         private static ErrorSeverity DeriveSeverityFromException(Exception exception)
