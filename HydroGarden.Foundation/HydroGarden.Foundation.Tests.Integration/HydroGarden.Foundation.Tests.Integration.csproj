@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="FluentAssertions" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
@@ -31,6 +33,7 @@
 
   <ItemGroup>
     <Folder Include="EventBus\" />
+    <Folder Include="ErrorHandling\" />
   </ItemGroup>
 
 </Project>

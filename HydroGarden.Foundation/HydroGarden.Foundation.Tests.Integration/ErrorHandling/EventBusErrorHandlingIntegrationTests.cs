@@ -41,6 +41,11 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 .Returns<IEvent, IEnumerable<IEventSubscription>, CancellationToken>((_, subs, _) => 
                     Task.FromResult<IReadOnlyList<IEventSubscription>>(subs.ToList()));
             
+            // Set up event store to handle persist calls
+            _mockEventStore
+                .Setup(s => s.PersistEventAsync(It.IsAny<IEvent>()))
+                .Returns(Task.CompletedTask);
+            
             // Create the event bus
             _eventBus = new Common.Events.EventBus(
                 _mockLogger.Object,
@@ -57,43 +62,44 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 _mockLogger.Object,
                 _transformationService);
         }
-        
+
         [Fact]
         public async Task EventBus_ShouldPublishErrorEventsWhenHandlersFail()
         {
             // Arrange
             var eventId = Guid.NewGuid();
             var sourceId = Guid.NewGuid();
-            
+
             // Create a test event
             var testEvent = new Mock<IEvent>();
             testEvent.Setup(e => e.EventId).Returns(eventId);
             testEvent.Setup(e => e.EventType).Returns(EventType.Command);
             testEvent.Setup(e => e.SourceId).Returns(sourceId);
             testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
-            
+
             // Create a handler that will throw an exception
             var mockHandler = new Mock<IEventHandler>();
             mockHandler
                 .Setup(h => h.HandleEventAsync(
-                    It.IsAny<object>(), 
-                    It.IsAny<IEvent>(), 
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()))
                 .Throws(new InvalidOperationException("Simulated handler failure"));
-            
+
             // Subscribe the handler
             _eventBus.Subscribe(mockHandler.Object);
-            
+
             // Set up event store to capture persisted events
             var persistedEvents = new List<IEvent>();
             _mockEventStore
                 .Setup(s => s.PersistEventAsync(It.IsAny<IEvent>()))
                 .Callback<IEvent>(evt => persistedEvents.Add(evt))
                 .Returns(Task.CompletedTask);
-            
+
             // Act
-            var result = await _eventBus.PublishAsync(this, testEvent.Object);
-            
+            var publishTask = _eventBus.PublishAsync(this, testEvent.Object);
+            var result = await Task.WhenAny(publishTask, Task.Delay(5000)) == publishTask ? publishTask.Result : null;
+
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
@@ -101,16 +107,17 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             result.SuccessCount.Should().Be(0);
             result.HasErrors.Should().BeTrue();
             result.Errors.Should().ContainSingle(e => e is InvalidOperationException);
-            
+
             // Event should be persisted for retry
             _mockEventStore.Verify(
                 s => s.PersistEventAsync(
                     It.Is<IEvent>(e => e.EventId == eventId)),
                 Times.Once);
-                
+
             persistedEvents.Should().ContainSingle(e => e.EventId == eventId);
         }
-        
+
+
         [Fact]
         public async Task ErrorHandlingMiddleware_ShouldCaptureAndReportErrors()
         {
@@ -124,7 +131,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             testEvent.Setup(e => e.EventType).Returns(EventType.Command);
             testEvent.Setup(e => e.SourceId).Returns(sourceId);
             testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
-            
+
             // Create a handler that will throw an exception which will be reported to error monitor
             var mockHandler = new Mock<IEventHandler>();
             _ = mockHandler
@@ -153,13 +160,13 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                     // Then throw the exception
                     throw new InvalidOperationException("Simulated handler failure");
                 });
-            
+
             // Subscribe the handler
             _eventBus.Subscribe(mockHandler.Object);
-            
+
             // Track published error events
             var errorEvents = new List<ErrorOccurredEvent>();
-            
+
             // Create a handler for error events
             var errorHandler = new Mock<IEventHandler>();
             errorHandler
@@ -167,7 +174,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                     It.IsAny<object>(),
                     It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<object, IEvent, CancellationToken>((_, evt, _) => 
+                .Callback<object, IEvent, CancellationToken>((_, evt, _) =>
                 {
                     if (evt is ErrorOccurredEvent errorEvent)
                     {
@@ -175,38 +182,40 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                     }
                 })
                 .Returns(Task.CompletedTask);
-            
+
             // Subscribe to error events
             _eventBus.Subscribe(errorHandler.Object, new Common.Events.EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.Error }
             });
-            
+
             // Act
-            var result = await _eventBus.PublishAsync(this, testEvent.Object);
-            
+            var publishTask = _eventBus.PublishAsync(this, testEvent.Object);
+            var result = await Task.WhenAny(publishTask, Task.Delay(5000)) == publishTask ? publishTask.Result : null;
+
             // Allow time for async error handling
             await Task.Delay(50);
-            
+
             // Assert
             result.Should().NotBeNull();
             result!.HasErrors.Should().BeTrue();
-            
+
             // Verify error was published - check the errorEvents collection
             // Note: We're not using a mock EventBus, so we rely on the events collected by our handler
-            
+
             // The handler should have reported an error
             errorEvents.Should().NotBeEmpty();
             var errorEvent = errorEvents.FirstOrDefault(e => e.ErrorData.ErrorCode == "EVENT_HANDLER_ERROR");
             errorEvent.Should().NotBeNull();
             errorEvent!.ErrorData.ExceptionType.Should().Be("System.InvalidOperationException");
             errorEvent.ErrorData.Message.Should().Contain("Error in event handler");
-            
+
             // The context should contain event info
             errorEvent.ErrorData.Context.Should().ContainKey("EventId");
             errorEvent.ErrorData.Context["EventId"].Should().Be(eventId);
         }
-        
+
+
         [Fact]
         public async Task ErrorCorrelation_ShouldLinkRelatedErrors()
         {
@@ -223,37 +232,36 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 ErrorSource.Device,
                 correlationId: correlationId);
             
-            // Track error events
+            // Track published events
+            var publishedEvents = new List<IEvent>();
             var errorEvents = new List<ErrorOccurredEvent>();
-            
-            // Create a handler for error events
-            var errorHandler = new Mock<IEventHandler>();
-            errorHandler
-                .Setup(h => h.HandleEventAsync(
-                    It.IsAny<object>(),
-                    It.IsAny<ErrorOccurredEvent>(),
-                    It.IsAny<CancellationToken>()))
-                .Callback<object, IEvent, CancellationToken>((_, evt, _) => 
+
+            // Mock the event bus's PublishAsync to capture published events
+            var mockEventBus = new Mock<IEventBus>();
+            mockEventBus
+                .Setup(b => b.PublishAsync(It.IsAny<object>(), It.IsAny<IEvent>(), It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, evt, _) =>
                 {
+                    publishedEvents.Add(evt);
                     if (evt is ErrorOccurredEvent errorEvent)
                     {
                         errorEvents.Add(errorEvent);
                     }
                 })
-                .Returns(Task.CompletedTask);
+                .ReturnsAsync(new Common.Events.PublishResult { EventId = Guid.NewGuid(), SuccessCount = 1 });
+
+            // Create a transformation service with our mocked event bus
+            var transformationService = new ErrorEventTransformationService(
+                mockEventBus.Object,
+                _mockLogger.Object);
+                
+            // Create an error monitor with our mocked transformation service
+            var errorMonitor = new ErrorMonitor(
+                _mockLogger.Object,
+                transformationService);
             
-            // Subscribe to error events
-            _eventBus.Subscribe(errorHandler.Object, new Common.Events.EventSubscriptionOptions
-            {
-                EventTypes = new[] { EventType.Error }
-            });
-            
-            // We need to register a handler for ErrorOccurredEvent before we report the error
             // Act - Report the original error
-            await _errorMonitor.ReportErrorAsync(originalError);
-            
-            // Wait a moment to ensure the error is published
-            await Task.Delay(50);
+            await errorMonitor.ReportErrorAsync(originalError);
             
             // Generate a related error with the same correlation ID
             var relatedError = new ComponentError(
@@ -265,25 +273,25 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 correlationId: correlationId);
                 
             // Report the related error
-            await _errorMonitor.ReportErrorAsync(relatedError);
+            await errorMonitor.ReportErrorAsync(relatedError);
             
-            // Wait a moment to ensure the error is published
-            await Task.Delay(50);
-            
-            // Both errors should now have been published as events
-            
-            // Act - Get correlated errors from the error monitor directly
-            var correlatedErrors = _errorMonitor.GetCorrelatedErrors(correlationId);
+            // Get correlated errors from the error monitor
+            var correlatedErrors = errorMonitor.GetCorrelatedErrors(correlationId);
             
             // Assert
-            errorEvents.Should().HaveCountGreaterThanOrEqualTo(2, "At least two error events should have been published");
+            // Verify that events were published to the event bus
+            mockEventBus.Verify(
+                b => b.PublishAsync(It.IsAny<object>(), It.IsAny<IEvent>(), It.IsAny<CancellationToken>()),
+                Times.Exactly(2));
+                
+            errorEvents.Should().HaveCount(2, "Two error events should have been published");
             
             // Events should include both the original and related error
             errorEvents.Should().Contain(e => e.ErrorData.ErrorCode == "ORIGINAL_ERROR");
             errorEvents.Should().Contain(e => e.ErrorData.ErrorCode == "RELATED_ERROR");
             
             // Should have found at least the original error plus a related one from the error monitor
-            correlatedErrors.Should().HaveCountGreaterThanOrEqualTo(2, "Error monitor should track both errors");
+            correlatedErrors.Should().HaveCount(2, "Error monitor should track both errors");
             correlatedErrors.Should().Contain(e => e.ErrorCode == "ORIGINAL_ERROR");
             correlatedErrors.Should().Contain(e => e.ErrorCode == "RELATED_ERROR");
             
