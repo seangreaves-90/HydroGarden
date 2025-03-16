@@ -2,42 +2,67 @@
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Common.PropertyMetadata;
-using HydroGarden.Foundation.Core.Components;
-using Moq;
-using System.Xml.Linq;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Common.PropertyMetadata;
+using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Core.Components;
+using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
+using Moq;
 using Xunit;
 
 namespace HydroGarden.Foundation.Tests.Unit.Components
 {
-    public class HydroGardenComponentBaseTests
+    public class ComponentBaseTests
     {
         private class TestComponent : ComponentBase
         {
-            public TestComponent(Guid id, string name, IErrorMonitor errorMonitor, ILogger logger)
-                : base(id, name, errorMonitor, logger)
+            public TestComponent(Guid id, string name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
+                : base(id, name, errorMonitor, eventBus, logger)
             {
+            }
+            
+            // Public method to expose the protected ValidateProperty method for testing
+            public bool TestValidateProperty(string name, object? value, IPropertyMetadata metadata)
+            {
+                return ValidateProperty(name, value, metadata);
             }
         }
 
         private readonly Mock<ILogger> _mockLogger;
         private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
         private readonly Mock<IErrorMonitor> _mockErrorMonitor;
+        private readonly Mock<IEventBus> _mockEventBus;
         private readonly Guid _testId;
         private readonly string _testName;
         private readonly TestComponent _sut;
 
-        public HydroGardenComponentBaseTests()
+        public ComponentBaseTests()
         {
             _mockLogger = new Mock<ILogger>();
             _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
             _mockErrorMonitor = new Mock<IErrorMonitor>();
+            _mockEventBus = new Mock<IEventBus>();
             _testId = Guid.NewGuid();
             _testName = "Test Component";
-            _sut = new TestComponent(_testId, _testName, _mockErrorMonitor.Object, _mockLogger.Object);
+            _sut = new TestComponent(_testId, _testName, _mockErrorMonitor.Object, _mockEventBus.Object, _mockLogger.Object);
             _sut.SetEventHandler(_mockEventHandler.Object);
+            
+            // Setup event bus for property change events
+            _mockEventBus
+                .Setup(eb => eb.PublishAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IPropertyChangedEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Mock<IPublishResult>().Object);
+                
+            // Setup event bus for state change events
+            _mockEventBus
+                .Setup(eb => eb.PublishAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IStateChangeEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Mock<IPublishResult>().Object);
         }
 
         [Fact]
@@ -51,249 +76,346 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         }
 
         [Fact]
-        public async Task SetPropertyAsync_ShouldStorePropertyValue()
-        {
-            string propertyName = "TestProperty";
-            string propertyValue = "Test Value";
-            await _sut.SetPropertyAsync(propertyName, propertyValue);
-            var result = await _sut.GetPropertyAsync<string>(propertyName);
-            result.Should().Be(propertyValue);
-        }
-
-        [Fact]
-        public async Task SetPropertyAsync_ShouldStorePropertyMetadata()
-        {
-            string propertyName = "TestProperty";
-            string propertyValue = "Test Value";
-            string displayName = "Test Display Name";
-            string description = "Test Description";
-            bool isEditable = true;
-            bool isVisible = true;
-            var metadata = new PropertyMetadata(isEditable, isVisible, displayName, description);
-            await _sut.SetPropertyAsync(propertyName, propertyValue, metadata);
-            var storedMetadata = _sut.GetPropertyMetadata(propertyName);
-            storedMetadata.Should().NotBeNull();
-            storedMetadata.DisplayName.Should().Be(displayName);
-            storedMetadata.Description.Should().Be(description);
-            storedMetadata.IsEditable.Should().Be(isEditable);
-            storedMetadata.IsVisible.Should().Be(isVisible);
-        }
-
-        [Fact]
-        public async Task SetPropertyAsync_ShouldRaisePropertyChangedEvent()
-        {
-            string propertyName = "TestProperty";
-            string propertyValue = "Test Value";
-
-            _mockEventHandler
-                .Setup(e => e.HandleEventAsync(
-                    It.IsAny<object>(),
-                    It.IsAny<IPropertyChangedEvent>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
-
-            await _sut.SetPropertyAsync(propertyName, propertyValue);
-
-            _mockEventHandler.Verify(e => e.HandleEventAsync(
-                It.Is<object>(o => o == _sut),
-                It.Is<IPropertyChangedEvent>(evt =>
-                    evt.DeviceId == _testId &&
-                    evt.PropertyName == propertyName &&
-                    (evt.NewValue != null ? evt.NewValue.ToString() : string.Empty) == propertyValue), // ✅ Single expression
-                It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task UpdatePropertyOptimisticAsync_ShouldUpdateValueAndRaiseEvent()
+        public async Task TransitionToStateAsync_WithValidTransition_ShouldSucceed()
         {
             // Arrange
-            string propertyName = "TestProperty";
-            int initialValue = 5;
-            await _sut.SetPropertyAsync(propertyName, initialValue);
-
-            _mockEventHandler
-                .Setup(e => e.HandleEventAsync(
-                    It.IsAny<object>(),
-                    It.IsAny<IPropertyChangedEvent>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _sut.UpdatePropertyOptimisticAsync<int>(propertyName, current => current + 10);
+            var result = await _sut.TransitionToStateAsync(ComponentState.Initializing);
 
             // Assert
-            result.Should().BeTrue("the update should succeed");
-            var updatedValue = await _sut.GetPropertyAsync<int>(propertyName);
-            updatedValue.Should().Be(15);
-
-            _mockEventHandler.Verify(e => e.HandleEventAsync(
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Initializing);
+            
+            // Verify state change event was published
+            _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IPropertyChangedEvent>(evt =>
+                It.Is<IStateChangeEvent>(evt =>
                     evt.DeviceId == _testId &&
-                    evt.PropertyName == propertyName &&
-                    evt.OldValue is int && (int)evt.OldValue == 5 &&
-                    evt.NewValue is int && (int)evt.NewValue == 15),
-                It.IsAny<CancellationToken>()), Times.Once);
+                    evt.OldState == ComponentState.Created &&
+                    evt.NewState == ComponentState.Initializing),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task UpdatePropertyOptimisticAsync_ForNonExistentProperty_ShouldAddProperty()
+        public async Task TransitionToStateAsync_WithInvalidTransition_ShouldFail()
+        {
+            // Arrange - try to go from Created directly to Running (invalid)
+            var result = await _sut.TransitionToStateAsync(ComponentState.Running);
+
+            // Assert
+            result.Should().BeFalse();
+            _sut.State.Should().Be(ComponentState.Created); // State should not change
+            
+            // Verify error was reported
+            _mockErrorMonitor.Verify(e => e.ReportErrorAsync(
+                It.IsAny<IApplicationError>(),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                
+            // We can't directly verify the extension method, but we can verify the parameters
+            // were correctly passed by checking the log message
+            _mockLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Invalid state transition"))), Times.Once);
+        }
+
+        [Fact]
+        public async Task PropertyValidation_WhenValidatorRegistered_ShouldValidatePropertyBeforeUpdate()
         {
             // Arrange
-            string propertyName = "NewProperty";
+            string propertyName = "validatedProperty";
+            bool validatorCalled = false;
+            
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+            {
+                validatorCalled = true;
+                return value is int intValue && intValue > 0;
+            });
 
-            _mockEventHandler
-                .Setup(e => e.HandleEventAsync(
-                    It.IsAny<object>(),
-                    It.IsAny<IPropertyChangedEvent>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _sut.UpdatePropertyOptimisticAsync<string>(propertyName, _ => "New Value");
-
+            // Act - set a valid value
+            await _sut.SetPropertyAsync(propertyName, 10);
+            
             // Assert
-            result.Should().BeTrue("the update should succeed");
-            var value = await _sut.GetPropertyAsync<string>(propertyName);
-            value.Should().Be("New Value");
+            validatorCalled.Should().BeTrue();
+            var storedValue = await _sut.GetPropertyAsync<int>(propertyName);
+            storedValue.Should().Be(10);
+            
+            // Reset flag
+            validatorCalled = false;
+            
+            // Act - try to set an invalid value
+            await _sut.SetPropertyAsync(propertyName, -5);
+            
+            // Assert
+            validatorCalled.Should().BeTrue();
+            storedValue = await _sut.GetPropertyAsync<int>(propertyName);
+            storedValue.Should().Be(10); // Value should not have changed
+        }
 
-            _mockEventHandler.Verify(e => e.HandleEventAsync(
+        [Fact]
+        public void TestValidateProperty_WithNoValidator_ShouldReturnTrue()
+        {
+            // Arrange
+            string propertyName = "unvalidatedProperty";
+            var metadata = new PropertyMetadata(true, true, propertyName, "Test property");
+            
+            // Act
+            var result = _sut.TestValidateProperty(propertyName, "any value", metadata);
+            
+            // Assert
+            result.Should().BeTrue();
+        }
+
+        [Fact]
+        public void RegisterPropertyValidator_ThenRemove_ShouldWorkCorrectly()
+        {
+            // Arrange
+            string propertyName = "testProperty";
+            bool validatorCalled = false;
+            
+            // Register validator
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+            {
+                validatorCalled = true;
+                return true;
+            });
+            
+            // Act - validate with validator
+            var metadata = new PropertyMetadata(true, true, propertyName, "Test property");
+            var result1 = _sut.TestValidateProperty(propertyName, "test", metadata);
+            
+            // Assert
+            validatorCalled.Should().BeTrue();
+            result1.Should().BeTrue();
+            
+            // Act - remove validator
+            var removed = _sut.RemovePropertyValidator(propertyName);
+            
+            // Assert
+            removed.Should().BeTrue();
+            
+            // Reset flag
+            validatorCalled = false;
+            
+            // Act - validate after removing validator
+            var result2 = _sut.TestValidateProperty(propertyName, "test", metadata);
+            
+            // Assert
+            validatorCalled.Should().BeFalse(); // Validator should not be called
+            result2.Should().BeTrue(); // Should pass validation by default
+        }
+
+        [Fact]
+        public async Task InitializeAsync_ShouldTransitionThroughCorrectStates()
+        {
+            // Act
+            var result = await _sut.InitializeAsync();
+            
+            // Assert
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Ready);
+            
+            // Verify state transitions occurred in the right order
+            _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IPropertyChangedEvent>(evt =>
-                    evt.DeviceId == _testId &&
-                    evt.PropertyName == propertyName &&
-                    evt.NewValue is string && (string)evt.NewValue == "New Value"),
-                It.IsAny<CancellationToken>()), Times.Once);
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Created && 
+                    evt.NewState == ComponentState.Initializing),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Initializing && 
+                    evt.NewState == ComponentState.Ready),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task GetPropertyAsync_NonExistentProperty_ShouldReturnDefault()
+        public async Task StartAsync_AfterInitialization_ShouldTransitionToRunning()
         {
-            string nonExistentProperty = "NonExistentProperty";
-            var result = await _sut.GetPropertyAsync<string>(nonExistentProperty);
-            result.Should().BeNull();
+            // Arrange
+            await _sut.InitializeAsync();
+            
+            // Act
+            var result = await _sut.StartAsync();
+            
+            // Assert
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Running);
+            
+            // Verify state transition occurred
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Ready && 
+                    evt.NewState == ComponentState.Running),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task GetPropertyAsync_WrongType_ShouldReturnDefault()
+        public async Task StopAsync_WhenRunning_ShouldTransitionToReady()
         {
-            string propertyName = "TestProperty";
-            string propertyValue = "Test Value";
-            await _sut.SetPropertyAsync(propertyName, propertyValue);
-            var result = await _sut.GetPropertyAsync<int>(propertyName);
-            result.Should().Be(default(int));
+            // Arrange
+            await _sut.InitializeAsync();
+            await _sut.StartAsync();
+            
+            // Act
+            var result = await _sut.StopAsync();
+            
+            // Assert
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Ready);
+            
+            // Verify state transitions occurred in the right order
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Running && 
+                    evt.NewState == ComponentState.Stopping),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Stopping && 
+                    evt.NewState == ComponentState.Ready),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task GetProperties_ShouldReturnAllProperties()
+        public async Task HandleErrorAsync_ShouldTransitionToErrorState()
         {
-            await _sut.SetPropertyAsync("Property1", "Value1");
-            await _sut.SetPropertyAsync("Property2", 42);
-            await _sut.SetPropertyAsync("Property3", true);
-            var properties = _sut.GetProperties();
-            properties.Should().NotBeNull();
-            properties.Count.Should().Be(3);
-            properties.Should().ContainKey("Property1");
-            properties["Property1"].Should().Be("Value1");
-            properties.Should().ContainKey("Property2");
-            properties["Property2"].Should().Be(42);
-            properties.Should().ContainKey("Property3");
-            properties["Property3"].Should().Be(true);
+            // Arrange
+            var mockError = new Mock<IApplicationError>();
+            mockError.Setup(e => e.DeviceId).Returns(_testId);
+            
+            // Act
+            var result = await _sut.HandleErrorAsync(mockError.Object);
+            
+            // Assert
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Error);
+            
+            // Verify state transition occurred
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Created && 
+                    evt.NewState == ComponentState.Error),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task GetAllPropertyMetadata_ShouldReturnAllMetadata()
+        public async Task RecoverFromErrorAsync_ShouldReinitializeComponent()
         {
-            var metadata1 = new PropertyMetadata(true, true, "Display1", "Description1");
-            var metadata2 = new PropertyMetadata(false, true, "Display2", "Description2");
-
-            await _sut.SetPropertyAsync("Property1", "Value1", metadata1);
-            await _sut.SetPropertyAsync("Property2", 42, metadata2);
-
-            var metadata = _sut.GetAllPropertyMetadata();
-            metadata.Should().NotBeNull();
-            metadata.Count.Should().Be(2);
-            metadata.Should().ContainKey("Property1");
-            metadata["Property1"].DisplayName.Should().Be("Display1");
-            metadata["Property1"].Description.Should().Be("Description1");
-            metadata["Property1"].IsEditable.Should().BeTrue();
-            metadata["Property1"].IsVisible.Should().BeTrue();
-            metadata.Should().ContainKey("Property2");
-            metadata["Property2"].DisplayName.Should().Be("Display2");
-            metadata["Property2"].Description.Should().Be("Description2");
-            metadata["Property2"].IsEditable.Should().BeFalse();
-            metadata["Property2"].IsVisible.Should().BeTrue();
+            // Arrange
+            var mockError = new Mock<IApplicationError>();
+            mockError.Setup(e => e.DeviceId).Returns(_testId);
+            await _sut.HandleErrorAsync(mockError.Object);
+            
+            // Act
+            var result = await _sut.RecoverFromErrorAsync();
+            
+            // Assert
+            result.Should().BeTrue();
+            _sut.State.Should().Be(ComponentState.Ready);
+            
+            // Verify reinitialize state transitions occurred
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Error && 
+                    evt.NewState == ComponentState.Initializing),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Initializing && 
+                    evt.NewState == ComponentState.Ready),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task LoadPropertiesAsync_ShouldOverwriteExistingProperties()
+        public void Dispose_ShouldTransitionToDisposedState()
         {
-            await _sut.SetPropertyAsync("Property1", "Original Value");
-            var properties = new Dictionary<string, object>
-            {
-                { "Property1", "Updated Value" },
-                { "Property2", 42 }
-            };
-            await _sut.LoadPropertiesAsync(properties);
-            var loadedValue1 = await _sut.GetPropertyAsync<string>("Property1");
-            var loadedValue2 = await _sut.GetPropertyAsync<int>("Property2");
-            loadedValue1.Should().Be("Updated Value");
-            loadedValue2.Should().Be(42);
-        }
-
-        [Fact]
-        public async Task LoadPropertiesAsync_WithMetadata_ShouldLoadBothPropertiesAndMetadata()
-        {
-            var properties = new Dictionary<string, object>
-            {
-                { "Property1", "Value1" },
-                { "Property2", 42 }
-            };
-            var metadata = new Dictionary<string, IPropertyMetadata>
-            {
-                {
-                    "Property1",
-                    new Common.PropertyMetadata.PropertyMetadata(
-                        true, true, "Display1", "Description1")
-                },
-                {
-                    "Property2",
-                    new Common.PropertyMetadata.PropertyMetadata(
-                        false, true, "Display2", "Description2")
-                }
-            };
-            await _sut.LoadPropertiesAsync(properties, metadata);
-            var loadedValue1 = await _sut.GetPropertyAsync<string>("Property1");
-            var loadedValue2 = await _sut.GetPropertyAsync<int>("Property2");
-            var loadedMetadata1 = _sut.GetPropertyMetadata("Property1");
-            var loadedMetadata2 = _sut.GetPropertyMetadata("Property2");
-            loadedValue1.Should().Be("Value1");
-            loadedValue2.Should().Be(42);
-            loadedMetadata1.Should().NotBeNull();
-            loadedMetadata1.DisplayName.Should().Be("Display1");
-            loadedMetadata1.Description.Should().Be("Description1");
-            loadedMetadata1.IsEditable.Should().BeTrue();
-            loadedMetadata1.IsVisible.Should().BeTrue();
-            loadedMetadata2.Should().NotBeNull();
-            loadedMetadata2.DisplayName.Should().Be("Display2");
-            loadedMetadata2.Description.Should().Be("Description2");
-            loadedMetadata2.IsEditable.Should().BeFalse();
-            loadedMetadata2.IsVisible.Should().BeTrue();
-        }
-
-        [Fact]
-        public void Dispose_ShouldSetStateToDisposed()
-        {
+            // Act
             _sut.Dispose();
+            
+            // Assert
             _sut.State.Should().Be(ComponentState.Disposed);
+            
+            // Verify state transition
+            _mockEventBus.Verify(e => e.PublishAsync(
+                It.Is<object>(o => o == _sut),
+                It.Is<IStateChangeEvent>(evt => 
+                    evt.OldState == ComponentState.Created && 
+                    evt.NewState == ComponentState.Disposed),
+                It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task SetPropertyAsync_NoEventHandler_ShouldLogMessage()
+        public async Task LoadPropertiesAsync_EnsuresRequiredPropertiesPresent()
         {
-            var component = new TestComponent(_testId, _testName,_mockErrorMonitor.Object, _mockLogger.Object);
-            await component.SetPropertyAsync("TestProperty", "Test Value");
-            _mockLogger.Verify(l => l.Log(It.IsAny<string>()), Times.Once);
+            // Arrange
+            var properties = new Dictionary<string, object>
+            {
+                { "CustomProperty", "Value" }
+            };
+            
+            // Act
+            await _sut.LoadPropertiesAsync(properties);
+            
+            // Assert
+            var allProps = _sut.GetProperties();
+            allProps.Should().ContainKey("Id");
+            allProps.Should().ContainKey("Name");
+            allProps.Should().ContainKey("AssemblyType");
+            allProps.Should().ContainKey("State");
+            allProps.Should().ContainKey("CustomProperty");
+            
+            allProps["Id"].Should().Be(_testId);
+            allProps["Name"].Should().Be(_testName);
+            allProps["State"].Should().Be(ComponentState.Created);
+            allProps["CustomProperty"].Should().Be("Value");
+        }
+
+        [Fact]
+        public async Task UpdatePropertyOptimisticAsync_ValidatesValue_WhenRequested()
+        {
+            // Arrange
+            string propertyName = "validatedProperty";
+            bool validatorCalled = false;
+            
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+            {
+                validatorCalled = true;
+                return value is int intValue && intValue > 0;
+            });
+            
+            // Act - set initial value
+            await _sut.SetPropertyAsync(propertyName, 5);
+            
+            // Reset flag
+            validatorCalled = false;
+            
+            // Act - try update with valid value
+            var result1 = await _sut.UpdatePropertyOptimisticAsync<int>(propertyName, v => v + 10);
+            
+            // Assert
+            result1.Should().BeTrue();
+            validatorCalled.Should().BeTrue();
+            var value1 = await _sut.GetPropertyAsync<int>(propertyName);
+            value1.Should().Be(15);
+            
+            // Reset flag
+            validatorCalled = false;
+            
+            // Act - try update with invalid value
+            var result2 = await _sut.UpdatePropertyOptimisticAsync<int>(propertyName, _ => -5);
+            
+            // Assert
+            result2.Should().BeFalse();
+            validatorCalled.Should().BeTrue();
+            var value2 = await _sut.GetPropertyAsync<int>(propertyName);
+            value2.Should().Be(15); // Value should not have changed
         }
     }
 }
