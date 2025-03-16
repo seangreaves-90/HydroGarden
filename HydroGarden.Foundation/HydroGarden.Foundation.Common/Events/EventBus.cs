@@ -33,24 +33,33 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="router">The event router to use for subscription matching.</param>
         /// <param name="topologyService">Optional topology service for event routing based on component relationships.</param>
         /// <param name="eventStore">Optional event store for persisting events.</param>
-        /// <param name="retryPolicy">Optional retry policy for failed events.</param>
-        /// <param name="transformer">Optional event transformer.</param>
+        /// <param name="transformer">Optional event transformer that will be applied during event publishing.</param>
         public EventBus(
             ILogger logger,
             IEventRouter router,
             ITopologyService? topologyService = null,
             IEventStore? eventStore = null,
-            IEventRetryPolicy? retryPolicy = null,
+            IEventRetryPolicy? retryPolicy = null, // Parameter maintained for backward compatibility but not used
             IEventTransformer? transformer = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _router = router ?? throw new ArgumentNullException(nameof(router));
             _topologyService = topologyService;
             _eventStore = eventStore;
-            _retryPolicy = retryPolicy;
+            _retryPolicy = null; // Retry policy is no longer used
             _transformer = transformer;
             
+            if (retryPolicy != null)
+            {
+                _logger.Log("Warning: Retry policy is deprecated and will be ignored");
+            }
+            
             _logger.Log("EventBus initialized with router: " + _router.GetType().Name);
+            
+            if (_transformer != null)
+            {
+                _logger.Log("Event transformer configured: " + _transformer.GetType().Name);
+            }
         }
 
         /// <inheritdoc/>
@@ -169,6 +178,21 @@ namespace HydroGarden.Foundation.Common.Events
             try
             {
                 _logger.Log($"Publishing event {evt.EventId} of type {evt.EventType}");
+                
+                // Apply transformation if transformer is available
+                if (_transformer != null)
+                {
+                    try
+                    {
+                        evt = _transformer.Transform(evt);
+                        _logger.Log($"Event {evt.EventId} transformed");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Log(ex, $"Error transforming event {evt.EventId}");
+                        return PublishResult.Failure(evt.EventId, ex);
+                    }
+                }
 
                 // Check if we have a pipeline configured
                 IEventProcessingPipeline? pipeline;
@@ -280,10 +304,16 @@ namespace HydroGarden.Foundation.Common.Events
                 if (asyncTasks.Count > 0 && evt.RoutingData?.Timeout.HasValue == true)
                 {
                     var timeout = evt.RoutingData.Timeout.Value;
-
-                    if (await Task.WhenAny(
+                    
+                    // Create a delay task outside the WhenAny call
+                    var delayTask = Task.Delay(timeout, ct);
+                    
+                    // Compare task references, not results
+                    var completedTask = await Task.WhenAny(
                         Task.WhenAll(asyncTasks),
-                        Task.Delay(timeout, ct)) == Task.Delay(timeout, ct))
+                        delayTask);
+                        
+                    if (completedTask == delayTask)
                     {
                         result.TimedOut = true;
                         _logger.Log($"Async handlers for event {evt.EventId} timed out after {timeout.TotalMilliseconds}ms");
@@ -327,15 +357,15 @@ namespace HydroGarden.Foundation.Common.Events
         }
 
         /// <summary>
-        /// Processes any failed events that were stored for retry.
+        /// Processes any failed events that were stored.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ProcessFailedEventsAsync(CancellationToken ct = default)
         {
-            if (_eventStore == null || _retryPolicy == null)
+            if (_eventStore == null)
             {
-                _logger.Log("Cannot process failed events: event store or retry policy is not configured");
+                _logger.Log("Cannot process failed events: event store is not configured");
                 return;
             }
 
@@ -347,26 +377,11 @@ namespace HydroGarden.Foundation.Common.Events
                     return;
                 }
 
-                _logger.Log($"Retrieved failed event {failedEvent.EventId} for retry processing");
+                _logger.Log($"Retrieved failed event {failedEvent.EventId} for processing");
 
-                // Check if we should retry
-                bool shouldRetry = await _retryPolicy.ShouldRetryAsync(failedEvent, 1);
-                if (shouldRetry)
-                {
-                    // Apply transformation if transformer is available
-                    IEvent eventToPublish = failedEvent;
-                    if (_transformer != null)
-                    {
-                        eventToPublish = _transformer.Transform(failedEvent);
-                    }
-
-                    _logger.Log($"Retrying failed event {failedEvent.EventId}");
-                    await PublishAsync(this, eventToPublish, ct);
-                }
-                else
-                {
-                    _logger.Log($"Failed event {failedEvent.EventId} will not be retried based on policy decision");
-                }
+                // Just publish the event - the transformer will be applied in PublishAsync
+                _logger.Log($"Publishing failed event {failedEvent.EventId}");
+                await PublishAsync(this, failedEvent, ct);
             }
             catch (Exception ex)
             {

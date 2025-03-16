@@ -190,8 +190,8 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             });
 
             // Act
-            var publishTask = _eventBus.PublishAsync(this, testEvent.Object);
-            var result = await Task.WhenAny(publishTask, Task.Delay(5000)) == publishTask ? publishTask.Result : null;
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var result = await _eventBus.PublishAsync(this, testEvent.Object, cts.Token);
 
             // Allow time for async error handling
             await Task.Delay(50);
@@ -214,6 +214,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             errorEvent.ErrorData.Context.Should().ContainKey("EventId");
             errorEvent.ErrorData.Context["EventId"].Should().Be(eventId);
         }
+
 
 
         [Fact]

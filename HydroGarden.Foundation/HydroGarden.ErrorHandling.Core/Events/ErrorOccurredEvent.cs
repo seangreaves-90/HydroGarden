@@ -35,5 +35,9 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         /// Gets or sets the device ID associated with this error.
         /// </summary>
         public Guid DeviceId { get; set; }
+
+        /// <inheritdoc/>
+        public IDictionary<string, object>? Metadata { get; set; }
+
     }
 }

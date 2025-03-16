@@ -1,4 +1,4 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 
@@ -39,6 +39,9 @@ namespace HydroGarden.Foundation.Common.Events
         /// Gets the routing data for this event (may be null)
         /// </summary>
         public IEventRoutingData? RoutingData => _routingData;
+
+        /// <inheritdoc />
+        public IDictionary<string, object>? Metadata { get; set; }
 
         /// <summary>
         /// Creates a new event base with default routing

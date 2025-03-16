@@ -34,6 +34,11 @@
         /// Optional routing data - used to determine how this event should be processed
         /// </summary>
         IEventRoutingData? RoutingData { get; }
+
+        /// <summary>
+        /// Additional metadata associated with the event
+        /// </summary>
+        IDictionary<string, object>? Metadata { get; }
     }
 
     /// <summary>

@@ -57,7 +57,9 @@
 
         /// <summary>
         /// Gets whether the event should be retried.
+        /// [DEPRECATED] Retry functionality is deprecated.
         /// </summary>
+        [Obsolete("Retry functionality is deprecated and will be removed in a future version.")]
         bool ShouldRetry { get; }
 
         /// <summary>
@@ -67,12 +69,16 @@
         
         /// <summary>
         /// Gets the number of retry attempts that have been made.
+        /// [DEPRECATED] Retry functionality is deprecated.
         /// </summary>
+        [Obsolete("Retry functionality is deprecated and will be removed in a future version.")]
         int RetryCount { get; }
         
         /// <summary>
         /// Gets the delay before the next retry attempt.
+        /// [DEPRECATED] Retry functionality is deprecated.
         /// </summary>
+        [Obsolete("Retry functionality is deprecated and will be removed in a future version.")]
         TimeSpan RetryDelay { get; }
     }
 }

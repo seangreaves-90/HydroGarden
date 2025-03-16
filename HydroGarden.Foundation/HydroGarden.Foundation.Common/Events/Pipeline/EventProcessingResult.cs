@@ -17,15 +17,18 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
         public bool IsSuccess { get; }
 
         /// <inheritdoc/>
+        [Obsolete("ShouldRetry is deprecated and will be removed in a future version.")]
         public bool ShouldRetry { get; }
 
         /// <inheritdoc/>
         public Exception? Exception { get; }
 
         /// <inheritdoc/>
+        [Obsolete("RetryCount is deprecated and will be removed in a future version.")]
         public int RetryCount { get; }
 
         /// <inheritdoc/>
+        [Obsolete("RetryDelay is deprecated and will be removed in a future version.")]
         public TimeSpan RetryDelay { get; }
 
         /// <summary>
@@ -78,12 +81,14 @@ namespace HydroGarden.Foundation.Common.Events.Pipeline
 
         /// <summary>
         /// Creates a result indicating the event should be retried.
+        /// [DEPRECATED] Retry functionality is deprecated and will be removed in a future version.
         /// </summary>
         /// <param name="event">The event that was processed.</param>
         /// <param name="exception">The exception that occurred, if any.</param>
         /// <param name="retryCount">The number of retry attempts that have been made.</param>
         /// <param name="retryDelay">The delay before the next retry attempt.</param>
         /// <returns>A retry result.</returns>
+        [Obsolete("Retry functionality is deprecated and will be removed in a future version.")]
         public static IEventProcessingResult Retry(
             IEvent @event,
             Exception? exception = null,

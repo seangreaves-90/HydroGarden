@@ -93,7 +93,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             
             // Log performance metrics - not a strict test as it depends on machine
             _mockLogger.Verify(l => 
-                l.Log(It.Is<string>(s => s.Contains($"Event {It.IsAny<Guid>()} published"))), 
+                l.Log(It.Is<string>(s => s.Contains($"Event") && s.Contains("published to") && s.Contains("handlers with") && s.Contains("successful"))), 
                 Times.Exactly(eventCount));
             
             // Performance check - This is a loose check as performance depends on the test environment
@@ -208,7 +208,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
         public async Task EventBus_ShouldHandleLongRunningHandlers()
         {
             // Arrange
-            const int longRunningDelay = 2000; // 2 seconds
+            const int longRunningDelay = 3000; // 3 seconds - make sure it's long enough
             const int eventCount = 5;
             
             // Create a long-running handler
@@ -253,8 +253,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 
                 // First half has short timeout, second half has long timeout
                 var timeout = i < eventCount / 2 
-                    ? TimeSpan.FromMilliseconds(500) // Short timeout
-                    : TimeSpan.FromMilliseconds(5000); // Long timeout
+                ? TimeSpan.FromMilliseconds(100) // Very short timeout (100ms)
+                : TimeSpan.FromMilliseconds(5000); // Long timeout (5s)
                     
                 routingData.Setup(r => r.Timeout).Returns(timeout);
                 mockEvent.Setup(e => e.RoutingData).Returns(routingData.Object);

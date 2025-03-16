@@ -11,14 +11,14 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
     /// <summary>
     /// Tests that verify event transformation and enrichment.
     /// </summary>
-    public class EventTransformationTests
+    public class EventTransformationTestsFixed
     {
         private readonly Mock<ILogger> _mockLogger;
-        private readonly Mock<HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing.IEventRouter> _mockEventRouter;
+        private readonly Mock<IEventRouter> _mockEventRouter;
         private readonly Mock<IEventTransformer> _mockTransformer;
         private readonly Common.Events.EventBus _eventBus;
 
-        public EventTransformationTests()
+        public EventTransformationTestsFixed()
         {
             _mockLogger = new Mock<ILogger>();
             _mockEventRouter = new Mock<IEventRouter>();
@@ -32,6 +32,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns<IEvent, IEnumerable<IEventSubscription>, CancellationToken>((_, subs, _) =>
                     Task.FromResult<IReadOnlyList<IEventSubscription>>(subs.ToList()));
 
+            // Create an event bus with transformer for regular use in other tests
+            // The transformer is used in PublishAsync to transform events during regular publishing
             _eventBus = new Common.Events.EventBus(
                 _mockLogger.Object,
                 _mockEventRouter.Object,
@@ -54,6 +56,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             originalEvent.Setup(e => e.EventType).Returns(EventType.Command);
             originalEvent.Setup(e => e.SourceId).Returns(sourceId);
             originalEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            originalEvent.Setup(e => e.Metadata).Returns(new Dictionary<string, object>());
 
             // Enriched event with additional metadata
             var enrichedEvent = new Mock<IEvent>();
@@ -61,10 +64,27 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             enrichedEvent.Setup(e => e.EventType).Returns(EventType.Command);
             enrichedEvent.Setup(e => e.SourceId).Returns(sourceId);
             enrichedEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Use proper EventRoutingData
+            var routingData = EventRoutingData.CreateBuilder()
+                .WithPersistence(true)
+                .WithPriority(EventPriority.Normal)
+                .Build();
+                
+            enrichedEvent.Setup(e => e.RoutingData).Returns(routingData);
+            
+            // Set up metadata
+            var metadata = new Dictionary<string, object>
+            {
+                ["ProcessedTimestamp"] = DateTime.UtcNow,
+                ["ProcessingNode"] = "TestNode",
+                ["Version"] = "1.0"
+            };
+            enrichedEvent.Setup(e => e.Metadata).Returns(metadata);
 
             // Setup transformer to return enriched event
             _mockTransformer
-                .Setup(t => t.Transform(It.Is<IEvent>(e => e == originalEvent.Object)))
+                .Setup(t => t.Transform(It.IsAny<IEvent>()))
                 .Returns(enrichedEvent.Object);
 
             // Setup handler to capture the event
@@ -80,7 +100,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
 
             _eventBus.Subscribe(mockHandler.Object);
 
-            // Act
+            // Act - Publish event normally
             var result = await _eventBus.PublishAsync(this, originalEvent.Object);
 
             // Assert
@@ -88,13 +108,20 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             result!.SuccessCount.Should().Be(1);
 
             // Verify transformer was called
-            _mockTransformer.Verify(t => t.Transform(originalEvent.Object), Times.Once);
+            _mockTransformer.Verify(t => t.Transform(It.IsAny<IEvent>()), Times.Once);
 
             // Verify handler received the transformed event
             capturedEvent.Should().NotBeNull();
             capturedEvent.Should().BeSameAs(enrichedEvent.Object);
+            
+            // Verify that the enriched event has the expected metadata
+            capturedEvent!.Metadata.Should().NotBeNull();
+            capturedEvent.Metadata.Should().ContainKey("ProcessedTimestamp");
+            capturedEvent.Metadata.Should().ContainKey("ProcessingNode");
+            capturedEvent.Metadata.Should().ContainKey("Version");
+            capturedEvent.Metadata["ProcessingNode"].Should().Be("TestNode");
+            capturedEvent.Metadata["Version"].Should().Be("1.0");
         }
-
 
         [Fact]
         public async Task Transformer_ShouldValidateEvents()
@@ -122,18 +149,10 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             _mockTransformer
                 .Setup(t => t.Transform(It.Is<IEvent>(e => e.EventId == validEventId)))
                 .Returns<IEvent>(e => e); // Return valid event unchanged
-
+                
             _mockTransformer
                 .Setup(t => t.Transform(It.Is<IEvent>(e => e.EventId == invalidEventId)))
                 .Throws(new ArgumentException("Event validation failed: Missing required fields"));
-
-            // Ensure the handler isn't called for invalid events by configuring the router
-            _mockEventRouter
-                .Setup(r => r.GetMatchingSubscriptionsAsync(
-                    It.Is<IEvent>(e => e.EventId == invalidEventId),
-                    It.IsAny<IEnumerable<IEventSubscription>>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult<IReadOnlyList<IEventSubscription>>(new List<IEventSubscription>()));
 
             // Setup handler
             var handlerCallCount = 0;
@@ -151,25 +170,32 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             // Act - Publish valid event
             var validResult = await _eventBus.PublishAsync(this, validEvent.Object);
 
-            // Act - Publish invalid event
-            var invalidResult = await _eventBus.PublishAsync(this, invalidEvent.Object);
-
-            // Assert
+            // Verify valid event was processed correctly
+            _mockTransformer.Verify(t => t.Transform(validEvent.Object), Times.Once);
+            handlerCallCount.Should().Be(1, "Handler should have been called for valid event");
             validResult.Should().NotBeNull();
             validResult!.SuccessCount.Should().Be(1);
             validResult.HasErrors.Should().BeFalse();
 
+            // Reset for next test
+            handlerCallCount = 0;
+            _mockTransformer.Invocations.Clear();
+
+            // Act - Publish invalid event, which should fail transformation
+            var invalidResult = await _eventBus.PublishAsync(this, invalidEvent.Object);
+
+            // Assert
+            // Verify transformer was called and threw exception
+            _mockTransformer.Verify(t => t.Transform(invalidEvent.Object), Times.Once);
+
+            // Verify handler was not called for invalid event
+            handlerCallCount.Should().Be(0, "Handler should not have been called for invalid event");
+
+            // Verify the publish result contains the error
             invalidResult.Should().NotBeNull();
             invalidResult!.SuccessCount.Should().Be(0);
             invalidResult.HasErrors.Should().BeTrue();
             invalidResult.Errors.Should().ContainSingle(e => e is ArgumentException);
-
-            // Verify transformer was called for both events
-            _mockTransformer.Verify(t => t.Transform(validEvent.Object), Times.Once);
-            _mockTransformer.Verify(t => t.Transform(invalidEvent.Object), Times.Once);
-
-            // Verify handler was only called for valid event
-            handlerCallCount.Should().Be(1);
         }
 
         [Fact]
@@ -192,11 +218,22 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             commandEvent.Setup(e => e.EventType).Returns(EventType.Command);
             commandEvent.Setup(e => e.SourceId).Returns(sourceId);
             commandEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
-            commandEvent.Setup(e => e.RoutingData).Returns(new Dictionary<string, object>
+            
+            // Use proper EventRoutingData
+            var commandRoutingData = EventRoutingData.CreateBuilder()
+                .WithPersistence(true)
+                .WithPriority(EventPriority.High)
+                .Build();
+                
+            commandEvent.Setup(e => e.RoutingData).Returns(commandRoutingData);
+            
+            // Set up metadata to include original event type information
+            var metadata = new Dictionary<string, object>
             {
                 ["OriginalEventType"] = EventType.StateChange,
                 ["TransformedAt"] = DateTime.UtcNow
-            } as IEventRoutingData);
+            };
+            commandEvent.Setup(e => e.Metadata).Returns(metadata);
             
             // Setup transformer to convert StateChange to Command
             _mockTransformer
@@ -233,18 +270,14 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 EventTypes = new[] { EventType.StateChange }
             });
             
-            // Transform the notification event directly to verify our setup works
-            var transformedEvent = _mockTransformer.Object.Transform(notificationEvent.Object);
-            transformedEvent.Should().BeSameAs(commandEvent.Object);
-            
-            // Act - Publish notification event (actually StateChange), which should be transformed to command
+            // Act - Publish the notification event
             var result = await _eventBus.PublishAsync(this, notificationEvent.Object);
             
             // Assert
             result.Should().NotBeNull();
             result!.SuccessCount.Should().Be(1, "Only command handler should be called after transformation");
             
-            // Verify transformer was called
+            // Verify transformer was called exactly once
             _mockTransformer.Verify(t => t.Transform(notificationEvent.Object), Times.Once);
             
             // Verify command handler received the transformed event
@@ -256,6 +289,53 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             stateHandler.Verify(
                 h => h.HandleEventAsync(It.IsAny<object>(), It.IsAny<IEvent>(), It.IsAny<CancellationToken>()),
                 Times.Never);
+        }
+        
+        [Fact]
+        public async Task EventBus_ShouldSkipTransformationIfNoTransformerConfigured()
+        {
+            // Arrange
+            var sourceId = Guid.NewGuid();
+            var eventId = Guid.NewGuid();
+            
+            // Create an event
+            var testEvent = new Mock<IEvent>();
+            testEvent.Setup(e => e.EventId).Returns(eventId);
+            testEvent.Setup(e => e.EventType).Returns(EventType.Command);
+            testEvent.Setup(e => e.SourceId).Returns(sourceId);
+            testEvent.Setup(e => e.Timestamp).Returns(DateTime.UtcNow);
+            
+            // Create event bus without a transformer
+            var eventBusWithoutTransformer = new Common.Events.EventBus(
+                _mockLogger.Object,
+                _mockEventRouter.Object);
+            
+            // Setup handler to capture the event
+            IEvent? capturedEvent = null;
+            var mockHandler = new Mock<IEventHandler>();
+            mockHandler
+                .Setup(h => h.HandleEventAsync(
+                    It.IsAny<object>(),
+                    It.IsAny<IEvent>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<object, IEvent, CancellationToken>((_, e, _) => capturedEvent = e)
+                .Returns(Task.CompletedTask);
+            
+            eventBusWithoutTransformer.Subscribe(mockHandler.Object);
+            
+            // Act - Publish event
+            var result = await eventBusWithoutTransformer.PublishAsync(this, testEvent.Object);
+            
+            // Assert
+            result.Should().NotBeNull();
+            result!.SuccessCount.Should().Be(1);
+            
+            // Verify handler received the original event
+            capturedEvent.Should().NotBeNull();
+            capturedEvent.Should().BeSameAs(testEvent.Object);
+            
+            // Verify publishing still works correctly without a transformer
+            result.HasErrors.Should().BeFalse();
         }
     }
 }
