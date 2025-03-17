@@ -1,9 +1,7 @@
 ﻿using FluentAssertions;
-using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -28,9 +26,9 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         {
             // Act & Assert
             var exception = Assert.Throws<ArgumentNullException>(() => new ErrorMonitor(
-                null, 
+                null,
                 _mockTransformationService.Object));
-            
+
             exception.ParamName.Should().Be("logger");
         }
 
@@ -39,9 +37,9 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         {
             // Act & Assert
             var exception = Assert.Throws<ArgumentNullException>(() => new ErrorMonitor(
-                _mockLogger.Object, 
+                _mockLogger.Object,
                 null));
-            
+
             exception.ParamName.Should().Be("transformationService");
         }
 
@@ -70,7 +68,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             _mockTransformationService.Verify(
                 t => t.PublishErrorAsEventAsync(It.Is<IApplicationError>(e => e == error), It.IsAny<CancellationToken>()),
                 Times.Once);
-            
+
             // Verify error is stored
             var activeErrors = await _errorMonitor.GetActiveErrorsForDeviceAsync(deviceId);
             activeErrors.Should().HaveCount(1);
@@ -81,7 +79,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         public async Task ReportErrorAsync_WithNullError_ShouldThrowArgumentNullException()
         {
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 _errorMonitor.ReportErrorAsync(null));
         }
 
@@ -108,7 +106,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Assert
             _mockLogger.Verify(l => l.Log(It.IsAny<string>()), Times.Once);
             _mockLogger.Verify(l => l.Log(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
-            
+
             // Verify error is still stored despite publishing failure
             var activeErrors = await _errorMonitor.GetActiveErrorsForDeviceAsync(deviceId);
             activeErrors.Should().HaveCount(1);
@@ -146,9 +144,9 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Assert
             _mockTransformationService.Verify(
                 t => t.PublishErrorAsEventAsync(
-                    It.Is<IApplicationError>(e => 
-                        e.ErrorCode == errorCode && 
-                        e.Message == message), 
+                    It.Is<IApplicationError>(e =>
+                        e.ErrorCode == errorCode &&
+                        e.Message == message),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -157,7 +155,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         public async Task ReportExceptionAsync_WithNullSource_ShouldThrowArgumentNullException()
         {
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 _errorMonitor.ReportExceptionAsync(
                     null,
                     new Exception(),
@@ -169,7 +167,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         public async Task ReportExceptionAsync_WithNullException_ShouldThrowArgumentNullException()
         {
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 _errorMonitor.ReportExceptionAsync(
                     new object(),
                     null,
@@ -183,23 +181,23 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Arrange
             var deviceId1 = Guid.NewGuid();
             var deviceId2 = Guid.NewGuid();
-            
+
             var error1 = new ComponentError(
                 deviceId1,
                 "ERROR_1",
                 "Error 1",
                 ErrorSeverity.Error,
                 ErrorSource.Device);
-            
+
             await Task.Delay(10); // Ensure different timestamps
-            
+
             var error2 = new ComponentError(
                 deviceId2,
                 "ERROR_2",
                 "Error 2",
                 ErrorSeverity.Critical,
                 ErrorSource.Service);
-            
+
             await _errorMonitor.ReportErrorAsync(error1);
             await _errorMonitor.ReportErrorAsync(error2);
 
@@ -224,7 +222,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
                     $"Error {i}",
                     ErrorSeverity.Error,
                     ErrorSource.Device);
-                
+
                 await _errorMonitor.ReportErrorAsync(error);
                 await Task.Delay(10); // Ensure different timestamps
             }
@@ -256,7 +254,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
                 "Warning message",
                 ErrorSeverity.Warning,
                 ErrorSource.Device);
-            
+
             await _errorMonitor.ReportErrorAsync(error);
 
             // Act
@@ -276,7 +274,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
                 "Critical error message",
                 ErrorSeverity.Critical,
                 ErrorSource.Device);
-            
+
             await _errorMonitor.ReportErrorAsync(error);
 
             // Act
@@ -292,14 +290,14 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Arrange
             var deviceId1 = Guid.NewGuid();
             var deviceId2 = Guid.NewGuid();
-            
+
             var error1 = new ComponentError(
                 deviceId1,
                 "ERROR_1",
                 "Error 1",
                 ErrorSeverity.Error,
                 ErrorSource.Device);
-            
+
             var error2 = new ComponentError(
                 deviceId2,
                 "ERROR_2",
@@ -313,7 +311,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
                 "Error 3",
                 ErrorSeverity.Critical,
                 ErrorSource.Device);
-            
+
             await _errorMonitor.ReportErrorAsync(error1);
             await _errorMonitor.ReportErrorAsync(error2);
             await _errorMonitor.ReportErrorAsync(error3);
@@ -334,14 +332,14 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Arrange
             var deviceId = Guid.NewGuid();
             var errorCode = "TEST_ERROR";
-            
+
             var error = new ComponentError(
                 deviceId,
                 errorCode,
                 "Test error",
                 ErrorSeverity.Error,
                 ErrorSource.Device);
-            
+
             await _errorMonitor.ReportErrorAsync(error);
 
             // Act
@@ -373,21 +371,21 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
             // Arrange
             var deviceId = Guid.NewGuid();
             var errorCode = "TEST_ERROR";
-            
+
             var error1 = new ComponentError(
                 deviceId,
                 errorCode,
                 "First error",
                 ErrorSeverity.Error,
                 ErrorSource.Device);
-            
+
             var error2 = new ComponentError(
                 deviceId,
                 errorCode,
                 "Updated error",
                 ErrorSeverity.Critical,
                 ErrorSource.Device);
-            
+
             await _errorMonitor.ReportErrorAsync(error1);
             await _errorMonitor.ReportErrorAsync(error2);
 
