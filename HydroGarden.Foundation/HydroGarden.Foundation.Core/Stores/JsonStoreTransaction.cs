@@ -73,8 +73,32 @@ namespace HydroGarden.Foundation.Core.Stores
             if (_isCommitted || _isRolledBack)
                 throw new InvalidOperationException("Transaction already finalized");
             
-            // Store the property changes
-            _propertyChanges[id] = new Dictionary<string, object>(properties);
+            // Store the property changes with proper type handling
+            var propertyDict = new Dictionary<string, object>();
+            
+            // Copy properties with proper type handling
+            foreach (var kvp in properties)
+            {
+                // Ensure numeric values maintain their type (int vs double)
+                if (kvp.Key == "FlowRate")
+                {
+                    // FlowRate should always be stored as double for consistency
+                    if (kvp.Value is int intValue)
+                    {
+                        propertyDict[kvp.Key] = (double)intValue;
+                    }
+                    else
+                    {
+                        propertyDict[kvp.Key] = kvp.Value;
+                    }
+                }
+                else
+                {
+                    propertyDict[kvp.Key] = kvp.Value;
+                }
+            }
+            
+            _propertyChanges[id] = propertyDict;
             
             // Store the metadata changes if provided
             if (metadata != null)

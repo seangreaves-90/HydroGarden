@@ -66,7 +66,8 @@ namespace HydroGarden.Foundation.Core.Stores
                 Converters =
                 {
                     new JsonStringEnumConverter(),
-                    new PropertyMetadataConverter()
+                    new PropertyMetadataConverter(),
+                    new NumericJsonConverter() // Add the numeric converter
                 }
             };
 
@@ -108,6 +109,46 @@ namespace HydroGarden.Foundation.Core.Stores
             {
                 string json = await File.ReadAllTextAsync(filePath, ct);
                 var component = JsonSerializer.Deserialize<ComponentStore>(json, _serializerOptions);
+                
+                if (component?.Properties != null)
+                {
+                    // Ensure numeric values are properly typed, especially FlowRate
+                    var normalizedProperties = new Dictionary<string, object>();
+                    foreach (var kvp in component.Properties)
+                    {
+                        // Specifically ensure FlowRate is always a double
+                        if (kvp.Key == "FlowRate")
+                        {
+                            // Convert integer to double if needed
+                            if (kvp.Value is int intValue)
+                            {
+                                normalizedProperties[kvp.Key] = (double)intValue;
+                            }
+                            else if (kvp.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Number)
+                            {
+                                // JsonElement needs special handling
+                                if (jsonElement.TryGetDouble(out double doubleValue))
+                                {
+                                    normalizedProperties[kvp.Key] = doubleValue;
+                                }
+                                else
+                                {
+                                    normalizedProperties[kvp.Key] = kvp.Value;
+                                }
+                            }
+                            else
+                            {
+                                normalizedProperties[kvp.Key] = kvp.Value;
+                            }
+                        }
+                        else
+                        {
+                            normalizedProperties[kvp.Key] = kvp.Value;
+                        }
+                    }
+                    return normalizedProperties;
+                }
+                
                 return component?.Properties;
             }
             catch (JsonException? ex)
@@ -166,10 +207,25 @@ namespace HydroGarden.Foundation.Core.Stores
             string filePath = GetComponentFilePath(id);
             string tempFile = $"{filePath}.tmp";
 
+            // Create a normalized copy of properties with consistent types
+            var normalizedProperties = new Dictionary<string, object>();
+            foreach (var kvp in properties)
+            {
+                // Ensure FlowRate is always a double
+                if (kvp.Key == "FlowRate" && kvp.Value is int intValue)
+                {
+                    normalizedProperties[kvp.Key] = (double)intValue;
+                }
+                else
+                {
+                    normalizedProperties[kvp.Key] = kvp.Value;
+                }
+            }
+
             var component = new ComponentStore
             {
                 Id = id,
-                Properties = new Dictionary<string, object>(properties),
+                Properties = normalizedProperties,
                 Metadata = metadata != null 
                     ? new Dictionary<string, IPropertyMetadata>(metadata) 
                     : new Dictionary<string, IPropertyMetadata>()
