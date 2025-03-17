@@ -1,16 +1,4 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces.Components;
-using HydroGarden.Foundation.Common.Events;
-using HydroGarden.Foundation.Common.Events.RetryPolicies;
-using HydroGarden.Foundation.Common.Events.Stores;
-using HydroGarden.Foundation.Common.Events.Transforms;
-using HydroGarden.Foundation.Core.Components.Devices;
-using HydroGarden.Foundation.Core.Services;
-using HydroGarden.Foundation.Core.Stores;
-using HydroGarden.Foundation.Common.PropertyMetadata;
-using System.Text.Json;
-using HydroGarden.Foundation.Abstractions.Interfaces;
-
-namespace TestConsole
+﻿namespace TestConsole
 {
     class Program
     {

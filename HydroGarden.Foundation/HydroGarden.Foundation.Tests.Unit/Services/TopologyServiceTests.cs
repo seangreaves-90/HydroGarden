@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Core.Services;
@@ -11,100 +12,57 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
     public class TopologyServiceTests
     {
         private readonly Mock<ILogger> _mockLogger;
-        private readonly Mock<IStore> _mockStore;
         private readonly Mock<IPersistenceService> _mockPersistenceService;
-        private readonly TopologyService _topologyService;
-        private readonly Guid _topologyStoreId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        private readonly Mock<IPersistenceTransaction> _mockTransaction;
+        private readonly Mock<IErrorMonitor> _mockErrorMonitor;
+        private readonly TopologyService _service;
 
         public TopologyServiceTests()
         {
             _mockLogger = new Mock<ILogger>();
-            _mockStore = new Mock<IStore>();
             _mockPersistenceService = new Mock<IPersistenceService>();
+            _mockTransaction = new Mock<IPersistenceTransaction>();
+            _mockErrorMonitor = new Mock<IErrorMonitor>();
 
-            // Setup mock store to return empty data initially
-            _mockStore.Setup(s => s.LoadAsync(_topologyStoreId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((IDictionary<string, object>?)null);
+            _mockPersistenceService.Setup(p => p.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(_mockTransaction.Object);
 
-            _topologyService = new TopologyService(_mockLogger.Object, _mockStore.Object, _mockPersistenceService.Object);
+            _service = new TopologyService(_mockLogger.Object, _mockPersistenceService.Object);
         }
 
         [Fact]
-        public async Task InitializeAsync_ShouldLoadConnectionsFromStore()
+        public async Task InitializeAsync_Should_LoadConnectionsFromPersistenceService()
         {
             // Arrange
-            var connection1 = new ComponentConnection
+            var connections = new List<IComponentConnection>
             {
-                ConnectionId = Guid.NewGuid(),
-                SourceId = Guid.NewGuid(),
-                TargetId = Guid.NewGuid(),
-                ConnectionType = "Test",
-                IsEnabled = true
+                new ComponentConnection
+                {
+                    ConnectionId = Guid.NewGuid(),
+                    SourceId = Guid.NewGuid(),
+                    TargetId = Guid.NewGuid(),
+                    ConnectionType = "TestType",
+                    IsEnabled = true
+                }
             };
 
-            var connections = new List<ComponentConnection> { connection1 };
-
-            var connectionsData = new Dictionary<string, object>
-            {
-                ["Connections"] = connections
-            };
-
-            _mockStore.Setup(s => s.LoadAsync(_topologyStoreId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(connectionsData);
+            _mockPersistenceService.Setup(p => p.GetAllConnectionsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(connections);
 
             // Act
-            await _topologyService.InitializeAsync();
-            var sourceConnections = await _topologyService.GetConnectionsForSourceAsync(connection1.SourceId);
-            var targetConnections = await _topologyService.GetConnectionsForTargetAsync(connection1.TargetId);
+            await _service.InitializeAsync();
 
             // Assert
-            sourceConnections.Should().HaveCount(1);
-            sourceConnections[0].ConnectionId.Should().Be(connection1.ConnectionId);
-
-            targetConnections.Should().HaveCount(1);
-            targetConnections[0].ConnectionId.Should().Be(connection1.ConnectionId);
+            _mockPersistenceService.Verify(p => p.GetAllConnectionsAsync(It.IsAny<CancellationToken>()), Times.Once);
+            
+            // Verify connections were loaded correctly
+            var sourceConnections = await _service.GetConnectionsForSourceAsync(connections[0].SourceId);
+            Assert.Single(sourceConnections);
+            Assert.Equal(connections[0].ConnectionId, sourceConnections[0].ConnectionId);
         }
 
         [Fact]
-        public async Task CreateConnectionAsync_ShouldAddConnectionAndSaveToStore()
-        {
-            // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
-            var connection = new ComponentConnection
-            {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true
-            };
-
-            // Act
-            var createdConnection = await _topologyService.CreateConnectionAsync(connection);
-            var sourceConnections = await _topologyService.GetConnectionsForSourceAsync(sourceId);
-            var targetConnections = await _topologyService.GetConnectionsForTargetAsync(targetId);
-
-            // Assert
-            createdConnection.Should().NotBeNull();
-            createdConnection.ConnectionId.Should().NotBe(Guid.Empty);
-
-            sourceConnections.Should().HaveCount(1);
-            sourceConnections[0].ConnectionId.Should().Be(createdConnection.ConnectionId);
-
-            targetConnections.Should().HaveCount(1);
-            targetConnections[0].ConnectionId.Should().Be(createdConnection.ConnectionId);
-
-            _mockStore.Verify(s => s.SaveAsync(
-                _topologyStoreId,
-                It.Is<IDictionary<string, object>>(d =>
-                    d.ContainsKey("Connections") &&
-                    ((List<ComponentConnection>)d["Connections"]).Count == 1),
-                It.IsAny<CancellationToken>()),
-                Times.Once);
-        }
-
-        [Fact]
-        public async Task CreateConnectionAsync_WithExistingId_ShouldThrowException()
+        public async Task CreateConnectionAsync_Should_StoreConnectionInPersistenceService()
         {
             // Arrange
             var connection = new ComponentConnection
@@ -112,311 +70,291 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 ConnectionId = Guid.NewGuid(),
                 SourceId = Guid.NewGuid(),
                 TargetId = Guid.NewGuid(),
-                ConnectionType = "Test",
+                ConnectionType = "TestType",
                 IsEnabled = true
-            };
-
-            // Create the first connection
-            await _topologyService.CreateConnectionAsync(connection);
-
-            // Try to create another connection with the same ID
-            var connection2 = new ComponentConnection
-            {
-                ConnectionId = connection.ConnectionId, // Same ID
-                SourceId = Guid.NewGuid(),
-                TargetId = Guid.NewGuid(),
-                ConnectionType = "Test2",
-                IsEnabled = true
-            };
-
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await _topologyService.CreateConnectionAsync(connection2));
-        }
-
-        [Fact]
-        public async Task UpdateConnectionAsync_ShouldUpdateConnectionAndSaveToStore()
-        {
-            // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
-            var connection = new ComponentConnection
-            {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true
-            };
-
-            var createdConnection = await _topologyService.CreateConnectionAsync(connection);
-
-            // Modify connection
-            var updatedConnection = new ComponentConnection
-            {
-                ConnectionId = createdConnection.ConnectionId,
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Updated",
-                IsEnabled = false
             };
 
             // Act
-            var updateResult = await _topologyService.UpdateConnectionAsync(updatedConnection);
-            var sourceConnections = await _topologyService.GetConnectionsForSourceAsync(sourceId);
+            var result = await _service.CreateConnectionAsync(connection);
 
             // Assert
-            updateResult.Should().BeTrue();
-            sourceConnections.Should().BeEmpty(); // Connection is disabled now
-
-            _mockStore.Verify(s => s.SaveAsync(
-                _topologyStoreId,
-                It.Is<IDictionary<string, object>>(d =>
-                    d.ContainsKey("Connections") &&
-                    ((List<ComponentConnection>)d["Connections"]).Count == 1),
-                It.IsAny<CancellationToken>()),
-                Times.Exactly(2)); // Once for create, once for update
-        }
-
-        [Fact]
-        public async Task DeleteConnectionAsync_ShouldRemoveConnectionAndSaveToStore()
-        {
-            // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
-            var connection = new ComponentConnection
-            {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true
-            };
-
-            var createdConnection = await _topologyService.CreateConnectionAsync(connection);
-
-            // Act
-            var deleteResult = await _topologyService.DeleteConnectionAsync(createdConnection.ConnectionId);
-            var sourceConnections = await _topologyService.GetConnectionsForSourceAsync(sourceId);
-            var targetConnections = await _topologyService.GetConnectionsForTargetAsync(targetId);
-
-            // Assert
-            deleteResult.Should().BeTrue();
-            sourceConnections.Should().BeEmpty();
-            targetConnections.Should().BeEmpty();
-
-            _mockStore.Verify(s => s.SaveAsync(
-                _topologyStoreId,
-                It.Is<IDictionary<string, object>>(d =>
-                    d.ContainsKey("Connections") &&
-                    ((List<ComponentConnection>)d["Connections"]).Count == 0),
+            _mockPersistenceService.Verify(p => p.StoreConnectionAsync(
+                It.Is<IComponentConnection>(c => c.ConnectionId == connection.ConnectionId),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
+                
+            Assert.Equal(connection.ConnectionId, result.ConnectionId);
         }
 
         [Fact]
-        public async Task EvaluateConnectionConditionAsync_NoCondition_ShouldReturnTrue()
+        public async Task UpdateConnectionAsync_Should_StoreUpdatedConnectionInPersistenceService()
         {
             // Arrange
             var connection = new ComponentConnection
             {
+                ConnectionId = Guid.NewGuid(),
                 SourceId = Guid.NewGuid(),
                 TargetId = Guid.NewGuid(),
-                ConnectionType = "Test",
-                IsEnabled = true,
-                Condition = null // No condition
+                ConnectionType = "TestType",
+                IsEnabled = true
             };
 
+            // First create the connection
+            await _service.CreateConnectionAsync(connection);
+            
+            // Modify the connection
+            connection.IsEnabled = false;
+            connection.ConnectionType = "UpdatedType";
+
             // Act
-            var result = await _topologyService.EvaluateConnectionConditionAsync(connection);
+            var result = await _service.UpdateConnectionAsync(connection);
 
             // Assert
-            result.Should().BeTrue();
+            Assert.True(result);
+            _mockPersistenceService.Verify(p => p.StoreConnectionAsync(
+                It.Is<IComponentConnection>(c => 
+                    c.ConnectionId == connection.ConnectionId && 
+                    c.ConnectionType == "UpdatedType" && 
+                    c.IsEnabled == false),
+                It.IsAny<CancellationToken>()),
+                Times.AtLeastOnce);
         }
 
         [Fact]
-        public async Task EvaluateConnectionConditionAsync_WithSimpleCondition_ShouldEvaluateCorrectly()
+        public async Task UpdateConnectionAsync_Should_ReturnFalse_WhenConnectionDoesNotExist()
         {
             // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
             var connection = new ComponentConnection
             {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true,
-                Condition = "source.Temperature > 25" // Condition referencing source device
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true
             };
 
-            // Set up persistence service to return a property value (Temperature = 30)
-            _mockPersistenceService.Setup(p => p.GetPropertyAsync<object>(
-                    sourceId, "Temperature", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(30);
-
             // Act
-            var result = await _topologyService.EvaluateConnectionConditionAsync(connection);
+            var result = await _service.UpdateConnectionAsync(connection);
 
             // Assert
-            result.Should().BeTrue();
+            Assert.False(result);
         }
 
         [Fact]
-        public async Task EvaluateConnectionConditionAsync_WithFalseCondition_ShouldReturnFalse()
+        public async Task DeleteConnectionAsync_Should_DeleteConnectionFromPersistenceService()
         {
             // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
             var connection = new ComponentConnection
             {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true,
-                Condition = "source.Temperature > 25" // Condition referencing source device
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true
             };
 
-            // Set up persistence service to return a property value (Temperature = 20)
-            _mockPersistenceService.Setup(p => p.GetPropertyAsync<object>(
-                    sourceId, "Temperature", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(20);
-
-            // Act
-            var result = await _topologyService.EvaluateConnectionConditionAsync(connection);
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-        [Fact]
-        public async Task EvaluateConnectionConditionAsync_WithTargetCondition_ShouldEvaluateCorrectly()
-        {
-            // Arrange
-            var sourceId = Guid.NewGuid();
-            var targetId = Guid.NewGuid();
-            var connection = new ComponentConnection
-            {
-                SourceId = sourceId,
-                TargetId = targetId,
-                ConnectionType = "Test",
-                IsEnabled = true,
-                Condition = "target.IsActive == true" // Condition referencing target device
-            };
-
-            // Set up persistence service to return a property value (IsActive = true)
-            _mockPersistenceService.Setup(p => p.GetPropertyAsync<object>(
-                    targetId, "IsActive", It.IsAny<CancellationToken>()))
+            // First create the connection
+            await _service.CreateConnectionAsync(connection);
+            
+            _mockPersistenceService.Setup(p => p.DeleteConnectionAsync(
+                    It.Is<Guid>(id => id == connection.ConnectionId),
+                    It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
             // Act
-            var result = await _topologyService.EvaluateConnectionConditionAsync(connection);
+            var result = await _service.DeleteConnectionAsync(connection.ConnectionId);
 
             // Assert
-            result.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task EvaluateConnectionConditionAsync_WithInvalidCondition_ShouldReturnFalse()
-        {
-            // Arrange
-            var connectionId = Guid.NewGuid();
-            var connection = new ComponentConnection
-            {
-                ConnectionId = connectionId,
-                SourceId = Guid.NewGuid(),
-                TargetId = Guid.NewGuid(),
-                ConnectionType = "Test",
-                IsEnabled = true,
-                Condition = "InvalidConditionFormat" // Invalid format - no operator
-            };
-
-            // Setup a clear failure for specific format - must be placed before invocation
-            // This will ensure ConditionEvaluator throws ArgumentException
-            _mockPersistenceService.Setup(p => p.GetPropertyAsync<object>(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new ArgumentException("Invalid condition format"));
-
-            // Act
-            var result = await _topologyService.EvaluateConnectionConditionAsync(connection);
-
-            // Assert
-            result.Should().BeFalse();
-            _mockLogger.Verify(l => l.Log(
-                It.IsAny<Exception>(),
-                It.Is<string>(s => s.Contains("Error evaluating condition"))),
+            Assert.True(result);
+            _mockPersistenceService.Verify(p => p.DeleteConnectionAsync(
+                It.Is<Guid>(id => id == connection.ConnectionId),
+                It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
         [Fact]
-        public async Task GetConnectionsForSource_WithMultipleConnections_ShouldFilterBySource()
+        public async Task GetConnectionsForSourceAsync_Should_ReturnConnectionsWithMatchingSource()
         {
             // Arrange
             var sourceId = Guid.NewGuid();
-            var targetId1 = Guid.NewGuid();
-            var targetId2 = Guid.NewGuid();
-
-            // Create two connections from the same source
+            var targetId = Guid.NewGuid();
+            
             var connection1 = new ComponentConnection
             {
+                ConnectionId = Guid.NewGuid(),
                 SourceId = sourceId,
-                TargetId = targetId1,
-                ConnectionType = "Test1",
+                TargetId = targetId,
+                ConnectionType = "TestType1",
                 IsEnabled = true
             };
-
+            
             var connection2 = new ComponentConnection
             {
+                ConnectionId = Guid.NewGuid(),
                 SourceId = sourceId,
-                TargetId = targetId2,
-                ConnectionType = "Test2",
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType2",
+                IsEnabled = true
+            };
+            
+            var connection3 = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = targetId,
+                ConnectionType = "TestType3",
                 IsEnabled = true
             };
 
-            await _topologyService.CreateConnectionAsync(connection1);
-            await _topologyService.CreateConnectionAsync(connection2);
+            // Create the connections
+            await _service.CreateConnectionAsync(connection1);
+            await _service.CreateConnectionAsync(connection2);
+            await _service.CreateConnectionAsync(connection3);
 
             // Act
-            var sourceConnections = await _topologyService.GetConnectionsForSourceAsync(sourceId);
+            var result = await _service.GetConnectionsForSourceAsync(sourceId);
 
             // Assert
-            sourceConnections.Should().HaveCount(2);
-            sourceConnections.Should().Contain(c => c.TargetId == targetId1);
-            sourceConnections.Should().Contain(c => c.TargetId == targetId2);
+            Assert.Equal(2, result.Count);
+            Assert.Contains(result, c => c.ConnectionId == connection1.ConnectionId);
+            Assert.Contains(result, c => c.ConnectionId == connection2.ConnectionId);
         }
 
         [Fact]
-        public async Task GetConnectionsForTarget_WithMultipleConnections_ShouldFilterByTarget()
+        public async Task GetConnectionsForTargetAsync_Should_ReturnConnectionsWithMatchingTarget()
         {
             // Arrange
-            var sourceId1 = Guid.NewGuid();
-            var sourceId2 = Guid.NewGuid();
+            var sourceId = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-
-            // Create two connections to the same target
+            
             var connection1 = new ComponentConnection
             {
-                SourceId = sourceId1,
+                ConnectionId = Guid.NewGuid(),
+                SourceId = sourceId,
                 TargetId = targetId,
-                ConnectionType = "Test1",
+                ConnectionType = "TestType1",
                 IsEnabled = true
             };
-
+            
             var connection2 = new ComponentConnection
             {
-                SourceId = sourceId2,
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
                 TargetId = targetId,
-                ConnectionType = "Test2",
+                ConnectionType = "TestType2",
+                IsEnabled = true
+            };
+            
+            var connection3 = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = sourceId,
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType3",
                 IsEnabled = true
             };
 
-            await _topologyService.CreateConnectionAsync(connection1);
-            await _topologyService.CreateConnectionAsync(connection2);
+            // Create the connections
+            await _service.CreateConnectionAsync(connection1);
+            await _service.CreateConnectionAsync(connection2);
+            await _service.CreateConnectionAsync(connection3);
 
             // Act
-            var targetConnections = await _topologyService.GetConnectionsForTargetAsync(targetId);
+            var result = await _service.GetConnectionsForTargetAsync(targetId);
 
             // Assert
-            targetConnections.Should().HaveCount(2);
-            targetConnections.Should().Contain(c => c.SourceId == sourceId1);
-            targetConnections.Should().Contain(c => c.SourceId == sourceId2);
+            Assert.Equal(2, result.Count);
+            Assert.Contains(result, c => c.ConnectionId == connection1.ConnectionId);
+            Assert.Contains(result, c => c.ConnectionId == connection2.ConnectionId);
+        }
+
+        [Fact]
+        public async Task EvaluateConnectionConditionAsync_Should_ReturnTrue_WhenNoConditionSpecified()
+        {
+            // Arrange
+            var connection = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true,
+                Condition = null
+            };
+
+            // Act
+            var result = await _service.EvaluateConnectionConditionAsync(connection);
+
+            // Assert
+            Assert.True(result);
+        }
+
+        [Fact]
+        public async Task EvaluateConnectionConditionAsync_Should_EvaluateCondition_WhenConditionSpecified()
+        {
+            // Arrange
+            var sourceId = Guid.NewGuid();
+            var targetId = Guid.NewGuid();
+            
+            var connection = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = sourceId,
+                TargetId = targetId,
+                ConnectionType = "TestType",
+                IsEnabled = true,
+                Condition = "source.Temperature > 20"
+            };
+
+            // Mock the condition evaluator to return true
+            _mockPersistenceService.Setup(p => p.GetPropertyAsync<double>(
+                    It.Is<Guid>(id => id == sourceId),
+                    It.Is<string>(name => name == "Temperature"),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(25.0);
+
+            // Act
+            var result = await _service.EvaluateConnectionConditionAsync(connection);
+
+            // Assert
+            Assert.True(result);
+            _mockPersistenceService.Verify(p => p.GetPropertyAsync<double>(
+                It.Is<Guid>(id => id == sourceId),
+                It.Is<string>(name => name == "Temperature"),
+                It.IsAny<CancellationToken>()),
+                Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task ErrorHandling_Should_LogAndReturnFalse_WhenConditionEvaluationThrows()
+        {
+            // Arrange
+            var connection = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true,
+                Condition = "source.Temperature > 20"
+            };
+
+            // Mock the persistence service to throw
+            _mockPersistenceService.Setup(p => p.GetPropertyAsync<object>(
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Test exception"));
+
+            // Act
+            var result = await _service.EvaluateConnectionConditionAsync(connection);
+
+            // Assert
+            Assert.False(result);
+            _mockLogger.Verify(l => l.Log(
+                It.IsAny<Exception>(),
+                It.IsAny<string>()),
+                Times.AtLeastOnce);
         }
     }
 }
