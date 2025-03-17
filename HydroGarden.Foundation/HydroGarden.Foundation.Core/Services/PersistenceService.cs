@@ -13,7 +13,8 @@ namespace HydroGarden.Foundation.Core.Services
     /// <summary>
     /// Unified persistence service implementation for component and topology data
     /// </summary>
-    public class PersistenceService : IPersistenceService, IPropertyChangedEventHandler
+    public class PersistenceService : IPersistenceService, IPropertyChangedEventHandler, 
+        IPropertyAccessService, IComponentRegistry, ITopologyRepository
     {
         // Constants
         private static readonly Guid TOPOLOGY_STORE_ID = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -253,6 +254,17 @@ namespace HydroGarden.Foundation.Core.Services
                 return Task.FromResult(value is T typedValue ? typedValue : default);
             }
             return Task.FromResult(default(T?));
+        }
+        
+        /// <inheritdoc />
+        public Task<IDictionary<string, object>> GetAllPropertiesAsync(Guid deviceId, CancellationToken ct = default)
+        {
+            if (_deviceProperties.TryGetValue(deviceId, out var properties))
+            {
+                // Return a copy to prevent external modification of our internal state
+                return Task.FromResult<IDictionary<string, object>>(new Dictionary<string, object>(properties));
+            }
+            return Task.FromResult<IDictionary<string, object>>(new Dictionary<string, object>());
         }
 
         /// <inheritdoc />

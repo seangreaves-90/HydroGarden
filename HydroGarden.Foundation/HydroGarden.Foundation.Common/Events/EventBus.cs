@@ -131,6 +131,42 @@ namespace HydroGarden.Foundation.Common.Events
             _logger.Log($"Handler {handler.GetType().Name} subscribed with ID {subscription.Id}");
             return subscription.Id;
         }
+        
+        /// <inheritdoc/>
+        public Guid Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent
+        {
+            if (handler == null)
+                throw new ArgumentNullException(nameof(handler));
+                
+            // Create adapter to convert typed handler to standard handler
+            var adapter = new Events.TypedEventHandlerAdapter<TEvent>(handler);
+            
+            // Get the event type from the TEvent type using reflection
+            var eventProperty = typeof(TEvent).GetProperty("EventType");
+            EventType[] eventTypes;
+            
+            if (eventProperty != null)
+            {                
+                // Try to determine the event type from the property
+                eventTypes = new[] { EventType.Custom }; // Default to Custom if we can't determine
+                
+                // This will be filled at runtime by the actual event instance
+            }
+            else
+            {
+                // If we can't determine event type, subscribe to all
+                eventTypes = Enum.GetValues<EventType>();
+            }
+            
+            // Create subscription options
+            var options = new EventSubscriptionOptions
+            {
+                EventTypes = eventTypes
+            };
+            
+            // Use standard subscription method
+            return Subscribe(adapter, options);
+        }
 
         /// <inheritdoc/>
         public bool Unsubscribe(Guid subscriptionId)

@@ -16,7 +16,8 @@ namespace HydroGarden.Foundation.Core.Services
     public class TopologyService : ITopologyService
     {
         private readonly ILogger _logger;
-        private readonly IPersistenceService _persistenceService;
+        private readonly IPropertyAccessService _propertyAccessService;
+        private readonly ITopologyRepository _topologyRepository;
         private readonly ConcurrentDictionary<Guid, ComponentConnection> _connections = new();
         private readonly ConcurrentDictionary<Guid, List<Guid>> _sourceToConnectionMap = new();
         private readonly ConcurrentDictionary<Guid, List<Guid>> _targetToConnectionMap = new();
@@ -29,12 +30,27 @@ namespace HydroGarden.Foundation.Core.Services
         /// Creates a new topology service instance
         /// </summary>
         /// <param name="logger">Logger for recording events</param>
+        /// <param name="propertyAccessService">Service for accessing component properties</param>
+        /// <param name="topologyRepository">Repository for managing topology connections</param>
+        public TopologyService(ILogger logger, IPropertyAccessService propertyAccessService, ITopologyRepository topologyRepository)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _propertyAccessService = propertyAccessService ?? throw new ArgumentNullException(nameof(propertyAccessService));
+            _topologyRepository = topologyRepository ?? throw new ArgumentNullException(nameof(topologyRepository));
+            _conditionEvaluator = new ConditionEvaluator(_propertyAccessService);
+        }
+        
+        /// <summary>
+        /// Creates a new topology service instance (legacy constructor for backward compatibility)
+        /// </summary>
+        /// <param name="logger">Logger for recording events</param>
         /// <param name="persistenceService">Persistence service for storing topology data</param>
         public TopologyService(ILogger logger, IPersistenceService persistenceService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _persistenceService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
-            _conditionEvaluator = new ConditionEvaluator(_persistenceService);
+            _propertyAccessService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
+            _topologyRepository = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
+            _conditionEvaluator = new ConditionEvaluator(_propertyAccessService);
         }
 
         /// <summary>
@@ -59,7 +75,7 @@ namespace HydroGarden.Foundation.Core.Services
             _logger.Log("Initializing topology service");
         
         // Load connections from the persistence service
-            var connections = await _persistenceService.GetAllConnectionsAsync(ct);
+            var connections = await _topologyRepository.GetAllConnectionsAsync(ct);
             foreach (var connection in connections)
             {
             if (connection is ComponentConnection compConnection)
@@ -235,8 +251,8 @@ namespace HydroGarden.Foundation.Core.Services
                 // Add to cache
                     AddConnectionToCache(internalConnection);
 
-                // Save to persistence service
-                    await _persistenceService.StoreConnectionAsync(internalConnection, ct);
+                // Save to topology repository
+                    await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
 
                     _logger.Log($"Created connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
                 return internalConnection;
@@ -310,8 +326,8 @@ namespace HydroGarden.Foundation.Core.Services
                 // Add updated connection to cache
                     AddConnectionToCache(internalConnection);
 
-                // Save to persistence service
-                    await _persistenceService.StoreConnectionAsync(internalConnection, ct);
+                // Save to topology repository
+                    await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
 
                     _logger.Log($"Updated connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
                 return true;
@@ -359,8 +375,8 @@ namespace HydroGarden.Foundation.Core.Services
 
                     RemoveConnectionFromCache(connection);
 
-                // Delete from persistence service
-            var result = await _persistenceService.DeleteConnectionAsync(connectionId, ct);
+                // Delete from topology repository
+            var result = await _topologyRepository.DeleteConnectionAsync(connectionId, ct);
 
                 if (result)
                 {
@@ -413,7 +429,7 @@ namespace HydroGarden.Foundation.Core.Services
                         try
                         {
                             // Direct check for property
-                            double temp = await _persistenceService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
+                            double temp = await _propertyAccessService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
                             
                             // Parse the condition to get the right side value
                             // Assume format: "source.Temperature > 20"
@@ -529,27 +545,15 @@ namespace HydroGarden.Foundation.Core.Services
         }
         
         /// <summary>
-        /// Gets an error monitor from the persistence service (helper method for error handling)
+        /// Gets an error monitor or creates a simple one (helper method for error handling)
         /// </summary>
-        private async Task<IErrorMonitor> GetErrorMonitorAsync()
+        private Task<IErrorMonitor> GetErrorMonitorAsync()
         {
-            // Try to extract the error monitor from the persistence service using reflection
-            // This is a bit of a hack, but it allows us to use the same error monitor
-            // without injecting it directly into this service
-            var persistenceServiceType = _persistenceService.GetType();
-            var errorMonitorField = persistenceServiceType.GetField("_errorMonitor", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
-            if (errorMonitorField != null)
-            {
-                var errorMonitor = errorMonitorField.GetValue(_persistenceService) as IErrorMonitor;
-                if (errorMonitor != null)
-                {
-                    return errorMonitor;
-                }
-            }
-            
-            // Fallback: Create a simple error monitor that just logs errors
-            return new HydroGarden.ErrorHandling.Core.ErrorMonitor(_logger, new ErrorEventTransformationService(_logger));
+            // Create a simple error monitor that logs errors
+            return Task.FromResult<IErrorMonitor>(
+                new HydroGarden.ErrorHandling.Core.ErrorMonitor(
+                    _logger, 
+                    new ErrorEventTransformationService(_logger)));
         }
     }
 }

@@ -16,6 +16,14 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IEventHandler;
 
         /// <summary>
+        /// Subscribes to events of a specific type with the given typed handler
+        /// </summary>
+        /// <typeparam name="TEvent">The specific event type to handle</typeparam>
+        /// <param name="handler">The typed event handler</param>
+        /// <returns>Subscription ID that can be used to unsubscribe</returns>
+        Guid Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+
+        /// <summary>
         /// Unsubscribes from events using the given subscription ID
         /// </summary>
         /// <param name="subscriptionId">The subscription ID to unsubscribe</param>

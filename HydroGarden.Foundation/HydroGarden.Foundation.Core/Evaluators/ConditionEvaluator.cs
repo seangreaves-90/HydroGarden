@@ -8,15 +8,15 @@ namespace HydroGarden.Foundation.Core.Services
     /// </summary>
     public class ConditionEvaluator
     {
-        private readonly IPersistenceService _persistenceService;
+        private readonly IPropertyAccessService _propertyAccessService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConditionEvaluator"/> class.
         /// </summary>
-        /// <param name="persistenceService">The persistence service for retrieving component properties.</param>
-        public ConditionEvaluator(IPersistenceService persistenceService)
+        /// <param name="propertyAccessService">The service for retrieving component properties.</param>
+        public ConditionEvaluator(IPropertyAccessService propertyAccessService)
         {
-            _persistenceService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
+            _propertyAccessService = propertyAccessService ?? throw new ArgumentNullException(nameof(propertyAccessService));
         }
 
         /// <summary>
@@ -57,8 +57,8 @@ namespace HydroGarden.Foundation.Core.Services
                 propertyName = deviceId;
             }
 
-            // Get the property value from the persistence service
-            var propertyValue = await _persistenceService.GetPropertyAsync<object>(actualDeviceId, propertyName, ct);
+            // Get the property value from the property access service
+            var propertyValue = await _propertyAccessService.GetPropertyAsync<object>(actualDeviceId, propertyName, ct);
 
             if (propertyValue == null)
                 return false; // Property not found or null
