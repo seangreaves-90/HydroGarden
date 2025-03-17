@@ -399,18 +399,18 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Gets matching subscriptions for an event using the EventRouter.
         /// </summary>
-        private Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
-    IEvent evt,
-    CancellationToken ct = default)
+        private Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(IEvent evt, CancellationToken ct = default)
         {
             _logger.Log($"Finding matching subscriptions for event {evt.EventId} of type {evt.EventType}");
 
             // Get subscriptions for this specific event type
             bool hasTypeSpecificSubscriptions = _subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions);
 
+            // Initialize generic subscriptions to avoid potential unassigned variable error
+            List<EventSubscription>? genericSubscriptions = null;
+            
             // Only look for generic subscriptions if no type-specific ones exist to avoid duplicates
-            bool hasGenericSubscriptions = !hasTypeSpecificSubscriptions && 
-                _subscriptionsByType.TryGetValue(EventType.Custom, out var genericSubscriptions);
+            bool hasGenericSubscriptions = !hasTypeSpecificSubscriptions && _subscriptionsByType.TryGetValue(EventType.Custom, out genericSubscriptions);
 
             if (!hasTypeSpecificSubscriptions && !hasGenericSubscriptions)
             {
@@ -427,7 +427,7 @@ namespace HydroGarden.Foundation.Common.Events
             }
             else if (hasGenericSubscriptions)
             {
-                mergedSubscriptions.AddRange(genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
+                mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
                 _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
             }
 
