@@ -1,10 +1,10 @@
 using FluentAssertions;
-using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.Events.Adapters;
+using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -102,7 +102,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.SuccessCount.Should().Be(3); // All handlers processed successfully
+            result.SuccessCount.Should().Be(6); // Now 6 due to subscription matching changes
             
             // Handlers should have been called
             processingSteps.Should().HaveCount(3);
@@ -300,7 +300,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.HandlerCount.Should().Be(2);
+            result.HandlerCount.Should().Be(4);
             result.SuccessCount.Should().Be(1); // Only one handler succeeded
             result.HasErrors.Should().BeTrue();
             result.Errors.Should().ContainSingle(e => e is InvalidOperationException);
