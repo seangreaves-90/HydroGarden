@@ -628,7 +628,7 @@ namespace HydroGarden.Foundation.Core.Services
         {
             // Create a simple error monitor that logs errors
             return Task.FromResult<IErrorMonitor>(
-                new ErrorMonitor(
+                new HydroGarden.ErrorHandling.Core.ErrorMonitor(
                     _logger, 
                     new ErrorEventTransformationService(_logger)));
         }
