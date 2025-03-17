@@ -297,49 +297,49 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             Assert.Empty(connections);
         }
 
-        //[Fact]
-        //public async Task BeginTransactionAsync_Should_ReturnTransactionWithConnectionAccess()
-        //{
-        //    // Arrange
-        //    var connection = new ComponentConnection
-        //    {
-        //        ConnectionId = Guid.NewGuid(),
-        //        SourceId = Guid.NewGuid(),
-        //        TargetId = Guid.NewGuid(),
-        //        ConnectionType = "TestType",
-        //        IsEnabled = true
-        //    };
+        [Fact]
+        public async Task BeginTransactionAsync_Should_ReturnTransactionWithConnectionAccess()
+        {
+            // Arrange
+            var connection = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true
+            };
 
-        //    // Store a connection
-        //    await _service.StoreConnectionAsync(connection);
+            // Store a connection
+            await _service.StoreConnectionAsync(connection);
 
-        //    // Act
-        //    await using var transaction = await _service.BeginTransactionAsync();
-            
-        //    // Store a new connection in the transaction
-        //    var newConnection = new ComponentConnection
-        //    {
-        //        ConnectionId = Guid.NewGuid(),
-        //        SourceId = Guid.NewGuid(),
-        //        TargetId = Guid.NewGuid(),
-        //        ConnectionType = "TestType",
-        //        IsEnabled = true
-        //    };
-            
-        //    await transaction.StoreConnectionAsync(newConnection);
-            
-        //    // Delete the old connection in the transaction
-        //    var deleteResult = await transaction.DeleteConnectionAsync(connection.ConnectionId);
-            
-        //    // Commit the transaction
-        //    await transaction.CommitAsync();
+            // Act
+            await using var transaction = await _service.BeginTransactionAsync();
 
-        //    // Assert
-        //    Assert.True(deleteResult);
-        //    var connections = await _service.GetAllConnectionsAsync();
-        //    Assert.Single(connections);
-        //    Assert.Equal(newConnection.ConnectionId, connections.First().ConnectionId);
-        //}
+            // Store a new connection in the transaction
+            var newConnection = new ComponentConnection
+            {
+                ConnectionId = Guid.NewGuid(),
+                SourceId = Guid.NewGuid(),
+                TargetId = Guid.NewGuid(),
+                ConnectionType = "TestType",
+                IsEnabled = true
+            };
+
+            await transaction.StoreConnectionAsync(newConnection);
+
+            // Delete the old connection in the transaction
+            var deleteResult = await transaction.DeleteConnectionAsync(connection.ConnectionId);
+
+            // Commit the transaction
+            await transaction.CommitAsync();
+
+            // Assert
+            Assert.True(deleteResult);
+            var connections = await _service.GetAllConnectionsAsync();
+            Assert.Single(connections);
+            Assert.Equal(newConnection.ConnectionId, connections.First().ConnectionId);
+        }
 
         [Fact]
         public async Task ErrorHandling_Should_ReportErrorOnFailure()
