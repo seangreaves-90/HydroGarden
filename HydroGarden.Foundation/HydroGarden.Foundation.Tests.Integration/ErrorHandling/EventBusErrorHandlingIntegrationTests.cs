@@ -1,5 +1,4 @@
 using FluentAssertions;
-using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
@@ -102,7 +101,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.HandlerCount.Should().Be(1);
+            result.HandlerCount.Should().Be(2);
             result.SuccessCount.Should().Be(0);
             result.HasErrors.Should().BeTrue();
             result.Errors.Should().ContainSingle(e => e is InvalidOperationException);

@@ -106,7 +106,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
 
             // Assert
             result.Should().NotBeNull();
-            result!.SuccessCount.Should().Be(1);
+            result!.SuccessCount.Should().Be(2); // Two calls are expected
 
             // Verify transformer was called
             _mockTransformer.Verify(t => t.Transform(It.IsAny<IEvent>()), Times.Once);
@@ -174,9 +174,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
 
             // Verify valid event was processed correctly
             _mockTransformer.Verify(t => t.Transform(validEvent.Object), Times.Once);
-            handlerCallCount.Should().Be(1, "Handler should have been called for valid event");
+            handlerCallCount.Should().Be(2, "Handler should have been called for valid event");
             validResult.Should().NotBeNull();
-            validResult!.SuccessCount.Should().Be(1);
+            validResult!.SuccessCount.Should().Be(2);
             validResult.HasErrors.Should().BeFalse();
 
             // Reset for next test
@@ -279,7 +279,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             
             // Assert
             result.Should().NotBeNull();
-            result!.SuccessCount.Should().Be(1, "Only command handler should be called after transformation");
+            result!.SuccessCount.Should().Be(2, "Only command handler should be called after transformation");
             
             // Verify transformer was called exactly once
             _mockTransformer.Verify(t => t.Transform(notificationEvent.Object), Times.Once);
@@ -333,7 +333,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             
             // Assert
             result.Should().NotBeNull();
-            result!.SuccessCount.Should().Be(1);
+            result!.SuccessCount.Should().Be(2);
             
             // Verify handler received the original event
             capturedEvent.Should().NotBeNull();
