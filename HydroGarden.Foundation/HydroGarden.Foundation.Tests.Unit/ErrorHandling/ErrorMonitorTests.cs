@@ -1,9 +1,7 @@
 ﻿using FluentAssertions;
-using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;

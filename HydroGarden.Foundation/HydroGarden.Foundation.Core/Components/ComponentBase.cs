@@ -580,10 +580,7 @@ namespace HydroGarden.Foundation.Core.Components
         /// <inheritdoc/>
         public virtual async Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null)
         {
-            await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync(
-                this,
-                ErrorMonitor,
-                async () =>
+            await this.ExecuteWithErrorHandlingAsync(ErrorMonitor, () =>
                 {
                     _properties.Clear();
                     foreach (var (key, value) in properties)
@@ -617,6 +614,7 @@ namespace HydroGarden.Foundation.Core.Components
 
                     if (!_properties.ContainsKey(nameof(State)))
                         _properties[nameof(State)] = _state;
+                    return Task.CompletedTask;
                 },
                 "PROPERTY_LOAD_FAILED",
                 "Failed to load properties",
