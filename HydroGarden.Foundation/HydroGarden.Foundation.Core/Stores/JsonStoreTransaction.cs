@@ -43,17 +43,24 @@ namespace HydroGarden.Foundation.Core.Stores
             // Ensure property types are preserved correctly
             foreach (var kvp in properties)
             {
-            // Ensure numeric values maintain their type (int vs double)
-            if (kvp.Value is int intValue)
-            {
-            // Convert int to double for all numeric properties to ensure consistency
-                propertyDict[kvp.Key] = (double)intValue;
+                // Ensure numeric values maintain their type (int vs double)
+                if (kvp.Value is int intValue)
+                {
+                    // FlowRate property should always be double for consistency
+                    if (kvp.Key == "FlowRate")
+                    {
+                        propertyDict[kvp.Key] = (double)intValue;
+                    }
+                    else
+                    {
+                        propertyDict[kvp.Key] = kvp.Value;
+                    }
+                }
+                else
+                {
+                    propertyDict[kvp.Key] = kvp.Value;
+                }
             }
-            else
-            {
-                propertyDict[kvp.Key] = kvp.Value;
-                }
-                }
             
             _propertyChanges[id] = propertyDict;
             

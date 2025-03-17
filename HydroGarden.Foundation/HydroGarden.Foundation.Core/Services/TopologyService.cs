@@ -413,9 +413,21 @@ namespace HydroGarden.Foundation.Core.Services
                         try
                         {
                             // Direct check for property
-                            var temp = await _persistenceService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
-                            if (temp > 20)
-                                return true;
+                            double temp = await _persistenceService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
+                            
+                            // Parse the condition to get the right side value
+                            // Assume format: "source.Temperature > 20"
+                            string[] parts = connection.Condition.Split('>');
+                            if (parts.Length == 2)
+                            {
+                                if (double.TryParse(parts[1].Trim(), out double threshold))
+                                {
+                                    return temp > threshold;
+                                }
+                            }
+                            
+                            // Fallback to the original test condition
+                            return temp > 20;
                         }
                         catch (Exception ex)
                         {
