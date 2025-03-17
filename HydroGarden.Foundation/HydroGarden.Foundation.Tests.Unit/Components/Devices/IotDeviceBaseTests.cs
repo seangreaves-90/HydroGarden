@@ -82,7 +82,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         }
 
         private readonly Mock<ILogger> _mockLogger;
-        private readonly Mock<IPropertyChangedEventHandler> _mockEventHandler;
+        private readonly Mock<IPropertyChangedEventHandler<IEvent>> _mockEventHandler;
         private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Guid _testId;
@@ -93,7 +93,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         public IoTDeviceBaseTests()
         {
             _mockLogger = new Mock<ILogger>();
-            _mockEventHandler = new Mock<IPropertyChangedEventHandler>();
+            _mockEventHandler = new Mock<IPropertyChangedEventHandler<IEvent>>();
             _mockErrorMonitor = new Mock<IErrorMonitor>();
             _mockEventBus = new Mock<IEventBus>();
             _testId = Guid.NewGuid();

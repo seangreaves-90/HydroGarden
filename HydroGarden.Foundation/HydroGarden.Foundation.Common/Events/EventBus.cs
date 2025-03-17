@@ -1,4 +1,4 @@
-using HydroGarden.Foundation.Common.Events.Adapters;﻿using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
@@ -18,10 +18,10 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly ConcurrentDictionary<Guid, EventSubscription> _subscriptions = new();
         private readonly ConcurrentDictionary<EventType, List<EventSubscription>> _subscriptionsByType = new();
         private readonly IEventRouter _router;
-        private readonly ITopologyService? _topologyService;
         private readonly IEventStore? _eventStore;
         private readonly IEventTransformer? _transformer;
         private IEventProcessingPipeline? _pipeline;
+        private ITopologyService? _topologyService;
         private readonly object _pipelineLock = new();
         private bool _isDisposed;
 
@@ -30,19 +30,16 @@ namespace HydroGarden.Foundation.Common.Events
         /// </summary>
         /// <param name="logger">The logger to use.</param>
         /// <param name="router">The event router to use for subscription matching.</param>
-        /// <param name="topologyService">Optional topology service for event routing based on component relationships.</param>
         /// <param name="eventStore">Optional event store for persisting events.</param>
         /// <param name="transformer">Optional event transformer that will be applied during event publishing.</param>
         public EventBus(
             ILogger logger,
             IEventRouter router,
-            ITopologyService? topologyService = null,
             IEventStore? eventStore = null,
             IEventTransformer? transformer = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _router = router ?? throw new ArgumentNullException(nameof(router));
-            _topologyService = topologyService;
             _eventStore = eventStore;
             _transformer = transformer;
 
@@ -56,54 +53,12 @@ namespace HydroGarden.Foundation.Common.Events
         }
 
         /// <inheritdoc/>
-        public void SetTopologyService(ITopologyService topologyService)
-        {
-            // This is already handled in the constructor, but we implement for interface compatibility
-            if (_topologyService == null)
-            {
-                // We can't actually update the reference since it's readonly, so log a warning
-                _logger.Log(
-                    "Warning: Attempting to set topology service after initialization. This has no effect - use constructor injection instead.");
-            }
-        }
-
-        /// <inheritdoc/>
-        public ITopologyService? GetTopologyService()
-        {
-            return _topologyService;
-        }
-
-        /// <summary>
-        /// Sets the event processing pipeline for the EventBus.
-        /// </summary>
-        /// <param name="pipeline">The event processing pipeline to use.</param>
-        public void SetEventProcessingPipeline(IEventProcessingPipeline pipeline)
-        {
-            lock (_pipelineLock)
-            {
-                _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
-                _logger.Log($"Event processing pipeline configured for EventBus");
-            }
-        }
-
-        /// <summary>
-        /// Gets the event processing pipeline used by the EventBus.
-        /// </summary>
-        /// <returns>The event processing pipeline, or null if none is configured.</returns>
-        public IEventProcessingPipeline? GetEventProcessingPipeline()
-        {
-            lock (_pipelineLock)
-            {
-                return _pipeline;
-            }
-        }
-
-        /// <inheritdoc/>
-        public Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IEventHandler
+        public Guid Subscribe<TEvent>(IEventHandler<IEvent> handler, IEventSubscriptionOptions? options) where TEvent : IEvent
         {
             if (handler == null)
                 throw new ArgumentNullException(nameof(handler));
 
+            // Create subscription with the handler
             var subscription = new EventSubscription(
                 Guid.NewGuid(),
                 handler,
@@ -111,10 +66,29 @@ namespace HydroGarden.Foundation.Common.Events
 
             _subscriptions[subscription.Id] = subscription;
 
-            // If no event types specified, subscribe to all event types
-            var eventTypes = subscription.Options.EventTypes.Length > 0
-                ? subscription.Options.EventTypes
-                : Enum.GetValues<EventType>();
+            // If no event types specified in options, determine based on TEvent
+            EventType[] eventTypes;
+            if (options?.EventTypes == null || options.EventTypes.Length == 0)
+            {
+                // Try to determine event type from TEvent
+                var eventProperty = typeof(TEvent).GetProperty("EventType");
+                if (eventProperty != null && eventProperty.PropertyType == typeof(EventType))
+                {
+                    // If TEvent has an EventType property, we'll use it at runtime
+                    // For now, default to Custom since we don't have an instance
+                    eventTypes = new[] { EventType.Custom };
+                }
+                else
+                {
+                    // If we can't determine event type, subscribe to all types
+                    eventTypes = Enum.GetValues<EventType>();
+                }
+            }
+            else
+            {
+                // Use the event types specified in options
+                eventTypes = options.EventTypes;
+            }
 
             // Add to type-based lookup for faster matching
             foreach (var eventType in eventTypes)
@@ -132,41 +106,33 @@ namespace HydroGarden.Foundation.Common.Events
             _logger.Log($"Handler {handler.GetType().Name} subscribed with ID {subscription.Id}");
             return subscription.Id;
         }
-        
+
         /// <inheritdoc/>
         public Guid Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent
         {
             if (handler == null)
                 throw new ArgumentNullException(nameof(handler));
-                
-            // Create adapter to convert typed handler to standard handler
-            var adapter = new TypedEventHandlerAdapter<TEvent>(handler);
             
-            // Get the event type from the TEvent type using reflection
+            // Create adapter to convert IEventHandler<TEvent> to IEventHandler<IEvent>
+            var adapter = new GenericEventHandlerAdapter<TEvent>(handler);
+            
+            // Build event types based on TEvent
+            var eventTypes = new EventSubscriptionOptions();
+            // Try to determine event type from TEvent
             var eventProperty = typeof(TEvent).GetProperty("EventType");
-            EventType[] eventTypes;
-            
-            if (eventProperty != null)
-            {                
-                // Try to determine the event type from the property
-                eventTypes = new[] { EventType.Custom }; // Default to Custom if we can't determine
-                
-                // This will be filled at runtime by the actual event instance
+            if (eventProperty != null && eventProperty.PropertyType == typeof(EventType))
+            {
+                // If TEvent has an EventType property, we'll use it at runtime
+                // For now, default to Custom since we don't have an instance
+                eventTypes.EventTypes = new[] { EventType.Custom };
             }
             else
             {
-                // If we can't determine event type, subscribe to all
-                eventTypes = Enum.GetValues<EventType>();
+                // If we can't determine event type, subscribe to all types
+                eventTypes.EventTypes = Enum.GetValues<EventType>();
             }
             
-            // Create subscription options
-            var options = new EventSubscriptionOptions
-            {
-                EventTypes = eventTypes
-            };
-            
-            // Use standard subscription method
-            return Subscribe(adapter, options);
+            return Subscribe<TEvent>(adapter, eventTypes);
         }
 
         /// <inheritdoc/>
@@ -361,13 +327,12 @@ namespace HydroGarden.Foundation.Common.Events
                 // If event had errors and we have an event store, persist for retry
                 if (hasErrors || result.HasErrors)
                 {
-                if (_eventStore is not null)
-                {
+                    if (_eventStore is not null)
+                    {
                         await _eventStore.PersistEventAsync(evt);
                         _logger.Log($"Event {evt.EventId} persisted due to handler errors for potential retry");
                     }
                 }
-
                 // If the event is configured to be persisted, do so even if handled successfully
                 else if (evt.RoutingData?.Persist == true && _eventStore is not null)
                 {
@@ -470,8 +435,24 @@ namespace HydroGarden.Foundation.Common.Events
         }
 
         /// <summary>
-        /// Disposes resources used by the event bus.
+        /// Sets the topology service for event routing.
         /// </summary>
+        /// <param name="topologyService">The topology service to use for routing events.</param>
+        public void SetTopologyService(ITopologyService topologyService)
+        {
+            _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
+            _logger.Log($"EventBus configured with topology service: {topologyService.GetType().Name}");
+        }
+
+        /// <summary>
+        /// Gets the topology service used by this event bus.
+        /// </summary>
+        /// <returns>The topology service, or null if not configured.</returns>
+        public ITopologyService? GetTopologyService()
+        {
+            return _topologyService;
+        }
+        
         /// <summary>
         /// Disposes resources used by the event bus.
         /// </summary>
@@ -511,5 +492,4 @@ namespace HydroGarden.Foundation.Common.Events
             GC.SuppressFinalize(this);
         }
     }
-
 }

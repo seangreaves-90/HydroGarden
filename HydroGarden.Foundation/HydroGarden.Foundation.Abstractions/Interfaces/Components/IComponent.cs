@@ -97,6 +97,6 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// Assigns an event handler to the component.
         /// </summary>
         /// <param name="handler">The event handler to assign.</param>
-        void SetEventHandler(IPropertyChangedEventHandler handler);
+        void SetEventHandler(IPropertyChangedEventHandler<IEvent> handler);
     }
 }

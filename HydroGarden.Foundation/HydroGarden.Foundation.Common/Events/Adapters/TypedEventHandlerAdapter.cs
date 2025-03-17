@@ -3,9 +3,11 @@
 namespace HydroGarden.Foundation.Common.Events.Adapters
 {
     /// <summary>
-    /// Adapter class to convert typed IEventHandler<TEvent> to IEventHandler
+    /// This adapter is deprecated as IEventHandler{TEvent} now implements IEventHandler directly.
+    /// It is kept for backward compatibility.
     /// </summary>
     /// <typeparam name="TEvent">The specific event type this adapter handles</typeparam>
+    [Obsolete("This adapter is no longer needed as IEventHandler<TEvent> now implements IEventHandler directly.")]
     public class TypedEventHandlerAdapter<TEvent> : IEventHandler<TEvent> where TEvent : IEvent 
     {
         private readonly IEventHandler<TEvent> _typedHandler;

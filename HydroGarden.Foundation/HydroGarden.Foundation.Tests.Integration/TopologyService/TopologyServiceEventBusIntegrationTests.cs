@@ -40,13 +40,13 @@
 //            // Create the error monitor
 //            _errorMonitor = new TestErrorMonitor(_logger);
 
-//            // Create event bus with error monitor
+//            // Create event bus with appropriate parameters
+//            // EventBus constructor accepts (ILogger, IEventRouter, IEventStore?, IEventTransformer?)
 //            _eventBus = new Common.Events.EventBus(
 //                _logger,
+//                new EventRouter(), // Need to add the proper router implementation
 //                new DeadLetterEventStore(),
-//                new ExponentialBackoffRetryPolicy(),
-//                new DefaultEventTransformer(),
-//                _errorMonitor);
+//                new DefaultEventTransformer());
 
 //            // Create persistence service with error monitor
 //            _persistenceService = new PersistenceService(_store, _eventBus, _logger, _errorMonitor);
@@ -103,7 +103,7 @@
 //                Synchronous = true
 //            };
 
-//            _eventBus.Subscribe(mockHandler.Object, options);
+//            _eventBus.Subscribe<IPropertyChangedEvent>(mockHandler.Object, options);
 
 //            // Act - Create an event from the source device
 //            var sourceEvent = new HydroGardenPropertyChangedEvent(
@@ -172,7 +172,7 @@
 //                Synchronous = true
 //            };
 
-//            _eventBus.Subscribe(mockHandler.Object, options);
+//            _eventBus.Subscribe<IPropertyChangedEvent>(mockHandler.Object, options);
 
 //            // Act - Create an event from the source device
 //            var sourceEvent = new HydroGardenPropertyChangedEvent(
@@ -262,7 +262,7 @@
 //                Synchronous = true
 //            };
 
-//            _eventBus.Subscribe(mockHandler.Object, options);
+//            _eventBus.Subscribe<IPropertyChangedEvent>(mockHandler.Object, options);
 
 //            // Act - Create an event from the source device
 //            var sourceEvent = new HydroGardenPropertyChangedEvent(

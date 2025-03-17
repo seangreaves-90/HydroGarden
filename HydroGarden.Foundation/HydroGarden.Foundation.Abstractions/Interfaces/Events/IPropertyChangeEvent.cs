@@ -32,9 +32,16 @@
     }
 
     /// <summary>
+    /// Defines a non-generic event handler for property change events.
+    /// </summary>
+    public interface IPropertyChangedEventHandler : IEventHandler
+    {
+    }
+
+    /// <summary>
     /// Defines an event handler that processes property change events in HydroGarden components.
     /// </summary>
-    public interface IPropertyChangedEventHandler <in TEvent> : IEventHandler<TEvent> where TEvent : IEvent 
+    public interface IPropertyChangedEventHandler<in TEvent> : IEventHandler<TEvent>, IPropertyChangedEventHandler where TEvent : IEvent 
     {
     }
 }

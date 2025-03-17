@@ -3,6 +3,7 @@ using HydroGarden.ErrorHandling.Core;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Events;
 using HydroGarden.Logger.Abstractions;
@@ -43,12 +44,12 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 .Setup(s => s.PersistEventAsync(It.IsAny<IEvent>()))
                 .Returns(Task.CompletedTask);
             
-            // Create the event bus
+            // Create the event bus - constructor is (ILogger, IEventRouter, IEventStore?, IEventTransformer?)
             _eventBus = new Common.Events.EventBus(
                 _mockLogger.Object,
                 _mockEventRouter.Object,
-                null,
-                _mockEventStore.Object);
+                _mockEventStore.Object,
+                null);
                 
             // Create error handling components
             _transformationService = new ErrorEventTransformationService(
@@ -84,7 +85,8 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 .Throws(new InvalidOperationException("Simulated handler failure"));
 
             // Subscribe the handler
-            _eventBus.Subscribe(mockHandler.Object);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter);
 
             // Set up event store to capture persisted events
             var persistedEvents = new List<IEvent>();

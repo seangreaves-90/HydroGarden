@@ -1,26 +1,38 @@
 ﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Services
 {
     /// <summary>
-    /// Service that provides read-only access to component properties
+    /// Service for accessing component properties
     /// </summary>
     public interface IPropertyAccessService
     {
         /// <summary>
-        /// Retrieves a stored property value for a given device.
+        /// Gets a property value from a component asynchronously
         /// </summary>
-        /// <typeparam name="T">The type of the property value to retrieve</typeparam>
-        /// <param name="deviceId">The ID of the device</param>
-        /// <param name="propertyName">The name of the property</param>
+        /// <typeparam name="T">The type to convert the property value to</typeparam>
+        /// <param name="componentId">The component ID</param>
+        /// <param name="propertyName">The property name</param>
         /// <param name="ct">Cancellation token</param>
-        /// <returns>The property value, or default(T) if not found</returns>
-        Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default);
+        /// <returns>The property value, or default if not found</returns>
+        Task<T?> GetPropertyAsync<T>(Guid componentId, string propertyName, CancellationToken ct = default);
 
         /// <summary>
-        /// Retrieves all properties for a given device.
+        /// Sets a property value on a component asynchronously
         /// </summary>
-        /// <param name="deviceId">The ID of the device</param>
+        /// <typeparam name="T">The property value type</typeparam>
+        /// <param name="componentId">The component ID</param>
+        /// <param name="propertyName">The property name</param>
+        /// <param name="value">The value to set</param>
         /// <param name="ct">Cancellation token</param>
-        /// <returns>Dictionary of property names and values, or empty dictionary if device not found</returns>
-        Task<IDictionary<string, object>> GetAllPropertiesAsync(Guid deviceId, CancellationToken ct = default);
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> SetPropertyAsync<T>(Guid componentId, string propertyName, T value, CancellationToken ct = default);
+
+        /// <summary>
+        /// Checks if a property exists on a component
+        /// </summary>
+        /// <param name="componentId">The component ID</param>
+        /// <param name="propertyName">The property name</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>True if the property exists, false otherwise</returns>
+        Task<bool> HasPropertyAsync(Guid componentId, string propertyName, CancellationToken ct = default);
     }
 }

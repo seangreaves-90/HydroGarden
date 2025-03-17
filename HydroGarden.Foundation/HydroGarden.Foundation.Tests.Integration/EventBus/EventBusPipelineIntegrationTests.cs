@@ -4,6 +4,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -87,10 +88,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     processingSteps.Add("Handler3"))
                 .Returns(Task.CompletedTask);
             
-            // Subscribe all handlers
-            _eventBus.Subscribe(handler1.Object);
-            _eventBus.Subscribe(handler2.Object);
-            _eventBus.Subscribe(handler3.Object);
+            // Subscribe all handlers using adapters
+            var adapter1 = new GenericEventHandlerAdapter<IEvent>(handler1.Object, typeof(IEvent));
+            var adapter2 = new GenericEventHandlerAdapter<IEvent>(handler2.Object, typeof(IEvent));
+            var adapter3 = new GenericEventHandlerAdapter<IEvent>(handler3.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter1);
+            _eventBus.Subscribe<IEvent>(adapter2);
+            _eventBus.Subscribe<IEvent>(adapter3);
             
             // Act
             var result = await _eventBus.PublishAsync(this, testEvent.Object);
@@ -165,7 +169,6 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 _mockLogger.Object,
                 mockRouter.Object,
                 null,
-                null,
                 transformer.Object);
 
             // Setup the handlers for specific event types
@@ -197,13 +200,16 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 })
                 .Returns(Task.CompletedTask);
 
-            // Subscribe handlers with specific event types
-            eventBus.Subscribe(commandHandler.Object, new EventSubscriptionOptions
+            // Subscribe handlers with specific event types using adapters
+            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object, typeof(IEvent));
+            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object, typeof(IEvent));
+            
+            eventBus.Subscribe<IEvent>(commandAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.Command }
             });
 
-            eventBus.Subscribe(stateHandler.Object, new EventSubscriptionOptions
+            eventBus.Subscribe<IEvent>(stateAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.StateChange }
             });
@@ -282,9 +288,11 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 })
                     .Returns(Task.CompletedTask);
             
-            // Subscribe both handlers
-            _eventBus.Subscribe(failingHandler.Object);
-            _eventBus.Subscribe(reportingHandler.Object);
+            // Subscribe both handlers with adapters
+            var failingAdapter = new GenericEventHandlerAdapter<IEvent>(failingHandler.Object, typeof(IEvent));
+            var reportingAdapter = new GenericEventHandlerAdapter<IEvent>(reportingHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(failingAdapter);
+            _eventBus.Subscribe<IEvent>(reportingAdapter);
             
             // Act
             var result = await _eventBus.PublishAsync(this, testEvent.Object);

@@ -34,9 +34,9 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 .ReturnsAsync(_mockTransaction.Object);
 
             _service = new PersistenceService(
-                _mockStore.Object, 
-                _mockEventBus.Object, 
-                _mockLogger.Object, 
+                _mockStore.Object,
+                _mockEventBus.Object,
+                _mockLogger.Object,
                 _mockErrorMonitor.Object);
         }
 
@@ -55,7 +55,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             {
                 ["Property1"] = new PropertyMetadata { IsVisible = true }
             });
-            
+
             // Act
             await _service.AddOrUpdateAsync(mockDevice.Object);
 
@@ -66,8 +66,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 It.IsAny<IDictionary<string, IPropertyMetadata>>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
-            
-            mockDevice.Verify(d => d.SetEventHandler(It.Is<IPropertyChangedEventHandler>(h => h == _service)), Times.Once);
+
+            mockDevice.Verify(d => d.SetEventHandler(It.Is<IPropertyChangedEventHandler<IEvent>>(h => h == _service)), Times.Once);
         }
 
         [Fact]
@@ -77,12 +77,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockDevice = new Mock<IIoTDevice>();
             mockDevice.Setup(d => d.Id).Returns(deviceId);
-            
+
             var existingProperties = new Dictionary<string, object>
             {
                 ["ExistingProp"] = "ExistingValue"
             };
-            
+
             var existingMetadata = new Dictionary<string, IPropertyMetadata>
             {
                 ["ExistingProp"] = new PropertyMetadata { IsVisible = true }
@@ -90,7 +90,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
 
             _mockStore.Setup(s => s.LoadAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(existingProperties);
-                
+
             _mockStore.Setup(s => s.LoadMetadataAsync(deviceId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(existingMetadata);
 
@@ -102,7 +102,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 It.Is<IDictionary<string, object>>(p => p == existingProperties),
                 It.Is<IDictionary<string, IPropertyMetadata>>(m => m == existingMetadata)),
                 Times.Once);
-            
+
             mockDevice.Verify(d => d.InitializeAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -136,12 +136,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockDevice = new Mock<IIoTDevice>();
             mockDevice.Setup(d => d.Id).Returns(deviceId);
-            
+
             // Make sure the device is registered in the service
             mockDevice.Setup(d => d.GetProperties()).Returns(new Dictionary<string, object>());
             mockDevice.Setup(d => d.GetAllPropertyMetadata()).Returns(new Dictionary<string, IPropertyMetadata>());
             await _service.AddOrUpdateAsync(mockDevice.Object);
-            
+
             // Create a property changed event
             var metadata = new PropertyMetadata { IsVisible = true };
             var propertyChangedEvent = new PropertyChangedEvent(deviceId, "TestProperty", "OldValue", "NewValue", metadata);
@@ -155,7 +155,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
                 It.Is<IPropertyChangedEvent>(e => e == propertyChangedEvent),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
-                
+
             // Verify the property was saved in memory
             var propValue = await _service.GetPropertyAsync<string>(deviceId, "TestProperty");
             Assert.Equal("NewValue", propValue);
@@ -168,19 +168,19 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockDevice = new Mock<IIoTDevice>();
             mockDevice.Setup(d => d.Id).Returns(deviceId);
-            
+
             // Make sure the device is registered in the service
             mockDevice.Setup(d => d.GetProperties()).Returns(new Dictionary<string, object>());
             mockDevice.Setup(d => d.GetAllPropertyMetadata()).Returns(new Dictionary<string, IPropertyMetadata>());
             await _service.AddOrUpdateAsync(mockDevice.Object);
-            
+
             // Create a property changed event
             var metadata = new PropertyMetadata { IsVisible = true };
             var propertyChangedEvent = new PropertyChangedEvent(deviceId, "TestProperty", "OldValue", "NewValue", metadata);
-            
+
             // Add event to the service
             await _service.HandleEventAsync(mockDevice.Object, propertyChangedEvent);
-            
+
             // Reset the verify count for the transaction
             _mockStore.Invocations.Clear();
             _mockTransaction.Invocations.Clear();
@@ -205,7 +205,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockDevice = new Mock<IIoTDevice>();
             mockDevice.Setup(d => d.Id).Returns(deviceId);
-            
+
             // Store a property directly in the service
             var fieldInfo = typeof(PersistenceService).GetField("_deviceProperties", BindingFlags.NonPublic | BindingFlags.Instance);
             var deviceProperties = (Dictionary<Guid, Dictionary<string, object>>)fieldInfo.GetValue(_service);
@@ -348,25 +348,25 @@ namespace HydroGarden.Foundation.Tests.Unit.Services
             var deviceId = Guid.NewGuid();
             var mockDevice = new Mock<IIoTDevice>();
             mockDevice.Setup(d => d.Id).Returns(deviceId);
-            
+
             // Set the mock test exception in the service using reflection
-            var fieldInfo = typeof(PersistenceService).GetField("_mockTestException", 
+            var fieldInfo = typeof(PersistenceService).GetField("_mockTestException",
                 BindingFlags.NonPublic | BindingFlags.Instance);
             var testException = new InvalidOperationException("Test exception");
             fieldInfo.SetValue(_service, testException);
-            
+
             // Make the store throw an exception
             _mockStore.Setup(s => s.SaveWithMetadataAsync(
-                    It.IsAny<Guid>(), 
-                    It.IsAny<IDictionary<string, object>>(), 
-                    It.IsAny<IDictionary<string, IPropertyMetadata>>(), 
+                    It.IsAny<Guid>(),
+                    It.IsAny<IDictionary<string, object>>(),
+                    It.IsAny<IDictionary<string, IPropertyMetadata>>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(testException);
 
             // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(async () => 
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 await _service.AddOrUpdateAsync(mockDevice.Object));
-                
+
             // Verify error was reported
             _mockErrorMonitor.Verify(m => m.ReportExceptionAsync(
                 It.IsAny<object>(),

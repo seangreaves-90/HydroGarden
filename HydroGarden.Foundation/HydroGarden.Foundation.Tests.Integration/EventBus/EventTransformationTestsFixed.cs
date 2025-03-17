@@ -2,6 +2,7 @@ using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -37,7 +38,6 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             _eventBus = new Common.Events.EventBus(
                 _mockLogger.Object,
                 _mockEventRouter.Object,
-                null,
                 null,
                 _mockTransformer.Object);
         }
@@ -97,7 +97,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Callback<object, IEvent, CancellationToken>((_, e, _) => capturedEvent = e)
                 .Returns(Task.CompletedTask);
 
-            _eventBus.Subscribe(mockHandler.Object);
+            // Create an adapter for IEventHandler to IEventHandler<IEvent>
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter);
 
             // Act - Publish event normally
             var result = await _eventBus.PublishAsync(this, originalEvent.Object);
@@ -164,7 +166,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Callback(() => handlerCallCount++)
                 .Returns(Task.CompletedTask);
 
-            _eventBus.Subscribe(mockHandler.Object);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter);
 
             // Act - Publish valid event
             var validResult = await _eventBus.PublishAsync(this, validEvent.Object);
@@ -259,12 +262,14 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns(Task.CompletedTask);
             
             // Subscribe with specific event type options
-            _eventBus.Subscribe(commandHandler.Object, new EventSubscriptionOptions
+            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(commandAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.Command }
             });
             
-            _eventBus.Subscribe(stateHandler.Object, new EventSubscriptionOptions
+            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(stateAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.StateChange }
             });
@@ -320,7 +325,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Callback<object, IEvent, CancellationToken>((_, e, _) => capturedEvent = e)
                 .Returns(Task.CompletedTask);
             
-            eventBusWithoutTransformer.Subscribe(mockHandler.Object);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            eventBusWithoutTransformer.Subscribe<IEvent>(adapter);
             
             // Act - Publish event
             var result = await eventBusWithoutTransformer.PublishAsync(this, testEvent.Object);

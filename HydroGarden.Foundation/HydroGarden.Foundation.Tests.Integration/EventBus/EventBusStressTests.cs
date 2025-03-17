@@ -2,6 +2,7 @@ using FluentAssertions;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using System.Collections.Concurrent;
@@ -57,8 +58,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     processedEvents.Add(evt.EventId))
                 .Returns(Task.CompletedTask);
             
-            // Subscribe the handler
-            _eventBus.Subscribe(fastHandler.Object);
+            // Subscribe the handler using adapter
+            var adapter = new GenericEventHandlerAdapter<IEvent>(fastHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter);
             
             // Create many events
             var events = new List<IEvent>();
@@ -137,8 +139,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 
                 handlers.Add(mockHandler.Object);
                 
-                // Subscribe the handler
-                var subId = _eventBus.Subscribe(mockHandler.Object);
+                // Subscribe the handler with adapter
+                var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+                var subId = _eventBus.Subscribe<IEvent>(adapter);
                 subscriptionIds.Add(subId);
             }
             
@@ -187,7 +190,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     
                     // Random delay to increase chance of concurrency issues
                     Thread.Sleep(Random.Shared.Next(1, 5));
-                    _eventBus.Subscribe(mockHandler.Object);
+                    var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+                    _eventBus.Subscribe<IEvent>(adapter);
                 }
             });
             
@@ -233,9 +237,11 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
             
-            // Subscribe both handlers
-            _eventBus.Subscribe(longRunningHandler.Object);
-            _eventBus.Subscribe(fastHandler.Object);
+            // Subscribe both handlers with adapters
+            var longAdapter = new GenericEventHandlerAdapter<IEvent>(longRunningHandler.Object, typeof(IEvent));
+            var fastAdapter = new GenericEventHandlerAdapter<IEvent>(fastHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(longAdapter);
+            _eventBus.Subscribe<IEvent>(fastAdapter);
             
             // Create events with different timeout settings
             var events = new List<IEvent>();
@@ -327,7 +333,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     .Returns(Task.CompletedTask);
                 
                 handlers.Add(mockHandler.Object);
-                _eventBus.Subscribe(mockHandler.Object);
+                var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+                _eventBus.Subscribe<IEvent>(adapter);
             }
             
             // Create event factory so we don't hold all events in memory at once

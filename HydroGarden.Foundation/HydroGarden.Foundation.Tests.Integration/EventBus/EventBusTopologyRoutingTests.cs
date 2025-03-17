@@ -5,6 +5,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -29,10 +30,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             _mockEventRouter = new Mock<IEventRouter>();
             _mockErrorMonitor = new Mock<IErrorMonitor>();
             
+            // Create event store mock since EventBus accepts IEventStore as third parameter, not ITopologyService
+            var mockEventStore = new Mock<IEventStore>();
+            
             _eventBus = new Common.Events.EventBus(
                 _mockLogger.Object,
                 _mockEventRouter.Object,
-                _mockTopologyService.Object);
+                mockEventStore.Object);
         }
         
         [Fact]
@@ -107,7 +111,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            _eventBus.Subscribe(mockHandler.Object, options);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create a test event from the source
             var testEvent = new Mock<IEvent>();
@@ -202,7 +207,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            _eventBus.Subscribe(mockHandler.Object, options);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create a test event from the source
             var testEvent = new Mock<IEvent>();
@@ -313,7 +319,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            _eventBus.Subscribe(mockHandler.Object, options);
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create high priority event with a first byte > 128
             var highPriorityGuid = new Guid(

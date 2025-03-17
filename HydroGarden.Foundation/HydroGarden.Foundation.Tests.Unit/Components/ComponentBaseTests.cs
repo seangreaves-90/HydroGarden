@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
                 : base(id, name, errorMonitor, eventBus, logger)
             {
             }
-            
+
             // Public method to expose the protected ValidateProperty method for testing
             public bool TestValidateProperty(string name, object? value, IPropertyMetadata metadata)
             {
@@ -46,8 +46,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             _testId = Guid.NewGuid();
             _testName = "Test Component";
             _sut = new TestComponent(_testId, _testName, _mockErrorMonitor.Object, _mockEventBus.Object, _mockLogger.Object);
-            _sut.SetEventHandler(_mockEventHandler.Object);
-            
+            _sut.SetEventHandler(_mockEventHandler.Object as IPropertyChangedEventHandler<IEvent>);
+
             // Setup event bus for property change events
             _mockEventBus
                 .Setup(eb => eb.PublishAsync(
@@ -55,7 +55,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
                     It.IsAny<IPropertyChangedEvent>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Mock<IPublishResult>().Object);
-                
+
             // Setup event bus for state change events
             _mockEventBus
                 .Setup(eb => eb.PublishAsync(
@@ -84,7 +84,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Initializing);
-            
+
             // Verify state change event was published
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
@@ -104,12 +104,12 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Assert
             result.Should().BeFalse();
             _sut.State.Should().Be(ComponentState.Created); // State should not change
-            
+
             // Verify error was reported
             _mockErrorMonitor.Verify(e => e.ReportErrorAsync(
                 It.IsAny<IApplicationError>(),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-                
+
             // We can't directly verify the extension method, but we can verify the parameters
             // were correctly passed by checking the log message
             _mockLogger.Verify(l => l.Log(It.Is<string>(s => s.Contains("Invalid state transition"))), Times.Once);
@@ -121,8 +121,8 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             string propertyName = "validatedProperty";
             bool validatorCalled = false;
-            
-            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) =>
             {
                 validatorCalled = true;
                 return value is int intValue && intValue > 0;
@@ -130,18 +130,18 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
 
             // Act - set a valid value
             await _sut.SetPropertyAsync(propertyName, 10);
-            
+
             // Assert
             validatorCalled.Should().BeTrue();
             var storedValue = await _sut.GetPropertyAsync<int>(propertyName);
             storedValue.Should().Be(10);
-            
+
             // Reset flag
             validatorCalled = false;
-            
+
             // Act - try to set an invalid value
             await _sut.SetPropertyAsync(propertyName, -5);
-            
+
             // Assert
             validatorCalled.Should().BeTrue();
             storedValue = await _sut.GetPropertyAsync<int>(propertyName);
@@ -154,10 +154,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             string propertyName = "unvalidatedProperty";
             var metadata = new PropertyMetadata(true, true, propertyName, "Test property");
-            
+
             // Act
             var result = _sut.TestValidateProperty(propertyName, "any value", metadata);
-            
+
             // Assert
             result.Should().BeTrue();
         }
@@ -168,34 +168,34 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             string propertyName = "testProperty";
             bool validatorCalled = false;
-            
+
             // Register validator
-            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) =>
             {
                 validatorCalled = true;
                 return true;
             });
-            
+
             // Act - validate with validator
             var metadata = new PropertyMetadata(true, true, propertyName, "Test property");
             var result1 = _sut.TestValidateProperty(propertyName, "test", metadata);
-            
+
             // Assert
             validatorCalled.Should().BeTrue();
             result1.Should().BeTrue();
-            
+
             // Act - remove validator
             var removed = _sut.RemovePropertyValidator(propertyName);
-            
+
             // Assert
             removed.Should().BeTrue();
-            
+
             // Reset flag
             validatorCalled = false;
-            
+
             // Act - validate after removing validator
             var result2 = _sut.TestValidateProperty(propertyName, "test", metadata);
-            
+
             // Assert
             validatorCalled.Should().BeFalse(); // Validator should not be called
             result2.Should().BeTrue(); // Should pass validation by default
@@ -206,23 +206,23 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             // Act
             var result = await _sut.InitializeAsync();
-            
+
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Ready);
-            
+
             // Verify state transitions occurred in the right order
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Created && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Created &&
                     evt.NewState == ComponentState.Initializing),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-                
+
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Initializing && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Initializing &&
                     evt.NewState == ComponentState.Ready),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -232,19 +232,19 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             // Arrange
             await _sut.InitializeAsync();
-            
+
             // Act
             var result = await _sut.StartAsync();
-            
+
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Running);
-            
+
             // Verify state transition occurred
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Ready && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Ready &&
                     evt.NewState == ComponentState.Running),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -255,26 +255,26 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             await _sut.InitializeAsync();
             await _sut.StartAsync();
-            
+
             // Act
             var result = await _sut.StopAsync();
-            
+
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Ready);
-            
+
             // Verify state transitions occurred in the right order
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Running && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Running &&
                     evt.NewState == ComponentState.Stopping),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-                
+
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Stopping && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Stopping &&
                     evt.NewState == ComponentState.Ready),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -285,19 +285,19 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             var mockError = new Mock<IApplicationError>();
             mockError.Setup(e => e.DeviceId).Returns(_testId);
-            
+
             // Act
             var result = await _sut.HandleErrorAsync(mockError.Object);
-            
+
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Error);
-            
+
             // Verify state transition occurred
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Created && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Created &&
                     evt.NewState == ComponentState.Error),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -309,26 +309,26 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             var mockError = new Mock<IApplicationError>();
             mockError.Setup(e => e.DeviceId).Returns(_testId);
             await _sut.HandleErrorAsync(mockError.Object);
-            
+
             // Act
             var result = await _sut.RecoverFromErrorAsync();
-            
+
             // Assert
             result.Should().BeTrue();
             _sut.State.Should().Be(ComponentState.Ready);
-            
+
             // Verify reinitialize state transitions occurred
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Error && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Error &&
                     evt.NewState == ComponentState.Initializing),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
-                
+
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Initializing && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Initializing &&
                     evt.NewState == ComponentState.Ready),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -338,15 +338,15 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         {
             // Act
             _sut.Dispose();
-            
+
             // Assert
             _sut.State.Should().Be(ComponentState.Disposed);
-            
+
             // Verify state transition
             _mockEventBus.Verify(e => e.PublishAsync(
                 It.Is<object>(o => o == _sut),
-                It.Is<IStateChangeEvent>(evt => 
-                    evt.OldState == ComponentState.Created && 
+                It.Is<IStateChangeEvent>(evt =>
+                    evt.OldState == ComponentState.Created &&
                     evt.NewState == ComponentState.Disposed),
                 It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
@@ -359,10 +359,10 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             {
                 { "CustomProperty", "Value" }
             };
-            
+
             // Act
             await _sut.LoadPropertiesAsync(properties);
-            
+
             // Assert
             var allProps = _sut.GetProperties();
             allProps.Should().ContainKey("Id");
@@ -370,7 +370,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             allProps.Should().ContainKey("AssemblyType");
             allProps.Should().ContainKey("State");
             allProps.Should().ContainKey("CustomProperty");
-            
+
             allProps["Id"].Should().Be(_testId);
             allProps["Name"].Should().Be(_testName);
             allProps["State"].Should().Be(ComponentState.Created);
@@ -383,34 +383,34 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
             // Arrange
             string propertyName = "validatedProperty";
             bool validatorCalled = false;
-            
-            _sut.RegisterPropertyValidator(propertyName, (value, metadata) => 
+
+            _sut.RegisterPropertyValidator(propertyName, (value, metadata) =>
             {
                 validatorCalled = true;
                 return value is int intValue && intValue > 0;
             });
-            
+
             // Act - set initial value
             await _sut.SetPropertyAsync(propertyName, 5);
-            
+
             // Reset flag
             validatorCalled = false;
-            
+
             // Act - try update with valid value
             var result1 = await _sut.UpdatePropertyOptimisticAsync<int>(propertyName, v => v + 10);
-            
+
             // Assert
             result1.Should().BeTrue();
             validatorCalled.Should().BeTrue();
             var value1 = await _sut.GetPropertyAsync<int>(propertyName);
             value1.Should().Be(15);
-            
+
             // Reset flag
             validatorCalled = false;
-            
+
             // Act - try update with invalid value
             var result2 = await _sut.UpdatePropertyOptimisticAsync<int>(propertyName, _ => -5);
-            
+
             // Assert
             result2.Should().BeFalse();
             validatorCalled.Should().BeTrue();

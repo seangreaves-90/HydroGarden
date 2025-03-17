@@ -4,6 +4,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using System.Threading.Channels;
@@ -13,7 +14,7 @@ namespace HydroGarden.Foundation.Core.Services
     /// <summary>
     /// Unified persistence service implementation for component and topology data
     /// </summary>
-    public class PersistenceService : IPersistenceService, IPropertyChangedEventHandler, 
+    public class PersistenceService : IPersistenceService, IPropertyChangedEventHandler<IEvent>, 
         IPropertyAccessService, IComponentRegistry, ITopologyRepository
     {
         // Constants
@@ -65,6 +66,64 @@ namespace HydroGarden.Foundation.Core.Services
             _eventChannel = Channel.CreateUnbounded<IPropertyChangedEvent>(new UnboundedChannelOptions { SingleReader = true });
             _processingTask = ProcessEventsAsync(_processingCts.Token);
         }
+
+        /// <inheritdoc/>
+        public Task<bool> HasPropertyAsync(Guid componentId, string propertyName, CancellationToken ct = default)
+        {
+            return Task.FromResult(_deviceProperties.TryGetValue(componentId, out var properties) &&
+                              properties.ContainsKey(propertyName));
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> SetPropertyAsync<T>(Guid componentId, string propertyName, T value, CancellationToken ct = default)
+        {
+            if (!_deviceProperties.TryGetValue(componentId, out var properties))
+            {
+                properties = new Dictionary<string, object>();
+                _deviceProperties[componentId] = properties;
+            }
+
+            if (!_deviceMetadata.TryGetValue(componentId, out var metadata))
+            {
+                metadata = new Dictionary<string, IPropertyMetadata>();
+                _deviceMetadata[componentId] = metadata;
+            }
+
+            // Get or create metadata
+            if (!metadata.TryGetValue(propertyName, out var propMetadata))
+            {
+                propMetadata = new PropertyMetadata(true, true, propertyName, $"Property {propertyName}");
+                metadata[propertyName] = propMetadata;
+            }
+
+            // Store the value
+            object oldValue = null;
+            if (properties.TryGetValue(propertyName, out var existingValue))
+            {
+                oldValue = existingValue;
+            }
+
+            properties[propertyName] = value;
+
+            // Create an event if we have an event bus
+            if (_eventBus != null)
+            {
+                var evt = new HydroGardenPropertyChangedEvent(
+                    componentId,
+                    componentId,
+                    propertyName,
+                    typeof(T),
+                    oldValue,
+                    value,
+                    propMetadata);
+
+                await _eventBus.PublishAsync(this, evt, ct);
+            }
+
+            return true;
+        }
+
+
 
         /// <summary>
         /// Initializes the service by loading topology data
@@ -265,6 +324,11 @@ namespace HydroGarden.Foundation.Core.Services
                 return Task.FromResult<IDictionary<string, object>>(new Dictionary<string, object>(properties));
             }
             return Task.FromResult<IDictionary<string, object>>(new Dictionary<string, object>());
+        }
+
+        public Task HandleAsync(IEvent @event, CancellationToken ct = default)
+        {
+            throw new NotImplementedException();
         }
 
         /// <inheritdoc />

@@ -17,9 +17,9 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         /// <param name="eventBus">The event bus.</param>
         /// <param name="handler">The handler for error events.</param>
         /// <returns>The subscription ID.</returns>
-        public static Guid SubscribeToErrors(this IEventBus eventBus, IEventHandler handler)
+        public static Guid SubscribeToErrors(this IEventBus eventBus, IEventHandler<IEvent> handler)
         {
-            return eventBus.Subscribe(handler, EventSubscriptionOptions.ForErrorEvents());
+            return eventBus.Subscribe<IEvent>(handler, EventSubscriptionOptions.ForErrorEvents());
         }
 
         /// <summary>
@@ -29,9 +29,9 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         /// <param name="handler">The handler for error events.</param>
         /// <param name="deviceId">The device ID to filter events for.</param>
         /// <returns>The subscription ID.</returns>
-        public static Guid SubscribeToDeviceErrors(this IEventBus eventBus, IEventHandler handler, Guid deviceId)
+        public static Guid SubscribeToDeviceErrors(this IEventBus eventBus, IEventHandler<IEvent> handler, Guid deviceId)
         {
-            return eventBus.Subscribe(handler, EventSubscriptionOptions.ForErrorEvents(deviceId));
+            return eventBus.Subscribe<IEvent>(handler, EventSubscriptionOptions.ForErrorEvents(deviceId));
         }
 
         /// <summary>
@@ -43,10 +43,10 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         /// <returns>The subscription ID.</returns>
         public static Guid SubscribeToErrorsBySeverity(
             this IEventBus eventBus,
-            IEventHandler handler,
+            IEventHandler<IEvent> handler,
             ErrorSeverity minimumSeverity)
         {
-            return eventBus.Subscribe(handler, EventSubscriptionOptions.ForErrorEventsBySeverity(minimumSeverity));
+            return eventBus.Subscribe<IEvent>(handler, EventSubscriptionOptions.ForErrorEventsBySeverity(minimumSeverity));
         }
 
         /// <summary>

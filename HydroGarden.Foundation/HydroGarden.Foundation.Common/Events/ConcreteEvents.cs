@@ -152,7 +152,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device lifecycle changes
     /// </summary>
-    public class HydroGardenLifecycleChangedEvent : ILifecycleEventHandler
+    public class HydroGardenLifecycleChangedEvent : ILifecycleEventHandler<IEvent>
     {
         private readonly List<ComponentState> _stateChanges;
         private readonly TaskCompletionSource<bool> _completionSource;
@@ -167,6 +167,11 @@ namespace HydroGarden.Foundation.Common.Events
         {
             _stateChanges = stateChanges ?? throw new ArgumentNullException(nameof(stateChanges));
             _completionSource = completionSource ?? throw new ArgumentNullException(nameof(completionSource));
+        }
+
+        public Task HandleAsync(IEvent @event, CancellationToken ct = default)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent

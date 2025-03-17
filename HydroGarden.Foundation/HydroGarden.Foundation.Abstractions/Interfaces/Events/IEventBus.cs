@@ -5,7 +5,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Interface for the event bus service
     /// </summary>
-    public interface IEventBus : ITopologyAware
+    public interface IEventBus 
     {
         /// <summary>
         /// Subscribes to events with the given handler and options
@@ -13,7 +13,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <param name="handler">The event handler</param>
         /// <param name="options">Options that control event filtering</param>
         /// <returns>Subscription ID that can be used to unsubscribe</returns>
-        Guid Subscribe<T>(T handler, IEventSubscriptionOptions? options = null) where T : IEventHandler<T> where T : IEvent ;
+        Guid Subscribe<TEvent>(IEventHandler<IEvent> handler, IEventSubscriptionOptions? options) where TEvent : IEvent;
 
         /// <summary>
         /// Subscribes to events of a specific type with the given typed handler
@@ -38,7 +38,17 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <param name="ct">Cancellation token</param>
         /// <returns>Result of the publish operation</returns>
         Task<IPublishResult?> PublishAsync(object? sender, IEvent evt, CancellationToken ct = default);
+        
+        /// <summary>
+        /// Sets the topology service for event routing.
+        /// </summary>
+        /// <param name="topologyService">The topology service to use for routing events.</param>
+        void SetTopologyService(ITopologyService topologyService);
+        
+        /// <summary>
+        /// Gets the topology service used by this event bus.
+        /// </summary>
+        /// <returns>The topology service, or null if not configured.</returns>
+        ITopologyService? GetTopologyService();
     }
-
-
 }
