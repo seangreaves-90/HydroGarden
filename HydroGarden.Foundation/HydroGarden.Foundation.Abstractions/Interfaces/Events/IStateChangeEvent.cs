@@ -21,7 +21,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
     /// <summary>
     /// Defines an event handler that processes state change events in HydroGarden components.
     /// </summary>
-    public interface IStateChangeEventHandler : IEventHandler 
+    public interface IStateChangeEventHandler<in TEvent> : IEventHandler<TEvent> where TEvent : IEvent
     {
     }
 }

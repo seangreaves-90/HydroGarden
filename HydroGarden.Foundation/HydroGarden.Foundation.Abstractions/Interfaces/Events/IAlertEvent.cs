@@ -40,7 +40,7 @@
     /// <summary>
     /// Specialized handler for alert events
     /// </summary>
-    public interface IAlertEventHandler : IEventHandler
+    public interface IAlertEventHandler<in TEvent> : IEventHandler<TEvent> where TEvent : IEvent
     {
     }
 }

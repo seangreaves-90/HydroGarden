@@ -13,7 +13,7 @@
         /// <summary>
         /// The event handler for this subscription
         /// </summary>
-        IEventHandler Handler { get; }
+        IEventHandler<IEvent> Handler { get; }
         
         /// <summary>
         /// Options that control event filtering and behavior

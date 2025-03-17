@@ -19,7 +19,7 @@
     /// <summary>
     /// Specialized handler for command events
     /// </summary>
-    public interface ICommandEventHandler : IEventHandler
+    public interface ICommandEventHandler <in TEvent> : IEventHandler<TEvent> where TEvent : IEvent
     {
     }
 }

@@ -6,7 +6,7 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
     /// Adapter class to convert typed IEventHandler<TEvent> to IEventHandler
     /// </summary>
     /// <typeparam name="TEvent">The specific event type this adapter handles</typeparam>
-    public class TypedEventHandlerAdapter<TEvent> : IEventHandler where TEvent : IEvent
+    public class TypedEventHandlerAdapter<TEvent> : IEventHandler<TEvent> where TEvent : IEvent 
     {
         private readonly IEventHandler<TEvent> _typedHandler;
 
@@ -20,16 +20,6 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
         }
 
         /// <inheritdoc />
-        public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
-        {
-            // Only handle events of the expected type
-            if (evt is TEvent typedEvent)
-            {
-                await _typedHandler.HandleAsync(typedEvent, ct);
-            }
-        }
-
-        /// <inheritdoc />
         public ValueTask DisposeAsync()
         {
             if (_typedHandler is IAsyncDisposable disposable)
@@ -37,6 +27,15 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
                 return disposable.DisposeAsync();
             }
             return ValueTask.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public async Task HandleAsync(TEvent @event, CancellationToken ct = default)
+        {
+            if (@event is { } typedEvent)
+            {
+                await _typedHandler.HandleAsync(typedEvent, ct);
+            }
         }
     }
 }

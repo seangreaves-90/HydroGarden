@@ -19,7 +19,7 @@
     /// <summary>
     /// Specialized handler for telemetry events
     /// </summary>
-    public interface ITelemetryEventHandler : IEventHandler 
+    public interface ITelemetryEventHandler <in TEvent> : IEventHandler<TEvent> where TEvent : IEvent 
     { 
     
     }
