@@ -281,6 +281,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             result.Should().NotBeNull();
             result!.SuccessCount.Should().Be(1, "Only command handler should be called after transformation");
             
+            // Also verify the total handler count matches our expectation
+            result.HandlerCount.Should().Be(1, "Only handlers matching the transformed event type should be included");
+            
             // Verify transformer was called exactly once
             _mockTransformer.Verify(t => t.Transform(notificationEvent.Object), Times.Once);
             
