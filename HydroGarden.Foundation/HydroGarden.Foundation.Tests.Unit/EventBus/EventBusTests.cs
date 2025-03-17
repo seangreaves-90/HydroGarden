@@ -1,10 +1,8 @@
 ﻿using FluentAssertions;
-using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Events.Pipeline;
 using HydroGarden.Logger.Abstractions;
 using Moq;
 using Xunit;
@@ -22,7 +20,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 MockEventRouter.Object,
                 MockTopologyService.Object,
                 MockStore.Object,
-                MockRetryPolicy.Object,
+                
                 MockTransformer.Object);
 
             // Assert
@@ -39,7 +37,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 MockEventRouter.Object,
                 MockTopologyService.Object,
                 MockStore.Object,
-                MockRetryPolicy.Object,
+                
                 MockTransformer.Object);
 
             act.Should().Throw<ArgumentNullException>().Which.ParamName.Should().Be("logger");
@@ -54,7 +52,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 null!,
                 MockTopologyService.Object,
                 MockStore.Object,
-                MockRetryPolicy.Object,
+                
                 MockTransformer.Object);
 
             act.Should().Throw<ArgumentNullException>().Which.ParamName.Should().Be("router");
@@ -261,7 +259,6 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
                 MockEventRouter.Object,
                 withTopologyService ? MockTopologyService.Object : null,
                 withStore ? MockStore.Object : null,
-                withRetryPolicy ? MockRetryPolicy.Object : null,
                 withTransformer ? MockTransformer.Object : null);
             
             return eventBus;

@@ -2,11 +2,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Logger.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Common.Events.Routing
 {
@@ -69,7 +64,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                     }
                     catch (Exception ex)
                     {
-                        _logger.Log(ex, $"Error checking topology connection for event {{{@event.EventId}}}");
+                        Logger.Log(ex, $"Error checking topology connection for event {{{@event.EventId}}}");
                         return false;
                     }
                 }
@@ -123,7 +118,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log(ex, $"Error checking topology connection between {sourceId} and {targetId}");
+                    Logger.Log(ex, $"Error checking topology connection between {sourceId} and {targetId}");
                 }
             }
 

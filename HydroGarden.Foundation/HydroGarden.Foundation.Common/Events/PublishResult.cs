@@ -20,10 +20,10 @@ namespace HydroGarden.Foundation.Common.Events
         public bool TimedOut { get; set; }
 
         /// <inheritdoc/>
-        public List<Exception?> Errors { get; set; } = new List<Exception?>();
+        public List<Exception?> Errors { get; set; } = [];
 
         /// <inheritdoc/>
-        public List<Task> HandlerTasks { get; } = new List<Task>();
+        public List<Task> HandlerTasks { get; } = [];
 
         /// <summary>
         /// Gets whether any errors occurred during event publishing.
@@ -31,7 +31,7 @@ namespace HydroGarden.Foundation.Common.Events
         public bool HasErrors => Errors.Count > 0;
 
         /// <summary>
-        /// Creates a new instance of the <see cref="PublishResult"/> class for a successful publish.
+        /// Creates a new instance of the <see cref="PublishResult"/> class for a successful publish result.
         /// </summary>
         /// <param name="eventId">The ID of the published event.</param>
         /// <returns>A publish result indicating success.</returns>
@@ -60,7 +60,7 @@ namespace HydroGarden.Foundation.Common.Events
                 HandlerCount = 0,
                 SuccessCount = 0,
                 TimedOut = false,
-                Errors = new List<Exception?> { error }
+                Errors = [error]
             };
         }
     }

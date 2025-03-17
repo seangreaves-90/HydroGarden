@@ -44,7 +44,7 @@ namespace HydroGarden.Foundation.Common.Events
         public IEventRoutingData? RoutingData { get; }
 
         /// <inheritdoc />
-        IDictionary<string, object>? IEvent.Metadata => _eventMetadata;
+        IDictionary<string, object> IEvent.Metadata => _eventMetadata;
 
         /// <summary>
         /// Initializes a new instance of the PropertyChangedEvent class.

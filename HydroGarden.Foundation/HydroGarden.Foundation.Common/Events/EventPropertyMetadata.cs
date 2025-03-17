@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Creates a new metadata collection initialized with the provided values
         /// </summary>
         /// <param name="initialValues">Initial metadata values</param>
-        public EventPropertyMetadata(IDictionary<string, object?> initialValues)
+        public EventPropertyMetadata(IDictionary<string, object?>? initialValues)
         {
             if (initialValues != null)
             {

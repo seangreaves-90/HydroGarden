@@ -1,9 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.Foundation.Common.QueueProcessors
+namespace HydroGarden.Foundation.Common.Events
 {
     /// <summary>
     /// Processes event queues based on priority levels and manages event execution asynchronously.

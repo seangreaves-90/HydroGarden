@@ -39,7 +39,6 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 _mockEventRouter.Object,
                 null,
                 null,
-                null,
                 _mockTransformer.Object);
         }
 

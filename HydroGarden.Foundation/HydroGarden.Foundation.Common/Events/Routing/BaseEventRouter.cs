@@ -1,11 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Logger.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace HydroGarden.Foundation.Common.Events.Routing
 {
@@ -21,7 +16,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
         /// <summary>
         /// Logger for event routing operations.
         /// </summary>
-        protected readonly ILogger _logger;
+        protected readonly ILogger Logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BaseEventRouter"/> class.
@@ -29,7 +24,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
         /// <param name="logger">The logger to use.</param>
         protected BaseEventRouter(ILogger logger)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>

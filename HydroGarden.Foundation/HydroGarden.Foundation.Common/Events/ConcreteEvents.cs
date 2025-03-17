@@ -36,7 +36,7 @@ namespace HydroGarden.Foundation.Common.Events
         IEventRoutingData IEvent.RoutingData => _routingData ?? new EventRoutingData();
 
         /// <summary>
-        /// Gets the routing data for this event (may be null)
+        /// Gets the routing data for this event (maybe null)
         /// </summary>
         public IEventRoutingData? RoutingData => _routingData;
 
@@ -87,7 +87,7 @@ namespace HydroGarden.Foundation.Common.Events
         public object? NewValue { get; }
 
         /// <inheritdoc />
-        public IPropertyMetadata Metadata { get; }
+        public new IPropertyMetadata Metadata { get; }
 
         /// <inheritdoc />
         public override EventType EventType => EventType.PropertyChanged;

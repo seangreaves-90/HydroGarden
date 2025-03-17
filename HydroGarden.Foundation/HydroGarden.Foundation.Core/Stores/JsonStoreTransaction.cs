@@ -1,6 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using System.Text.Json;
+using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Stores
 {

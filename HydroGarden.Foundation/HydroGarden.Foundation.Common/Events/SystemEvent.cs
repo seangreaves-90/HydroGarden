@@ -1,5 +1,4 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Common.Events.Extensions;
 
 namespace HydroGarden.Foundation.Common.Events
 {
@@ -9,7 +8,7 @@ namespace HydroGarden.Foundation.Common.Events
     public class SystemEvent : HydroGardenEventBase, ISystemEvent
     {
         /// <summary>
-        /// Gets the sub-type of the system event.
+        /// Gets the subtype of the system event.
         /// </summary>
         public string EventSubType { get; }
 
@@ -27,7 +26,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// Initializes a new instance of the <see cref="SystemEvent"/> class.
         /// </summary>
         /// <param name="deviceId">The device ID.</param>
-        /// <param name="eventSubType">The sub-type of the system event.</param>
+        /// <param name="eventSubType">The subtype of the system event.</param>
         /// <param name="eventData">The event data.</param>
         /// <param name="routingData">Optional routing data.</param>
         public SystemEvent(

@@ -8,10 +8,10 @@ namespace HydroGarden.Foundation.Common.Events
     public class EventRoutingDataBuilder
     {
         private readonly List<Guid> _targetIds = new();
-        private bool _persist = false;
+        private bool _persist;
         private EventPriority _priority = EventPriority.Normal;
-        private bool _requiresAcknowledgment = false;
-        private TimeSpan? _timeout = null;
+        private bool _requiresAcknowledgment;
+        private TimeSpan? _timeout;
 
         /// <summary>
         /// Adds a target ID to the routing data.

@@ -22,7 +22,7 @@ namespace HydroGarden.Foundation.Common.Events
             bool requiresAcknowledgment = false,
             TimeSpan? timeout = null)
         {
-            TargetIds = targetIds ?? Array.Empty<Guid>();
+            TargetIds = targetIds ?? [];
             Persist = persist;
             Priority = priority;
             RequiresAcknowledgment = requiresAcknowledgment;
@@ -43,7 +43,7 @@ namespace HydroGarden.Foundation.Common.Events
             EventPriority priority = EventPriority.Normal,
             bool requiresAcknowledgment = false,
             TimeSpan? timeout = null)
-            : this(new[] { targetId }, persist, priority, requiresAcknowledgment, timeout)
+            : this([targetId], persist, priority, requiresAcknowledgment, timeout)
         {
         }
 

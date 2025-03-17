@@ -166,7 +166,6 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 mockRouter.Object,
                 null,
                 null,
-                null, 
                 transformer.Object);
 
             // Setup the handlers for specific event types

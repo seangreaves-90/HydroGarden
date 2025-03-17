@@ -1,5 +1,4 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.Events;
-using HydroGarden.Foundation.Common.Results;
 
 namespace HydroGarden.Foundation.Common.Events
 {

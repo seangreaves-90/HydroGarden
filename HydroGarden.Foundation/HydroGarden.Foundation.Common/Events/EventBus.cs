@@ -2,7 +2,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Events.Pipeline;
 using HydroGarden.Logger.Abstractions;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -20,7 +19,6 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly IEventRouter _router;
         private readonly ITopologyService? _topologyService;
         private readonly IEventStore? _eventStore;
-        private readonly IEventRetryPolicy? _retryPolicy;
         private readonly IEventTransformer? _transformer;
         private IEventProcessingPipeline? _pipeline;
         private readonly object _pipelineLock = new();
@@ -39,23 +37,17 @@ namespace HydroGarden.Foundation.Common.Events
             IEventRouter router,
             ITopologyService? topologyService = null,
             IEventStore? eventStore = null,
-            IEventRetryPolicy? retryPolicy = null, // Parameter maintained for backward compatibility but not used
             IEventTransformer? transformer = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _router = router ?? throw new ArgumentNullException(nameof(router));
             _topologyService = topologyService;
             _eventStore = eventStore;
-            _retryPolicy = null; // Retry policy is no longer used
             _transformer = transformer;
-            
-            if (retryPolicy != null)
-            {
-                _logger.Log("Warning: Retry policy is deprecated and will be ignored");
-            }
-            
+
+
             _logger.Log("EventBus initialized with router: " + _router.GetType().Name);
-            
+
             if (_transformer != null)
             {
                 _logger.Log("Event transformer configured: " + _transformer.GetType().Name);
@@ -69,7 +61,8 @@ namespace HydroGarden.Foundation.Common.Events
             if (_topologyService == null)
             {
                 // We can't actually update the reference since it's readonly, so log a warning
-                _logger.Log("Warning: Attempting to set topology service after initialization. This has no effect - use constructor injection instead.");
+                _logger.Log(
+                    "Warning: Attempting to set topology service after initialization. This has no effect - use constructor injection instead.");
             }
         }
 
@@ -174,11 +167,11 @@ namespace HydroGarden.Foundation.Common.Events
                 throw new ArgumentNullException(nameof(evt));
 
             var stopwatch = Stopwatch.StartNew();
-            
+
             try
             {
                 _logger.Log($"Publishing event {evt.EventId} of type {evt.EventType}");
-                
+
                 // Apply transformation if transformer is available
                 if (_transformer != null)
                 {
@@ -212,7 +205,8 @@ namespace HydroGarden.Foundation.Common.Events
                         if (pipelineResult.IsSuccess)
                         {
                             stopwatch.Stop();
-                            _logger.Log($"Event {evt.EventId} processed successfully by pipeline in {stopwatch.ElapsedMilliseconds}ms");
+                            _logger.Log(
+                                $"Event {evt.EventId} processed successfully by pipeline in {stopwatch.ElapsedMilliseconds}ms");
 
                             // Return a result that indicates success
                             return new PublishResult
@@ -258,9 +252,10 @@ namespace HydroGarden.Foundation.Common.Events
                         await _eventStore.PersistEventAsync(evt);
                         _logger.Log($"Event {evt.EventId} persisted with no matching handlers");
                     }
-                    
+
                     stopwatch.Stop();
-                    _logger.Log($"No matching handlers found for event {evt.EventId} (completed in {stopwatch.ElapsedMilliseconds}ms)");
+                    _logger.Log(
+                        $"No matching handlers found for event {evt.EventId} (completed in {stopwatch.ElapsedMilliseconds}ms)");
                     return result;
                 }
 
@@ -270,7 +265,7 @@ namespace HydroGarden.Foundation.Common.Events
                     .ToList();
 
                 bool hasErrors = false;
-                
+
                 foreach (var subscription in syncSubscriptions)
                 {
                     try
@@ -304,19 +299,20 @@ namespace HydroGarden.Foundation.Common.Events
                 if (asyncTasks.Count > 0 && evt.RoutingData?.Timeout.HasValue == true)
                 {
                     var timeout = evt.RoutingData.Timeout.Value;
-                    
+
                     // Create a delay task outside the WhenAny call
                     var delayTask = Task.Delay(timeout, ct);
-                    
+
                     // Compare task references, not results
                     var completedTask = await Task.WhenAny(
                         Task.WhenAll(asyncTasks),
                         delayTask);
-                        
+
                     if (completedTask == delayTask)
                     {
                         result.TimedOut = true;
-                        _logger.Log($"Async handlers for event {evt.EventId} timed out after {timeout.TotalMilliseconds}ms");
+                        _logger.Log(
+                            $"Async handlers for event {evt.EventId} timed out after {timeout.TotalMilliseconds}ms");
                     }
                 }
                 else if (asyncTasks.Count > 0)
@@ -334,7 +330,7 @@ namespace HydroGarden.Foundation.Common.Events
                         _logger.Log($"Event {evt.EventId} persisted due to handler errors for potential retry");
                     }
                 }
-                
+
                 // If the event is configured to be persisted, do so even if handled successfully
                 else if (evt.RoutingData?.Persist == true && _eventStore != null)
                 {
@@ -345,7 +341,7 @@ namespace HydroGarden.Foundation.Common.Events
                 stopwatch.Stop();
                 _logger.Log($"Event {evt.EventId} published to {result.HandlerCount} handlers " +
                             $"with {result.SuccessCount} successful in {stopwatch.ElapsedMilliseconds}ms");
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -439,6 +435,9 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Disposes resources used by the event bus.
         /// </summary>
+        /// <summary>
+        /// Disposes resources used by the event bus.
+        /// </summary>
         public void Dispose()
         {
             if (_isDisposed)
@@ -453,8 +452,18 @@ namespace HydroGarden.Foundation.Common.Events
             {
                 if (_pipeline is IDisposable disposablePipeline)
                 {
-                    disposablePipeline.Dispose();
-                    _pipeline = null;
+                    try
+                    {
+                        disposablePipeline.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Log(ex, "Error disposing event processing pipeline");
+                    }
+                    finally
+                    {
+                        _pipeline = null;
+                    }
                 }
             }
 
@@ -465,4 +474,5 @@ namespace HydroGarden.Foundation.Common.Events
             GC.SuppressFinalize(this);
         }
     }
+
 }
