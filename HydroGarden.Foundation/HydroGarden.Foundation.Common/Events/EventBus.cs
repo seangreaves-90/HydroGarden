@@ -429,16 +429,8 @@ namespace HydroGarden.Foundation.Common.Events
             _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
             }
 
-            // Only include subscriptions that match the current event type or are generic
-            List<EventSubscription> filteredSubscriptions = mergedSubscriptions
-                .Where(s => s.Options.EventTypes.Length == 0 || // No event types specified means all types
-                       s.Options.EventTypes.Contains(evt.EventType))
-                .ToList();
-
-            _logger.Log($"Filtered to {filteredSubscriptions.Count} subscriptions matching event type {evt.EventType}");
-
             // Delegate subscription matching to the router
-            return _router.GetMatchingSubscriptionsAsync(evt, filteredSubscriptions, ct);
+            return _router.GetMatchingSubscriptionsAsync(evt, mergedSubscriptions, ct);
         }
 
         /// <summary>
