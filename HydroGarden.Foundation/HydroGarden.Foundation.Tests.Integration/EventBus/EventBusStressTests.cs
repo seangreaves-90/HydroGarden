@@ -86,8 +86,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             var eventsPerSecond = eventCount / (elapsedMs / 1000.0);
             
-            // Each event should have been processed twice due to our changes making both general and specific subscriptions match
-            processedEvents.Count.Should().Be(eventCount * 2);
+            // Each event should have been processed once per handler
+            processedEvents.Count.Should().Be(eventCount);
             
             // Verify all tasks completed successfully
             publishTasks.Should().AllSatisfy(task => task.IsCompleted.Should().BeTrue());
@@ -311,7 +311,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<object>(),
                     It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()),
-                Times.Exactly(eventCount * 2));
+                Times.Exactly(eventCount));
                 
             // Update verification for longRunningHandler as well
             longRunningHandler.Verify(
@@ -319,7 +319,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<object>(),
                     It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()),
-                Times.Exactly(eventCount * 2));
+                Times.Exactly(eventCount));
         }
         
         [Fact]

@@ -101,7 +101,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.HandlerCount.Should().Be(2);
+            result.HandlerCount.Should().Be(1);
             result.SuccessCount.Should().Be(0);
             result.HasErrors.Should().BeTrue();
             result.Errors.Should().ContainSingle(e => e is InvalidOperationException);
