@@ -1,8 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using System;
-using System.Collections.Generic;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Provides information about error rates for a specific error code.
@@ -37,6 +35,6 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Gets or sets the device IDs associated with this error code.
         /// </summary>
-        public HashSet<Guid> DeviceIds { get; set; } = new HashSet<Guid>();
+        public HashSet<Guid> DeviceIds { get; set; } = [];
     }
 }

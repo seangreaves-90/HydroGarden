@@ -7,7 +7,7 @@ namespace HydroGarden.Foundation.Common.Events
     /// </summary>
     public class EventRoutingDataBuilder
     {
-        private readonly List<Guid> _targetIds = new();
+        private readonly List<Guid>? _targetIds = [];
         private bool _persist;
         private EventPriority _priority = EventPriority.Normal;
         private bool _requiresAcknowledgment;
@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <returns>This builder, for method chaining.</returns>
         public EventRoutingDataBuilder AddTarget(Guid targetId)
         {
-            _targetIds.Add(targetId);
+            _targetIds?.Add(targetId);
             return this;
         }
 
@@ -31,7 +31,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <returns>This builder, for method chaining.</returns>
         public EventRoutingDataBuilder AddTargets(IEnumerable<Guid> targetIds)
         {
-            _targetIds.AddRange(targetIds);
+            _targetIds?.AddRange(targetIds);
             return this;
         }
 
@@ -106,7 +106,7 @@ namespace HydroGarden.Foundation.Common.Events
         public EventRoutingData Build()
         {
             return new EventRoutingData(
-                _targetIds.ToArray(),
+                _targetIds,
                 _persist,
                 _priority,
                 _requiresAcknowledgment,

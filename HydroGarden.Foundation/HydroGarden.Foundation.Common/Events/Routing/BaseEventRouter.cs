@@ -11,21 +11,12 @@ namespace HydroGarden.Foundation.Common.Events.Routing
     /// This class provides core functionality that all routers should have, including
     /// basic filtering by event type and custom filters.
     /// </remarks>
-    public abstract class BaseEventRouter : IEventRouter
+    public abstract class BaseEventRouter(ILogger logger) : IEventRouter
     {
         /// <summary>
         /// Logger for event routing operations.
         /// </summary>
-        protected readonly ILogger Logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BaseEventRouter"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        protected BaseEventRouter(ILogger logger)
-        {
-            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        protected readonly ILogger Logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <inheritdoc/>
         public async Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
@@ -33,11 +24,8 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             IEnumerable<IEventSubscription> availableSubscriptions,
             CancellationToken ct = default)
         {
-            if (@event == null)
-                throw new ArgumentNullException(nameof(@event));
-            
-            if (availableSubscriptions == null)
-                throw new ArgumentNullException(nameof(availableSubscriptions));
+            ArgumentNullException.ThrowIfNull(@event);
+            ArgumentNullException.ThrowIfNull(availableSubscriptions);
 
             var result = new List<IEventSubscription>();
 
@@ -62,11 +50,8 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             IEventSubscription subscription,
             CancellationToken ct = default)
         {
-            if (@event == null)
-                throw new ArgumentNullException(nameof(@event));
-            
-            if (subscription == null)
-                throw new ArgumentNullException(nameof(subscription));
+            ArgumentNullException.ThrowIfNull(@event);
+            ArgumentNullException.ThrowIfNull(subscription);
 
             // Check event type filter
             if (subscription.Options.EventTypes.Length > 0 && 

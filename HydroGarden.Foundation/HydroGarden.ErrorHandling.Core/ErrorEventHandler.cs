@@ -1,5 +1,4 @@
-﻿using HydroGarden.ErrorHandling.Core;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.ErrorHandling.Events;
 using HydroGarden.Logger.Abstractions;
@@ -9,23 +8,12 @@ namespace HydroGarden.Foundation.ErrorHandling
     /// <summary>
     /// Handles error events from the event bus.
     /// </summary>
-    public class ErrorEventHandler : IEventHandler
+    /// <param name="errorMonitor">The error monitor to report errors to.</param>
+    /// <param name="logger">The logger.</param>
+    public class ErrorEventHandler(IErrorMonitor errorMonitor, ILogger logger) : IEventHandler
     {
-        private readonly IErrorMonitor _errorMonitor;
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ErrorEventHandler"/> class.
-        /// </summary>
-        /// <param name="errorMonitor">The error monitor to report errors to.</param>
-        /// <param name="logger">The logger.</param>
-        public ErrorEventHandler(
-            IErrorMonitor errorMonitor,
-            ILogger logger)
-        {
-            _errorMonitor = errorMonitor ?? throw new ArgumentNullException(nameof(errorMonitor));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly IErrorMonitor _errorMonitor = errorMonitor ?? throw new ArgumentNullException(nameof(errorMonitor));
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <inheritdoc/>
         public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent
@@ -57,7 +45,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <inheritdoc/>
         public ValueTask DisposeAsync()
         {
-            // No resources to dispose
+            GC.SuppressFinalize(this);
             return ValueTask.CompletedTask;
         }
     }

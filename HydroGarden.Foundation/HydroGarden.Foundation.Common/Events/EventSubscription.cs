@@ -6,29 +6,19 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Represents an event subscription
     /// </summary>
-    public class EventSubscription : IEventSubscription
+    /// <param name="id">Unique identifier</param>
+    /// <param name="handler">Event handler</param>
+    /// <param name="options">Subscription options</param>
+    public class EventSubscription(Guid id, IEventHandler<IEvent> handler, IEventSubscriptionOptions options) : IEventSubscription
     {
         /// <inheritdoc/>
-        public Guid Id { get; }
+        public Guid Id { get; } = id;
 
         /// <inheritdoc/>
-        public IEventHandler<IEvent> Handler { get; }
+        public IEventHandler<IEvent> Handler { get; } = handler ?? throw new ArgumentNullException(nameof(handler));
 
         /// <inheritdoc/>
-        public IEventSubscriptionOptions Options { get; }
-
-        /// <summary>
-        /// Creates a new event subscription
-        /// </summary>
-        /// <param name="id">Unique identifier</param>
-        /// <param name="handler">Event handler</param>
-        /// <param name="options">Subscription options</param>
-        public EventSubscription(Guid id, IEventHandler<IEvent> handler, IEventSubscriptionOptions options)
-        {
-            Id = id;
-            Handler = handler ?? throw new ArgumentNullException(nameof(handler));
-            Options = options ?? throw new ArgumentNullException(nameof(options));
-        }
+        public IEventSubscriptionOptions Options { get; } = options ?? throw new ArgumentNullException(nameof(options));
     }
 
 

@@ -1,9 +1,4 @@
-﻿using System;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Common;
-
-namespace HydroGarden.ErrorHandling.Core
+﻿namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Advanced error monitor extensions to supplement the basic ones.

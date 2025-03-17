@@ -1,11 +1,11 @@
-﻿using HydroGarden.ErrorHandling.Core.Repositories;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+using HydroGarden.Foundation.ErrorHandling.Repositories;
 using HydroGarden.Logger.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace HydroGarden.ErrorHandling.Core.Extensions
+namespace HydroGarden.Foundation.ErrorHandling.Extensions
 {
     /// <summary>
     /// Extension methods for registering error persistence services.

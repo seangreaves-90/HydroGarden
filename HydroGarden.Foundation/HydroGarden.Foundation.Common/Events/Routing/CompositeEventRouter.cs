@@ -22,12 +22,12 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             /// A subscription matches if any router matches it.
             /// </summary>
             Any,
-            
+
             /// <summary>
             /// A subscription matches only if all routers match it.
             /// </summary>
             All,
-            
+
             /// <summary>
             /// Uses only the first router that returns matches.
             /// </summary>
@@ -51,39 +51,30 @@ namespace HydroGarden.Foundation.Common.Events.Routing
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _routers = routers ?? throw new ArgumentNullException(nameof(routers));
-            
-            if (!routers.Any())
+
+            if (routers.Count == 0)
                 throw new ArgumentException("At least one router must be provided", nameof(routers));
-            
+
             _strategy = strategy;
         }
 
         /// <inheritdoc/>
         public async Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
-            IEvent @event, 
+            IEvent @event,
             IEnumerable<IEventSubscription> availableSubscriptions,
             CancellationToken ct = default)
         {
-            if (@event == null)
-                throw new ArgumentNullException(nameof(@event));
-            
-            if (availableSubscriptions == null)
-                throw new ArgumentNullException(nameof(availableSubscriptions));
+            ArgumentNullException.ThrowIfNull(@event);
+            ArgumentNullException.ThrowIfNull(availableSubscriptions);
 
             var subscriptionList = availableSubscriptions.ToList();
-            
-            switch (_strategy)
+
+            return _strategy switch
             {
-                case MatchingStrategy.First:
-                    return await GetFirstMatchingSubscriptionsAsync(@event, subscriptionList, ct);
-                
-                case MatchingStrategy.All:
-                    return await GetAllRequiredMatchingSubscriptionsAsync(@event, subscriptionList, ct);
-                
-                case MatchingStrategy.Any:
-                default:
-                    return await GetAnyMatchingSubscriptionsAsync(@event, subscriptionList, ct);
-            }
+                MatchingStrategy.First => await GetFirstMatchingSubscriptionsAsync(@event, subscriptionList, ct),
+                MatchingStrategy.All => await GetAllRequiredMatchingSubscriptionsAsync(@event, subscriptionList, ct),
+                _ => await GetAnyMatchingSubscriptionsAsync(@event, subscriptionList, ct) // MatchingStrategy.Any or default
+            };
         }
 
         /// <inheritdoc/>
@@ -92,14 +83,12 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             IEventSubscription subscription,
             CancellationToken ct = default)
         {
-            if (@event == null)
-                throw new ArgumentNullException(nameof(@event));
-            
-            if (subscription == null)
-                throw new ArgumentNullException(nameof(subscription));
+
+            ArgumentNullException.ThrowIfNull(@event);
+            ArgumentNullException.ThrowIfNull(subscription);
 
             var matchResults = new List<bool>();
-            
+
             foreach (var router in _routers)
             {
                 if (ct.IsCancellationRequested)
@@ -109,11 +98,11 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 {
                     bool matches = await router.MatchesSubscriptionAsync(@event, subscription, ct);
                     matchResults.Add(matches);
-                    
+
                     // For First strategy, return on first match
                     if (_strategy == MatchingStrategy.First && matches)
                         return true;
-                    
+
                     // For All strategy, return false on first non-match
                     if (_strategy == MatchingStrategy.All && !matches)
                         return false;
@@ -127,11 +116,11 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             // For Any strategy, return true if any matched
             if (_strategy == MatchingStrategy.Any)
                 return matchResults.Any(x => x);
-            
+
             // For All strategy, all routers must match (if we get here, they all matched)
             if (_strategy == MatchingStrategy.All)
                 return matchResults.All(x => x);
-            
+
             // For First strategy, if we get here, no router matched
             return false;
         }
@@ -149,7 +138,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 try
                 {
                     var matches = await router.GetMatchingSubscriptionsAsync(@event, subscriptions, ct);
-                    if (matches.Any())
+                    if (matches.Count > 0)
                     {
                         return matches;
                     }
@@ -165,10 +154,10 @@ namespace HydroGarden.Foundation.Common.Events.Routing
 
         private async Task<IReadOnlyList<IEventSubscription>> GetAllRequiredMatchingSubscriptionsAsync(
             IEvent @event,
-            IList<IEventSubscription> subscriptions,
+            List<IEventSubscription> subscriptions,
             CancellationToken ct)
         {
-            var result = new HashSet<IEventSubscription>();
+            var result = new HashSet<IEventSubscription>(subscriptions.Count);
             bool isFirstRouter = true;
 
             foreach (var router in _routers)
@@ -179,7 +168,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 try
                 {
                     var matches = await router.GetMatchingSubscriptionsAsync(@event, subscriptions, ct);
-                    
+
                     if (isFirstRouter)
                     {
                         // Initialize with first router's matches
@@ -196,7 +185,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                     }
 
                     // If no common matches left, we can exit early
-                    if (!result.Any())
+                    if (result.Count == 0)
                     {
                         break;
                     }
@@ -207,15 +196,15 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 }
             }
 
-            return result.ToList();
+            return [.. result];
         }
 
         private async Task<IReadOnlyList<IEventSubscription>> GetAnyMatchingSubscriptionsAsync(
             IEvent @event,
-            IList<IEventSubscription> subscriptions,
+            List<IEventSubscription> subscriptions,
             CancellationToken ct)
         {
-            var result = new HashSet<IEventSubscription>();
+            var result = new HashSet<IEventSubscription>(subscriptions.Count);
 
             foreach (var router in _routers)
             {
@@ -236,7 +225,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 }
             }
 
-            return result.ToList();
+            return [.. result];
         }
     }
 }

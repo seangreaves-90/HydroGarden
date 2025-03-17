@@ -28,7 +28,7 @@
         /// <summary>
         /// Metadata associated with the property
         /// </summary>
-        IPropertyMetadata Metadata { get; }
+        new IPropertyMetadata Metadata { get; }
     }
 
     /// <summary>

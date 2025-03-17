@@ -1,72 +1,51 @@
-﻿using HydroGarden.ErrorHandling.Core;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
 namespace HydroGarden.Foundation.ErrorHandling.Exceptions
 {
     /// <summary>
     /// Base exception class for all application-specific exceptions.
     /// </summary>
-    public abstract class ApplicationException : Exception
+    /// <param name="message">The error message.</param>
+    /// <param name="errorCode">The error code.</param>
+    /// <param name="severity">The severity level.</param>
+    /// <param name="source">The error source.</param>
+    /// <param name="innerException">The inner exception.</param>
+    /// <param name="deviceId">The associated device ID, if applicable.</param>
+    /// <param name="context">Additional context information.</param>
+    /// <param name="category">The error category.</param>
+    public abstract class ApplicationException(string message, string errorCode, ErrorSeverity severity, ErrorSource source, 
+        Exception? innerException = null, Guid? deviceId = null, IDictionary<string, object>? context = null, ErrorCategory? category = null) 
+        : Exception(message, innerException)
     {
         /// <summary>
         /// Gets the error code associated with this exception.
         /// </summary>
-        public string ErrorCode { get; }
+        public string ErrorCode { get; } = errorCode ?? throw new ArgumentNullException(nameof(errorCode));
 
         /// <summary>
         /// Gets the severity level of the exception.
         /// </summary>
-        public ErrorSeverity Severity { get; }
+        public ErrorSeverity Severity { get; } = severity;
 
         /// <summary>
         /// Gets the source of the exception.
         /// </summary>
-        public ErrorSource Source { get; }
+        public new ErrorSource Source { get; } = source;
 
         /// <summary>
         /// Gets the context data for the exception.
         /// </summary>
-        public IDictionary<string, object> Context { get; }
+        public IDictionary<string, object> Context { get; } = context is null ? [] :  new Dictionary<string, object>(context);
 
         /// <summary>
         /// Gets the device ID associated with this exception, if applicable.
         /// </summary>
-        public Guid? DeviceId { get; }
+        public Guid? DeviceId { get; } = deviceId;
 
         /// <summary>
         /// Gets the error category.
         /// </summary>
-        public ErrorCategory Category { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ApplicationException"/> class.
-        /// </summary>
-        /// <param name="message">The error message.</param>
-        /// <param name="errorCode">The error code.</param>
-        /// <param name="severity">The severity level.</param>
-        /// <param name="source">The error source.</param>
-        /// <param name="innerException">The inner exception.</param>
-        /// <param name="deviceId">The associated device ID, if applicable.</param>
-        /// <param name="context">Additional context information.</param>
-        /// <param name="category">The error category.</param>
-        protected ApplicationException(
-            string message,
-            string errorCode,
-            ErrorSeverity severity,
-            ErrorSource source,
-            Exception? innerException = null,
-            Guid? deviceId = null,
-            IDictionary<string, object>? context = null,
-            ErrorCategory? category = null)
-            : base(message, innerException)
-        {
-            ErrorCode = errorCode ?? throw new ArgumentNullException(nameof(errorCode));
-            Severity = severity;
-            Source = source;
-            DeviceId = deviceId;
-            Context = new Dictionary<string, object>(context ?? new Dictionary<string, object>());
-            Category = category ?? DeriveCategory(errorCode);
-        }
+        public ErrorCategory Category { get; } = category ?? DeriveCategory(errorCode);
 
         /// <summary>
         /// Converts the exception to an ApplicationError for monitoring and reporting.

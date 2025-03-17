@@ -9,7 +9,7 @@
         /// Optional list of specific target component IDs
         /// If empty, the event is routed based on topology
         /// </summary>
-        Guid[] TargetIds { get; }
+        List<Guid> TargetIds { get; }
 
         /// <summary>
         /// Whether this event should be persisted

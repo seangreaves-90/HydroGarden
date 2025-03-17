@@ -1,10 +1,9 @@
-﻿using HydroGarden.ErrorHandling.Core.Models;
-using HydroGarden.Logger.Abstractions;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.ErrorHandling.Core;
+using HydroGarden.Foundation.ErrorHandling.Models;
+using HydroGarden.Logger.Abstractions;
 
-namespace HydroGarden.ErrorHandling.Core.Repositories
+namespace HydroGarden.Foundation.ErrorHandling.Repositories
 {
     /// <summary>
     /// An in-memory implementation of the error repository for testing and development.
@@ -27,8 +26,8 @@ namespace HydroGarden.ErrorHandling.Core.Repositories
         /// <inheritdoc/>
         public Task<Guid> SaveErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            if (error == null)
-                throw new ArgumentNullException(nameof(error));
+
+            ArgumentNullException.ThrowIfNull(error);
 
             // Create a record from the error
             var record = ErrorRecord.FromApplicationError(error);

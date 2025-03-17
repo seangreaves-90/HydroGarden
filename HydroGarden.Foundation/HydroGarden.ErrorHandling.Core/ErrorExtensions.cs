@@ -1,7 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.ErrorHandling.Core.Models;
+using HydroGarden.Foundation.ErrorHandling.Models;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Extension methods for working with application errors.

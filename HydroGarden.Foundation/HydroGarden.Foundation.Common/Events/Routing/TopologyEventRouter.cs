@@ -12,25 +12,19 @@ namespace HydroGarden.Foundation.Common.Events.Routing
     /// This router uses the topology service to determine if components are connected,
     /// allowing for more advanced routing decisions.
     /// </remarks>
-    public class TopologyEventRouter : BaseEventRouter
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="TopologyEventRouter"/> class.
+    /// </remarks>
+    /// <param name="logger">The logger to use.</param>
+    /// <param name="topologyService">The topology service to use for routing decisions.</param>
+    /// <param name="fallbackRouter">The fallback router to use when topology routing is not applicable.</param>
+    public class TopologyEventRouter(
+        ILogger logger,
+        ITopologyService topologyService,
+        IEventRouter fallbackRouter) : BaseEventRouter(logger)
     {
-        private readonly ITopologyService _topologyService;
-        private readonly IEventRouter _fallbackRouter;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TopologyEventRouter"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        /// <param name="topologyService">The topology service to use for routing decisions.</param>
-        /// <param name="fallbackRouter">The fallback router to use when topology routing is not applicable.</param>
-        public TopologyEventRouter(
-            ILogger logger,
-            ITopologyService topologyService,
-            IEventRouter fallbackRouter) : base(logger)
-        {
-            _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
-            _fallbackRouter = fallbackRouter ?? throw new ArgumentNullException(nameof(fallbackRouter));
-        }
+        private readonly ITopologyService _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
+        private readonly IEventRouter _fallbackRouter = fallbackRouter ?? throw new ArgumentNullException(nameof(fallbackRouter));
 
         /// <inheritdoc/>
         protected override async Task<bool> MatchesSubscriptionCoreAsync(
@@ -39,7 +33,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             CancellationToken ct = default)
         {
             // Check if the event has explicit target IDs
-            if (@event.RoutingData?.TargetIds.Length > 0)
+            if (@event.RoutingData?.TargetIds.Count > 0)
             {
                 // Use fallback router for targeted events - direct matching logic
                 return await _fallbackRouter.MatchesSubscriptionAsync(@event, subscription, ct);

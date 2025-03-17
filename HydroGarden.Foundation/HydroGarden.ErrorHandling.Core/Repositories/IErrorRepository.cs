@@ -1,7 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
-
-namespace HydroGarden.ErrorHandling.Core.Repositories
+namespace HydroGarden.Foundation.ErrorHandling.Repositories
 {
     /// <summary>
     /// Repository interface for error persistence operations.

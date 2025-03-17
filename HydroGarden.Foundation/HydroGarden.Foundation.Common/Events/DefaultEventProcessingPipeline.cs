@@ -7,26 +7,20 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Default implementation of the event processing pipeline.
     /// </summary>
-    public class DefaultEventProcessingPipeline : IEventProcessingPipeline, IDisposable
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="DefaultEventProcessingPipeline"/> class.
+    /// </remarks>
+    /// <param name="logger">The logger to use.</param>
+    public class DefaultEventProcessingPipeline(ILogger logger) : IEventProcessingPipeline, IDisposable
     {
-        private readonly ILogger _logger;
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly ConcurrentDictionary<Guid, MiddlewareRegistration> _middleware = new();
         private bool _isDisposed;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultEventProcessingPipeline"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        public DefaultEventProcessingPipeline(ILogger logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
 
         /// <inheritdoc/>
         public void AddMiddleware(IEventMiddleware middleware)
         {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
+            ArgumentNullException.ThrowIfNull(middleware);
 
             var registration = new MiddlewareRegistration(middleware, null);
             _middleware[middleware.Id] = registration;
@@ -35,8 +29,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <inheritdoc/>
         public void AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes)
         {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
+            ArgumentNullException.ThrowIfNull(middleware);
 
             var registration = new MiddlewareRegistration(middleware, eventTypes);
             _middleware[middleware.Id] = registration;
@@ -51,8 +44,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <inheritdoc/>
         public async Task<IEventProcessingResult> ProcessEventAsync(object? sender, IEvent @event, CancellationToken cancellationToken = default)
         {
-            if (@event == null)
-                throw new ArgumentNullException(nameof(@event));
+            ArgumentNullException.ThrowIfNull(@event);
 
             try
             {
@@ -131,66 +123,37 @@ namespace HydroGarden.Foundation.Common.Events
         /// <summary>
         /// Represents a middleware registration.
         /// </summary>
-        private class MiddlewareRegistration
+        private class MiddlewareRegistration(IEventMiddleware middleware, EventType[]? eventTypes)
         {
-            /// <summary>
-            /// Initializes a new instance of the <see cref="MiddlewareRegistration"/> class.
-            /// </summary>
-            /// <param name="middleware">The middleware instance.</param>
-            /// <param name="eventTypes">The event types this middleware handles.</param>
-            public MiddlewareRegistration(IEventMiddleware middleware, EventType[]? eventTypes)
-            {
-                Middleware = middleware;
-                EventTypes = eventTypes;
-            }
+        /// <summary>
+        /// Gets the middleware instance.
+        /// </summary>
+        public IEventMiddleware Middleware { get; } = middleware;
 
-            /// <summary>
-            /// Gets the middleware instance.
-            /// </summary>
-            public IEventMiddleware Middleware { get; }
-
-            /// <summary>
-            /// Gets the event types this middleware handles.
-            /// </summary>
-            public EventType[]? EventTypes { get; }
+        /// <summary>
+        /// Gets the event types this middleware handles.
+        /// </summary>
+        public EventType[]? EventTypes { get; } = eventTypes;
         }
     }
 
     /// <summary>
     /// Represents the result of event processing.
     /// </summary>
-    public class EventProcessingResult : IEventProcessingResult
+    public class EventProcessingResult(IEvent originalEvent, IEvent processedEvent, bool isSuccess, Exception? exception) : IEventProcessingResult
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EventProcessingResult"/> class.
-        /// </summary>
-        /// <param name="originalEvent">The original event.</param>
-        /// <param name="processedEvent">The processed event.</param>
-        /// <param name="isSuccess">Whether processing was successful.</param>
-        /// <param name="exception">Any exception that occurred.</param>
-        public EventProcessingResult(
-            IEvent originalEvent,
-            IEvent processedEvent,
-            bool isSuccess,
-            Exception? exception)
-        {
-            Event = originalEvent;
-            ProcessedEvent = processedEvent;
-            IsSuccess = isSuccess;
-            Exception = exception;
-        }
 
         /// <inheritdoc/>
-        public IEvent Event { get; }
+        public IEvent Event { get; } = originalEvent;
 
         /// <inheritdoc/>
-        public IEvent ProcessedEvent { get; }
+        public IEvent ProcessedEvent { get; } = processedEvent;
 
         /// <inheritdoc/>
-        public bool IsSuccess { get; }
+        public bool IsSuccess { get; } = isSuccess;
 
         /// <inheritdoc/>
-        public Exception? Exception { get; }
+        public Exception? Exception { get; } = exception;
 
         /// <inheritdoc/>
         [Obsolete("Retry functionality is deprecated and will be removed in a future version.")]

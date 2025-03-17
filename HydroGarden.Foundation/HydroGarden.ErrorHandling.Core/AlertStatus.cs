@@ -1,8 +1,6 @@
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using System;
-using System.Collections.Generic;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Represents the alert status based on monitored errors.
@@ -17,7 +15,7 @@ namespace HydroGarden.ErrorHandling.Core
         /// <summary>
         /// Gets or sets the list of active alerts.
         /// </summary>
-        public IReadOnlyCollection<ErrorAlert> Alerts { get; set; } = Array.Empty<ErrorAlert>();
+        public IReadOnlyCollection<ErrorAlert> Alerts { get; set; } = [];
     }
 
     /// <summary>

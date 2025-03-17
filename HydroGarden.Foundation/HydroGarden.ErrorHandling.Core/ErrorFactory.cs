@@ -1,5 +1,4 @@
-﻿using HydroGarden.ErrorHandling.Core;
-using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
 namespace HydroGarden.Foundation.ErrorHandling
 {
@@ -56,7 +55,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             IDictionary<string, object>? context = null)
         {
             var contextDict = new Dictionary<string, object>();
-            
+
             if (context != null)
             {
                 foreach (var kvp in context)
@@ -64,9 +63,9 @@ namespace HydroGarden.Foundation.ErrorHandling
                     contextDict[kvp.Key] = kvp.Value;
                 }
             }
-            
+
             contextDict["ServiceName"] = serviceName;
-            
+
             return new ComponentError(
                 Guid.Empty, // No device ID for service errors
                 errorCode,
@@ -175,8 +174,8 @@ namespace HydroGarden.Foundation.ErrorHandling
             string? errorCode = null,
             IDictionary<string, object>? context = null)
         {
-            if (exception == null)
-                throw new ArgumentNullException(nameof(exception));
+
+            ArgumentNullException.ThrowIfNull(exception);
 
             // Build context with exception details
             var contextBuilder = ErrorContextBuilder.Create()
@@ -225,28 +224,28 @@ namespace HydroGarden.Foundation.ErrorHandling
         public static string DeriveErrorCodeFromException(Exception exception)
         {
             var exceptionType = exception.GetType().Name;
-            
+
             if (exceptionType.Contains("Timeout"))
                 return "SERVICE_OP_TIMEOUT";
-            
+
             if (exceptionType.Contains("ArgumentNull") || exceptionType.Contains("ArgumentOutOfRange"))
                 return "SERVICE_INVALID_ARGUMENT";
-                
+
             if (exceptionType.Contains("IO") || exceptionType.Contains("File"))
                 return "STORAGE_IO_ERROR";
-                
+
             if (exceptionType.Contains("Format") || exceptionType.Contains("Parse"))
                 return "SERVICE_DATA_FORMAT_ERROR";
-                
+
             if (exceptionType.Contains("NotSupported") || exceptionType.Contains("NotImplemented"))
                 return "SERVICE_NOT_SUPPORTED";
-                
+
             if (exceptionType.Contains("Security") || exceptionType.Contains("Unauthorized"))
                 return "SECURITY_ERROR";
-                
+
             if (exceptionType.Contains("ObjectDisposed"))
                 return "SERVICE_DISPOSED_ERROR";
-                
+
             // Default fallback
             return "SERVICE_UNHANDLED_EXCEPTION";
         }
@@ -257,16 +256,16 @@ namespace HydroGarden.Foundation.ErrorHandling
         private static ErrorSource DeriveSourceFromException(Exception exception)
         {
             var exceptionType = exception.GetType().Name;
-            
-            if (exceptionType.Contains("IO") || exceptionType.Contains("File") || 
+
+            if (exceptionType.Contains("IO") || exceptionType.Contains("File") ||
                 exceptionType.Contains("Sql") || exceptionType.Contains("Entity") ||
                 exceptionType.Contains("Data"))
                 return ErrorSource.Database;
-                
+
             if (exceptionType.Contains("Http") || exceptionType.Contains("Socket") ||
                 exceptionType.Contains("Tcp") || exceptionType.Contains("Network"))
                 return ErrorSource.Communication;
-                
+
             // Default fallback
             return ErrorSource.Service;
         }
@@ -277,19 +276,19 @@ namespace HydroGarden.Foundation.ErrorHandling
         private static ErrorCategory DeriveCategoryFromException(Exception exception)
         {
             var exceptionType = exception.GetType().Name;
-            
-            if (exceptionType.Contains("IO") || exceptionType.Contains("File") || 
+
+            if (exceptionType.Contains("IO") || exceptionType.Contains("File") ||
                 exceptionType.Contains("Sql") || exceptionType.Contains("Entity") ||
                 exceptionType.Contains("Data"))
                 return ErrorCategory.Storage;
-                
+
             if (exceptionType.Contains("Http") || exceptionType.Contains("Socket") ||
                 exceptionType.Contains("Tcp") || exceptionType.Contains("Network"))
                 return ErrorCategory.Communication;
-                
+
             if (exceptionType.Contains("Event"))
                 return ErrorCategory.EventSystem;
-                
+
             // Default fallback
             return ErrorCategory.Service;
         }
@@ -324,7 +323,7 @@ namespace HydroGarden.Foundation.ErrorHandling
                 ErrorSource.System => ErrorCategory.System,
                 _ => ErrorCategory.Unknown
             };
-            
+
             return new ComponentError(
                 deviceId,
                 errorCode,
@@ -335,28 +334,28 @@ namespace HydroGarden.Foundation.ErrorHandling
                 exception,
                 category);
         }
-        
+
         /// <summary>
         /// Attempts to derive an appropriate error severity from an exception type.
         /// </summary>
         private static ErrorSeverity DeriveSeverityFromException(Exception exception)
         {
             var exceptionType = exception.GetType().Name;
-            
+
             // Critical errors that likely affect system stability
-            if (exceptionType.Contains("OutOfMemory") || 
+            if (exceptionType.Contains("OutOfMemory") ||
                 exceptionType.Contains("ThreadAbort") ||
                 exceptionType.Contains("StackOverflow") ||
                 exceptionType.Contains("ExecutionEngine"))
                 return ErrorSeverity.Catastrophic;
-                
+
             // Serious errors that need attention but might not crash the system
-            if (exceptionType.Contains("Security") || 
+            if (exceptionType.Contains("Security") ||
                 exceptionType.Contains("Unauthorized") ||
                 exceptionType.Contains("InvalidOperation") ||
                 exceptionType.Contains("NotSupported"))
                 return ErrorSeverity.Critical;
-                
+
             // Default for most exceptions
             return ErrorSeverity.Error;
         }

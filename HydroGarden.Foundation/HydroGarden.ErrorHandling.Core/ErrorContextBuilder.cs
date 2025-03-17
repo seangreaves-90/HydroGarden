@@ -9,7 +9,7 @@ namespace HydroGarden.Foundation.ErrorHandling
     /// </summary>
     public class ErrorContextBuilder
     {
-        private readonly Dictionary<string, object> _context = new();
+        private readonly Dictionary<string, object> _context = [];
 
         /// <summary>
         /// Creates a new error context builder.

@@ -8,10 +8,10 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
     public class EventSubscriptionOptions : IEventSubscriptionOptions
     {
         /// <inheritdoc/>
-        public EventType[] EventTypes { get; set; } = Array.Empty<EventType>();
+        public EventType[] EventTypes { get; set; } = [];
 
         /// <inheritdoc/>
-        public Guid[] SourceIds { get; set; } = Array.Empty<Guid>();
+        public Guid[] SourceIds { get; set; } = [];
 
         /// <inheritdoc/>
         public Func<IEvent, bool>? Filter { get; set; }
@@ -31,14 +31,14 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         {
             var options = new EventSubscriptionOptions
             {
-                EventTypes = new[] { EventType.Error },
+                EventTypes = [EventType.Error],
                 IncludeConnectedSources = true,
                 Synchronous = false
             };
 
             if (deviceId.HasValue)
             {
-                options.SourceIds = new[] { deviceId.Value };
+                options.SourceIds = [deviceId.Value];
             }
 
             return options;
@@ -56,14 +56,14 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         {
             var options = new EventSubscriptionOptions
             {
-                EventTypes = new[] { EventType.Error },
+                EventTypes = [EventType.Error],
                 IncludeConnectedSources = true,
                 Synchronous = false
             };
 
             if (deviceId.HasValue)
             {
-                options.SourceIds = new[] { deviceId.Value };
+                options.SourceIds = [deviceId.Value];
             }
 
             options.Filter = evt =>

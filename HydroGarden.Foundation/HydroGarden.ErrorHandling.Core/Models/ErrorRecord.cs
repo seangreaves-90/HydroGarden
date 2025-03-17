@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
+﻿using System.Text.Json;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
-namespace HydroGarden.ErrorHandling.Core.Models
+namespace HydroGarden.Foundation.ErrorHandling.Models
 {
     /// <summary>
     /// Represents a persisted error record in the system.

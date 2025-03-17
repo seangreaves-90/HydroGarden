@@ -82,6 +82,7 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
             {
                 return _untypedHandler.DisposeAsync();
             }
+            GC.SuppressFinalize(this);
             return ValueTask.CompletedTask;
         }
     }

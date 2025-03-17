@@ -15,8 +15,8 @@ namespace HydroGarden.Foundation.Common.Events
         /// </summary>
         public PublishResult()
         {
-            _errors = new List<Exception>();
-            HandlerTasks = new List<Task>();
+            _errors = [];
+            HandlerTasks = [];
         }
 
         /// <summary>

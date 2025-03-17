@@ -31,6 +31,7 @@ namespace HydroGarden.Foundation.Common.Events
             {
                 return disposable.DisposeAsync();
             }
+            GC.SuppressFinalize(this);
             return ValueTask.CompletedTask;
         }
     }

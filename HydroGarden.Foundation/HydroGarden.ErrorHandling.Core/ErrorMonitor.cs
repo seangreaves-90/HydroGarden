@@ -1,13 +1,10 @@
-﻿
+﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorEventTransformation;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.ErrorHandling.Core; // Added for ComponentError and ErrorExtensions
-using HydroGarden.ErrorHandling.Core.Repositories;
+using HydroGarden.Foundation.ErrorHandling.Repositories;
 using HydroGarden.Logger.Abstractions;
-using System.Collections.Concurrent;
-using HydroGarden.Foundation.ErrorHandling;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Provides error monitoring and tracking functionality.
@@ -35,7 +32,7 @@ namespace HydroGarden.ErrorHandling.Core
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _transformationService = transformationService ?? throw new ArgumentNullException(nameof(transformationService));
             _errorRepository = errorRepository;
-            
+
             if (_errorRepository != null)
             {
                 _logger.Log("ErrorMonitor initialized with repository for error persistence");
@@ -45,25 +42,27 @@ namespace HydroGarden.ErrorHandling.Core
         /// <inheritdoc/>
         public async Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default)
         {
-            if (error == null)
-                throw new ArgumentNullException(nameof(error));
+
+            ArgumentNullException.ThrowIfNull(error);
 
             // Store the error in active errors
-            string errorKey = $"{error.DeviceId}:{error.ErrorCode}";
+            var errorKey = $"{error.DeviceId}:{error.ErrorCode}";
             _activeErrors[errorKey] = error;
-            
+
             // Track error rates
             _errorRates.AddOrUpdate(
-                error.ErrorCode,
-                _ => new ErrorRateInfo {
-                    ErrorCode = error.ErrorCode,
+                error.ErrorCode ?? string.Empty,
+                _ => new ErrorRateInfo
+                {
+                    ErrorCode = error.ErrorCode ?? string.Empty,
                     Count = 1,
                     FirstOccurrence = error.Timestamp,
                     LastOccurrence = error.Timestamp,
                     MaxSeverity = error.Severity,
-                    DeviceIds = new HashSet<Guid> { error.DeviceId }
+                    DeviceIds = [error.DeviceId]
                 },
-                (_, existing) => {
+                (_, existing) =>
+                {
                     existing.Count++;
                     existing.LastOccurrence = error.Timestamp;
                     existing.DeviceIds.Add(error.DeviceId);
@@ -71,21 +70,22 @@ namespace HydroGarden.ErrorHandling.Core
                         existing.MaxSeverity = error.Severity;
                     return existing;
                 });
-                
+
             // Track correlated errors
             if (error.CorrelationId != Guid.Empty)
             {
                 _correlatedErrors.AddOrUpdate(
                     error.CorrelationId,
-                    _ => new List<IApplicationError> { error },
-                    (_, existing) => {
+                    _ => [error],
+                    (_, existing) =>
+                    {
                         existing.Add(error);
                         return existing;
                     });
             }
 
             _logger.Log($"Error reported: {error}");
-            
+
             // Persist the error if we have a repository
             if (_errorRepository != null)
             {
@@ -122,21 +122,21 @@ namespace HydroGarden.ErrorHandling.Core
             IDictionary<string, object>? context = null,
             CancellationToken ct = default)
         {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source));
-            if (exception == null)
-                throw new ArgumentNullException(nameof(exception));
+
+            ArgumentNullException.ThrowIfNull(source);
+
+            ArgumentNullException.ThrowIfNull(exception);
 
             // Determine device ID from source or context
             Guid deviceId = Guid.Empty;
-            
+
             // Try to get device ID from context
-            if (context != null && context.TryGetValue("DeviceId", out var deviceIdObj) && 
+            if (context != null && context.TryGetValue("DeviceId", out var deviceIdObj) &&
                 deviceIdObj is string deviceIdStr && Guid.TryParse(deviceIdStr, out var parsedId))
             {
                 deviceId = parsedId;
             }
-            
+
             // Create error from exception
             var error = new ComponentError(
                 deviceId,
@@ -153,7 +153,7 @@ namespace HydroGarden.ErrorHandling.Core
 
         /// <inheritdoc/>
         public async Task<IReadOnlyCollection<IApplicationError>> GetRecentErrorsAsync(
-            int limit = 10, 
+            int limit = 10,
             CancellationToken ct = default)
         {
             // If we have a repository, use it to get recent errors
@@ -163,16 +163,14 @@ namespace HydroGarden.ErrorHandling.Core
                 {
                     // Get unresolved errors from repository with higher precedence
                     var unresolvedErrors = await _errorRepository.GetUnresolvedErrorsAsync(ct);
-                    return unresolvedErrors.OrderByDescending(e => e.Timestamp)
-                        .Take(limit)
-                        .ToList();
+                    return [.. unresolvedErrors.OrderByDescending(e => e.Timestamp).Take(limit)];
                 }
                 catch (Exception ex)
                 {
                     _logger.Log(ex, "Failed to get recent errors from repository");
                 }
             }
-            
+
             // Fall back to in-memory errors
             var recentErrors = _activeErrors.Values
                 .OrderByDescending(e => e.Timestamp)
@@ -184,7 +182,7 @@ namespace HydroGarden.ErrorHandling.Core
 
         /// <inheritdoc/>
         public async Task<bool> HasActiveErrorsAsync(
-            ErrorSeverity minSeverity = ErrorSeverity.Warning, 
+            ErrorSeverity minSeverity = ErrorSeverity.Warning,
             CancellationToken ct = default)
         {
             // If we have a repository, check it for active errors
@@ -200,7 +198,7 @@ namespace HydroGarden.ErrorHandling.Core
                     _logger.Log(ex, "Failed to check for active errors in repository");
                 }
             }
-            
+
             // Fall back to in-memory errors
             bool hasErrors = _activeErrors.Values
                 .Any(e => e.Severity >= minSeverity);
@@ -210,7 +208,7 @@ namespace HydroGarden.ErrorHandling.Core
 
         /// <inheritdoc/>
         public async Task<IReadOnlyCollection<IApplicationError>> GetActiveErrorsForDeviceAsync(
-            Guid deviceId, 
+            Guid deviceId,
             CancellationToken ct = default)
         {
             // If we have a repository, use it to get device errors
@@ -225,7 +223,7 @@ namespace HydroGarden.ErrorHandling.Core
                     _logger.Log(ex, $"Failed to get active errors for device {deviceId} from repository");
                 }
             }
-            
+
             // Fall back to in-memory errors
             var deviceErrors = _activeErrors.Values
                 .Where(e => e.DeviceId == deviceId)
@@ -243,7 +241,7 @@ namespace HydroGarden.ErrorHandling.Core
         {
             return new Dictionary<string, ErrorRateInfo>(_errorRates);
         }
-        
+
         /// <summary>
         /// Gets the alert status based on error rates.
         /// </summary>
@@ -251,7 +249,7 @@ namespace HydroGarden.ErrorHandling.Core
         public AlertStatus GetAlertStatus()
         {
             var alerts = new List<ErrorAlert>();
-            
+
             // For now, just create alerts for critical errors
             foreach (var rate in _errorRates.Values)
             {
@@ -267,14 +265,14 @@ namespace HydroGarden.ErrorHandling.Core
                     });
                 }
             }
-            
+
             return new AlertStatus
             {
                 HasActiveAlerts = alerts.Count > 0,
                 Alerts = alerts
             };
         }
-        
+
         /// <summary>
         /// Gets all errors with the specified correlation ID.
         /// </summary>
@@ -286,22 +284,22 @@ namespace HydroGarden.ErrorHandling.Core
             {
                 return errors.AsReadOnly();
             }
-            
-            return Array.Empty<IApplicationError>();
+
+            return [];
         }
-        
+
         public async Task ClearErrorAsync(
-            Guid deviceId, 
-            string errorCode, 
+            Guid deviceId,
+            string errorCode,
             CancellationToken ct = default)
         {
             string errorKey = $"{deviceId}:{errorCode}";
-            
+
             // Remove from in-memory cache
             if (_activeErrors.TryRemove(errorKey, out var error))
             {
                 _logger.Log($"Cleared error {errorCode} for device {deviceId} from memory");
-                
+
                 // Mark as resolved in repository if available
                 if (_errorRepository != null && error != null)
                 {

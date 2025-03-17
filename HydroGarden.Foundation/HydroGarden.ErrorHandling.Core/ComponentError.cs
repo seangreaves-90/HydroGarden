@@ -1,6 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 
-namespace HydroGarden.ErrorHandling.Core
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
     /// Error representation for IoT components with improved classification and context capture.
@@ -66,7 +66,7 @@ namespace HydroGarden.ErrorHandling.Core
             // Initialize context from provided context or create an empty one
             Context = context != null 
                 ? new Dictionary<string, object>(context) 
-                : new Dictionary<string, object>();
+                : [];
                 
             // Only enrich the context if we're given an exception or the context isn't empty
             if (exception != null || context != null)

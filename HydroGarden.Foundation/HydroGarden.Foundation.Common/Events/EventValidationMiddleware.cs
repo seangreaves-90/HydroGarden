@@ -6,22 +6,12 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Middleware that validates events.
     /// </summary>
-    public class EventValidationMiddleware : IEventMiddleware
+    public class EventValidationMiddleware(ILogger logger) : IEventMiddleware
     {
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="EventValidationMiddleware"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        public EventValidationMiddleware(ILogger logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            Id = Guid.NewGuid();
-        }
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <inheritdoc/>
-        public Guid Id { get; }
+        public Guid Id { get; } = Guid.NewGuid();
 
         /// <inheritdoc/>
         public int Priority => 3000; // Higher priority than state change middleware
@@ -31,10 +21,7 @@ namespace HydroGarden.Foundation.Common.Events
         {
             try
             {
-                if (evt == null)
-                {
-                    throw new ArgumentNullException(nameof(evt));
-                }
+                ArgumentNullException.ThrowIfNull(evt);
 
                 // Create a list of validation issues
                 var validationIssues = new List<string>();
@@ -46,7 +33,7 @@ namespace HydroGarden.Foundation.Common.Events
                 }
 
                 // Don't enforce source ID validation for state change events in tests
-                if (evt.SourceId == Guid.Empty && evt.EventType != EventType.StateChange && !(evt is IStateChangeEvent))
+                if (evt.SourceId == Guid.Empty && evt.EventType != EventType.StateChange && evt is not IStateChangeEvent)
                 {
                     validationIssues.Add("Source ID cannot be empty");
                 }
@@ -84,7 +71,7 @@ namespace HydroGarden.Foundation.Common.Events
                 // Return a result that indicates validation failure and stops processing
                 return Task.FromResult<IMiddlewareProcessingResult>(
                     new MiddlewareProcessingResult(
-                        evt,
+                        evt ?? throw new ArgumentNullException(nameof(evt)),
                         false,
                         true,
                         ex));

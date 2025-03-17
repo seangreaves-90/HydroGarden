@@ -3,7 +3,7 @@ using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Common.Events.Routing
 {
-    /// <summary>
+  /// <summary>
     /// A simple event router that matches events based on direct criteria without topology information.
     /// </summary>
     /// <remarks>
@@ -24,7 +24,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
             CancellationToken ct = default)
         {
             // Check if the event has explicit target IDs
-            if (@event.RoutingData?.TargetIds.Length > 0)
+            if (@event.RoutingData?.TargetIds.Count > 0)
             {
                 // Check if any subscription source ID matches a target
                 if (subscription.Options.SourceIds.Length > 0)

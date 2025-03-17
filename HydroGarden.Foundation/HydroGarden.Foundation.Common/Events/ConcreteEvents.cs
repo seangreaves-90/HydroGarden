@@ -11,25 +11,31 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Base class for all HydroGarden events
     /// </summary>
-    public abstract class HydroGardenEventBase : IEvent
+    /// <remarks>
+    /// Creates a new event base with separate device and source IDs
+    /// </remarks>
+    /// <param name="deviceId">The device ID</param>
+    /// <param name="sourceId">The source ID</param>
+    /// <param name="routingData">Optional routing data</param>
+    public abstract class HydroGardenEventBase(Guid deviceId, Guid sourceId, IEventRoutingData? routingData = null) : IEvent
     {
         /// <inheritdoc />
-        public Guid EventId { get; }
+        public Guid EventId { get; } = Guid.NewGuid();
 
         /// <inheritdoc />
-        public Guid SourceId { get; }
+        public Guid SourceId { get; } = sourceId;
 
         /// <inheritdoc />
-        public DateTimeOffset Timestamp { get; }
+        public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
 
         /// <inheritdoc />
-        public Guid DeviceId { get; }
+        public Guid DeviceId { get; } = deviceId;
 
         /// <inheritdoc />
         public abstract EventType EventType { get; }
 
         // Private backing field for RoutingData
-        private readonly IEventRoutingData? _routingData;
+        private readonly IEventRoutingData? _routingData = routingData;
 
         /// <inheritdoc />
         // Explicit implementation to ensure we never return null from the interface
@@ -51,21 +57,6 @@ namespace HydroGarden.Foundation.Common.Events
         protected HydroGardenEventBase(Guid deviceId, IEventRoutingData? routingData = null)
             : this(deviceId, deviceId, routingData) // Default sourceId to deviceId
         {
-        }
-
-        /// <summary>
-        /// Creates a new event base with separate device and source IDs
-        /// </summary>
-        /// <param name="deviceId">The device ID</param>
-        /// <param name="sourceId">The source ID</param>
-        /// <param name="routingData">Optional routing data</param>
-        protected HydroGardenEventBase(Guid deviceId, Guid sourceId, IEventRoutingData? routingData = null)
-        {
-            EventId = Guid.NewGuid();
-            Timestamp = DateTimeOffset.UtcNow;
-            DeviceId = deviceId;
-            SourceId = sourceId;
-            _routingData = routingData;
         }
     }
 
@@ -159,7 +150,7 @@ namespace HydroGarden.Foundation.Common.Events
 
         public HydroGardenLifecycleChangedEvent()
         {
-            _stateChanges = new List<ComponentState>();
+            _stateChanges = [];
             _completionSource = new TaskCompletionSource<bool>();
         }
 
@@ -203,6 +194,7 @@ namespace HydroGarden.Foundation.Common.Events
 
         public ValueTask DisposeAsync()
         {
+            GC.SuppressFinalize(this);
             return ValueTask.CompletedTask;
         }
     }
@@ -210,109 +202,86 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Event for device commands
     /// </summary>
-    public class CommandEvent : HydroGardenEventBase, ICommandEvent
+    /// <remarks>
+    /// Creates a new command event
+    /// </remarks>
+    /// <param name="deviceId">The source device ID</param>
+    /// <param name="commandName">The name of the command to execute</param>
+    /// <param name="parameters">Optional command parameters</param>
+    /// <param name="routingData">Optional routing data</param>
+    public class CommandEvent(
+        Guid deviceId,
+        string commandName,
+        IDictionary<string, object?>? parameters = null,
+        IEventRoutingData? routingData = null) : HydroGardenEventBase(deviceId, routingData), ICommandEvent
     {
         /// <inheritdoc />
-        public string CommandName { get; }
+        public string CommandName { get; } = commandName ?? throw new ArgumentNullException(nameof(commandName));
 
         /// <inheritdoc />
-        public IDictionary<string, object?>? Parameters { get; }
+        public IDictionary<string, object?>? Parameters { get; } = parameters;
 
         /// <inheritdoc />
         public override EventType EventType => EventType.Command;
-
-        /// <summary>
-        /// Creates a new command event
-        /// </summary>
-        /// <param name="deviceId">The source device ID</param>
-        /// <param name="commandName">The name of the command to execute</param>
-        /// <param name="parameters">Optional command parameters</param>
-        /// <param name="routingData">Optional routing data</param>
-        public CommandEvent(
-            Guid deviceId,
-            string commandName,
-            IDictionary<string, object?>? parameters = null,
-            IEventRoutingData? routingData = null)
-            : base(deviceId, routingData)
-        {
-            CommandName = commandName ?? throw new ArgumentNullException(nameof(commandName));
-            Parameters = parameters;
-        }
     }
 
     /// <summary>
     /// Event for device telemetry/sensor readings
     /// </summary>
-    public class TelemetryEvent : HydroGardenEventBase, ITelemetryEvent
+    /// <remarks>
+    /// Creates a new telemetry event
+    /// </remarks>
+    /// <param name="deviceId">The source device ID</param>
+    /// <param name="readings">The telemetry readings</param>
+    /// <param name="units">Optional units of measurement</param>
+    /// <param name="routingData">Optional routing data</param>
+    public class TelemetryEvent(
+        Guid deviceId,
+        IDictionary<string, object> readings,
+        IDictionary<string, string>? units = null,
+        IEventRoutingData? routingData = null) : HydroGardenEventBase(deviceId, routingData), ITelemetryEvent
     {
         /// <inheritdoc />
-        public IDictionary<string, object> Readings { get; }
+        public IDictionary<string, object> Readings { get; } = readings ?? throw new ArgumentNullException(nameof(readings));
 
         /// <inheritdoc />
-        public IDictionary<string, string>? Units { get; }
+        public IDictionary<string, string>? Units { get; } = units;
 
         /// <inheritdoc />
         public override EventType EventType => EventType.Telemetry;
-
-        /// <summary>
-        /// Creates a new telemetry event
-        /// </summary>
-        /// <param name="deviceId">The source device ID</param>
-        /// <param name="readings">The telemetry readings</param>
-        /// <param name="units">Optional units of measurement</param>
-        /// <param name="routingData">Optional routing data</param>
-        public TelemetryEvent(
-            Guid deviceId,
-            IDictionary<string, object> readings,
-            IDictionary<string, string>? units = null,
-            IEventRoutingData? routingData = null)
-            : base(deviceId, routingData)
-        {
-            Readings = readings ?? throw new ArgumentNullException(nameof(readings));
-            Units = units;
-        }
     }
 
     /// <summary>
     /// Event for alerts/notifications
     /// </summary>
-    public class AlertEvent : HydroGardenEventBase, IAlertEvent
+    /// <remarks>
+    /// Creates a new alert event
+    /// </remarks>
+    /// <param name="deviceId">The source device ID</param>
+    /// <param name="severity">The severity of the alert</param>
+    /// <param name="message">The alert message</param>
+    /// <param name="alertData">Optional additional data</param>
+    /// <param name="routingData">Optional routing data</param>
+    public class AlertEvent(
+        Guid deviceId,
+        AlertSeverity severity,
+        string message,
+        IDictionary<string, object>? alertData = null,
+        IEventRoutingData? routingData = null) : HydroGardenEventBase(deviceId, routingData), IAlertEvent
     {
         /// <inheritdoc />
-        public AlertSeverity Severity { get; }
+        public AlertSeverity Severity { get; } = severity;
 
         /// <inheritdoc />
-        public string Message { get; }
+        public string Message { get; } = message ?? throw new ArgumentNullException(nameof(message));
 
         /// <inheritdoc />
-        public IDictionary<string, object>? AlertData { get; }
+        public IDictionary<string, object>? AlertData { get; } = alertData;
 
         /// <inheritdoc />
-        public bool IsAcknowledged { get; set; }
+        public bool IsAcknowledged { get; set; } = false;
 
         /// <inheritdoc />
         public override EventType EventType => EventType.Alert;
-
-        /// <summary>
-        /// Creates a new alert event
-        /// </summary>
-        /// <param name="deviceId">The source device ID</param>
-        /// <param name="severity">The severity of the alert</param>
-        /// <param name="message">The alert message</param>
-        /// <param name="alertData">Optional additional data</param>
-        /// <param name="routingData">Optional routing data</param>
-        public AlertEvent(
-            Guid deviceId,
-            AlertSeverity severity,
-            string message,
-            IDictionary<string, object>? alertData = null,
-            IEventRoutingData? routingData = null)
-            : base(deviceId, routingData)
-        {
-            Severity = severity;
-            Message = message ?? throw new ArgumentNullException(nameof(message));
-            AlertData = alertData;
-            IsAcknowledged = false;
-        }
     }
 }

@@ -33,7 +33,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         }
 
         /// <inheritdoc/>
-        public Guid[] TargetIds { get; set; }
+        public List<Guid> TargetIds { get; set; }
 
         /// <inheritdoc/>
         public bool Persist { get; set; }

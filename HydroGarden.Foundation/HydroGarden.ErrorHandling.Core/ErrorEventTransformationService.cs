@@ -9,23 +9,12 @@ namespace HydroGarden.Foundation.ErrorHandling
     /// <summary>
     /// Service that handles conversion between errors and events.
     /// </summary>
-    public class ErrorEventTransformationService : IErrorEventTransformationService
+    /// <param name="eventBus">The event bus for publishing events.</param>
+    /// <param name="logger">The logger.</param>
+    public class ErrorEventTransformationService(IEventBus eventBus, ILogger logger) : IErrorEventTransformationService
     {
-        private readonly IEventBus _eventBus;
-        private readonly ILogger _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ErrorEventTransformationService"/> class.
-        /// </summary>
-        /// <param name="eventBus">The event bus for publishing events.</param>
-        /// <param name="logger">The logger.</param>
-        public ErrorEventTransformationService(
-            IEventBus eventBus,
-            ILogger logger)
-        {
-            _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly IEventBus _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <inheritdoc/>
         public IErrorEvent? ExtractErrorEvent(IEvent @event)
@@ -39,20 +28,20 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <inheritdoc/>
         public async Task PublishErrorAsEventAsync(IApplicationError error, CancellationToken cancellationToken = default)
         {
-            if (error == null)
-                throw new ArgumentNullException(nameof(error));
+
+            ArgumentNullException.ThrowIfNull(error);
 
             try
             {
                 // Transform error to event
                 var errorEvent = TransformErrorToEvent(error);
-                
+
                 // Transform to publishable event
                 var publishableEvent = TransformToPublishableEvent(errorEvent);
-                
+
                 // Publish the event
                 await _eventBus.PublishAsync(this, publishableEvent, cancellationToken);
-                
+
                 _logger.Log($"Published error as event: {error.ErrorCode}, DeviceId: {error.DeviceId}, Severity: {error.Severity}");
             }
             catch (Exception ex)
@@ -65,8 +54,8 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <inheritdoc/>
         public IErrorEvent TransformErrorToEvent(IApplicationError error)
         {
-            if (error == null)
-                throw new ArgumentNullException(nameof(error));
+
+            ArgumentNullException.ThrowIfNull(error);
 
             return ErrorEvent.FromApplicationError(error);
         }
@@ -74,8 +63,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <inheritdoc/>
         public IEvent TransformToPublishableEvent(IErrorEvent errorEvent)
         {
-            if (errorEvent == null)
-                throw new ArgumentNullException(nameof(errorEvent));
+            ArgumentNullException.ThrowIfNull(errorEvent);
 
             var routingData = new ErrorEventRoutingData
             {

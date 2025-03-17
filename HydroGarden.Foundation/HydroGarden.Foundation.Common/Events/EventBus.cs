@@ -19,7 +19,6 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly ConcurrentDictionary<EventType, List<EventSubscription>> _subscriptionsByType = new();
         private readonly IEventRouter _router;
         private readonly IEventStore? _eventStore;
-        private readonly IEventTransformer? _transformer;
         private readonly IEventProcessingPipeline _pipeline;
         private readonly object _pipelineLock = new();
         private bool _isDisposed;
@@ -40,41 +39,48 @@ namespace HydroGarden.Foundation.Common.Events
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _router = router ?? throw new ArgumentNullException(nameof(router));
             _eventStore = eventStore;
-            _transformer = transformer;
+            var transformer1 = transformer;
 
             // Initialize the event processing pipeline
             _pipeline = new DefaultEventProcessingPipeline(_logger);
-            
+
             // Add the validation middleware first (highest priority)
             _pipeline.AddMiddleware(new EventValidationMiddleware(_logger));
-            
+
             // Add the state change middleware to ensure proper handling of state change events
             _pipeline.AddMiddleware(new StateChangeMiddleware(_logger));
 
             _logger.Log("EventBus initialized with router: " + _router.GetType().Name);
 
-            if (_transformer != null)
+            if (transformer1 != null)
             {
-                _logger.Log("Event transformer configured: " + _transformer.GetType().Name);
-                
+                _logger.Log("Event transformer configured: " + transformer1.GetType().Name);
+
                 // Register the transformer middleware - make it higher priority than state change middleware
-                var transformerMiddleware = new DefaultTransformerMiddleware(_transformer, _logger);
+                var transformerMiddleware = new DefaultTransformerMiddleware(transformer1, _logger);
                 _pipeline.AddMiddleware(transformerMiddleware);
             }
+        }
+
+        public EventBus(IEventProcessingPipeline pipeline, ILogger logger, IEventRouter router)
+        {
+            _pipeline = pipeline;
+            _logger = logger;
+            _router = router;
         }
 
         /// <inheritdoc/>
         public Guid Subscribe<TEvent>(IEventHandler<IEvent> handler, IEventSubscriptionOptions? options) where TEvent : IEvent
         {
-            if (handler == null)
-                throw new ArgumentNullException(nameof(handler));
+
+            ArgumentNullException.ThrowIfNull(handler);
 
             // Create subscription with the handler
             var subscription = new EventSubscription(
                 Guid.NewGuid(),
                 handler,
                 options ?? new EventSubscriptionOptions());
-                
+
             _logger.Log($"Creating subscription for handler {handler.GetType().Name} with ID {subscription.Id}");
 
             _subscriptions[subscription.Id] = subscription;
@@ -108,13 +114,13 @@ namespace HydroGarden.Foundation.Common.Events
             {
                 _subscriptionsByType.AddOrUpdate(
                     eventType,
-                    new List<EventSubscription> { subscription },
+                    [subscription],
                     (_, list) =>
                     {
                         list.Add(subscription);
                         return list;
                     });
-                    
+
                 _logger.Log($"Handler {handler.GetType().Name} subscribed to event type {eventType} with ID {subscription.Id}");
             }
 
@@ -125,12 +131,12 @@ namespace HydroGarden.Foundation.Common.Events
         /// <inheritdoc/>
         public Guid Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent
         {
-            if (handler == null)
-                throw new ArgumentNullException(nameof(handler));
-            
+
+            ArgumentNullException.ThrowIfNull(handler);
+
             // Create adapter to convert IEventHandler<TEvent> to IEventHandler<IEvent>
             var adapter = new GenericEventHandlerAdapter<TEvent>(handler);
-            
+
             // Build event types based on TEvent
             var eventTypes = new EventSubscriptionOptions();
             // Try to determine event type from TEvent
@@ -146,7 +152,7 @@ namespace HydroGarden.Foundation.Common.Events
                 // If we can't determine event type, subscribe to all types
                 eventTypes.EventTypes = Enum.GetValues<EventType>();
             }
-            
+
             return Subscribe<TEvent>(adapter, eventTypes);
         }
 
@@ -179,10 +185,9 @@ namespace HydroGarden.Foundation.Common.Events
         /// <inheritdoc/>
         public async Task<IPublishResult?> PublishAsync(object? sender, IEvent evt, CancellationToken ct = default)
         {
-            if (sender == null)
-                throw new ArgumentNullException(nameof(sender));
-            if (evt == null)
-                throw new ArgumentNullException(nameof(evt));
+
+            ArgumentNullException.ThrowIfNull(sender);
+            ArgumentNullException.ThrowIfNull(evt);
 
             var stopwatch = Stopwatch.StartNew();
 
@@ -193,7 +198,7 @@ namespace HydroGarden.Foundation.Common.Events
                 // Use the pipeline to process the event (including transformation)
                 IEvent eventToPublish = evt;
                 Exception? pipelineException = null;
-                
+
                 try
                 {
                     var pipelineResult = await _pipeline.ProcessEventAsync(sender, evt, ct);
@@ -227,17 +232,17 @@ namespace HydroGarden.Foundation.Common.Events
                     HandlerCount = 0,
                     SuccessCount = 0
                 };
-                
+
                 // Add any pipeline exception if it occurred
                 if (pipelineException != null)
                 {
                     result.AddError(pipelineException);
-                    
+
                     // If pipeline processing failed with an exception, don't proceed to handlers
                     _logger.Log($"Pipeline failed with exception for event {evt.EventId}, skipping handler processing");
                     return result;
                 }
-                
+
                 // Find matching subscriptions using the router with the potentially transformed event
                 var matchingSubscriptions = await GetMatchingSubscriptionsAsync(eventToPublish, ct);
                 result.HandlerCount = matchingSubscriptions.Count;
@@ -254,13 +259,13 @@ namespace HydroGarden.Foundation.Common.Events
                     stopwatch.Stop();
                     _logger.Log(
                         $"No matching handlers found for event {evt.EventId} (completed in {stopwatch.ElapsedMilliseconds}ms)");
-                    
+
                     // If there were pipeline errors but no handlers to execute, ensure they're reported
                     if (pipelineException != null && !result.HasErrors)
                     {
                         result.AddError(pipelineException);
                     }
-                    
+
                     return result;
                 }
 
@@ -395,46 +400,34 @@ namespace HydroGarden.Foundation.Common.Events
         /// Gets matching subscriptions for an event using the EventRouter.
         /// </summary>
         private Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
-            IEvent evt,
-            CancellationToken ct = default)
+    IEvent evt,
+    CancellationToken ct = default)
         {
             _logger.Log($"Finding matching subscriptions for event {evt.EventId} of type {evt.EventType}");
-            
+
             // Get subscriptions for this specific event type
             bool hasTypeSpecificSubscriptions = _subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions);
-            
+
             // Get subscriptions for all event types (registered without a specific EventType)
             bool hasGenericSubscriptions = _subscriptionsByType.TryGetValue(EventType.Custom, out var genericSubscriptions);
-            
+
             if (!hasTypeSpecificSubscriptions && !hasGenericSubscriptions)
             {
                 _logger.Log($"No subscriptions found for event type {evt.EventType}");
-                return Task.FromResult<IReadOnlyList<IEventSubscription>>(Array.Empty<IEventSubscription>());
+                return Task.FromResult<IReadOnlyList<IEventSubscription>>([]);
             }
-            
+
             // Merge the subscriptions if we have both types
-            List<EventSubscription> mergedSubscriptions;
-            if (hasTypeSpecificSubscriptions && hasGenericSubscriptions)
+            List<EventSubscription> mergedSubscriptions = [];
+            if (hasTypeSpecificSubscriptions)
             {
-                mergedSubscriptions = new List<EventSubscription>(typeSubscriptions);
-                foreach (var sub in genericSubscriptions)
-                {
-                    if (!mergedSubscriptions.Contains(sub))
-                    {
-                        mergedSubscriptions.Add(sub);
-                    }
-                }
-                _logger.Log($"Found {mergedSubscriptions.Count} subscriptions ({typeSubscriptions.Count} specific, {genericSubscriptions.Count} generic)");
+                mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
+                _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
             }
-            else if (hasTypeSpecificSubscriptions)
+            if (hasGenericSubscriptions)
             {
-                mergedSubscriptions = typeSubscriptions;
-                _logger.Log($"Found {mergedSubscriptions.Count} type-specific subscriptions for {evt.EventType}");
-            }
-            else
-            {
-                mergedSubscriptions = genericSubscriptions;
-                _logger.Log($"Found {mergedSubscriptions.Count} generic subscriptions for any event type");
+                mergedSubscriptions.AddRange(genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
+                _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
             }
 
             // Delegate subscription matching to the router
@@ -470,22 +463,22 @@ namespace HydroGarden.Foundation.Common.Events
                 }
             }
         }
-        
+
         /// <summary>
         /// Adds middleware to the event processing pipeline.
         /// </summary>
         /// <param name="middleware">The middleware to add.</param>
         public void AddPipelineMiddleware(IEventMiddleware middleware)
         {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
-                
+
+            ArgumentNullException.ThrowIfNull(middleware);
+
             lock (_pipelineLock)
             {
                 _pipeline.AddMiddleware(middleware);
             }
         }
-        
+
         /// <summary>
         /// Adds middleware to the event processing pipeline for specific event types.
         /// </summary>
@@ -493,15 +486,15 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="eventTypes">The event types the middleware should process.</param>
         public void AddPipelineMiddleware(IEventMiddleware middleware, params EventType[] eventTypes)
         {
-            if (middleware == null)
-                throw new ArgumentNullException(nameof(middleware));
-                
+
+            ArgumentNullException.ThrowIfNull(middleware);
+
             lock (_pipelineLock)
             {
                 _pipeline.AddMiddleware(middleware, eventTypes);
             }
         }
-        
+
         /// <summary>
         /// Disposes resources used by the event bus.
         /// </summary>
