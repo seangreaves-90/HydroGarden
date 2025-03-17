@@ -33,14 +33,16 @@ namespace HydroGarden.Foundation.Core.Stores
         private readonly string _backupPath;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly JsonSerializerOptions _serializerOptions;
-        private readonly ILogger _logger;
+private readonly ILogger _logger;
+private long _lastBackupTimestamp;
+private readonly TimeSpan _backupInterval;
 
         /// <summary>
         /// Creates a new instance of the JsonStore
         /// </summary>
         /// <param name="basePath">The base directory path for storage</param>
         /// <param name="logger">Logger for operations</param>
-        public JsonStore(string basePath, ILogger? logger)
+        public JsonStore(string basePath, ILogger? logger, TimeSpan? backupInterval = null)
         {
             // Setup paths
             _basePath = Path.GetFullPath(basePath);
@@ -49,6 +51,10 @@ namespace HydroGarden.Foundation.Core.Stores
             _statePath = Path.Combine(_basePath, STATE_DIR);
             _eventsPath = Path.Combine(_basePath, EVENTS_DIR);
             _backupPath = Path.Combine(_basePath, BACKUP_DIR);
+            
+            // Initialize backup tracking
+            _lastBackupTimestamp = DateTime.UtcNow.Ticks;
+            _backupInterval = backupInterval ?? TimeSpan.FromHours(24); // Default: daily backup
 
             // Create directory structure
             Directory.CreateDirectory(_componentsPath);
@@ -93,6 +99,9 @@ namespace HydroGarden.Foundation.Core.Stores
         /// <inheritdoc />
         public async Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default)
         {
+            // Check for cancellation before proceeding
+            ct.ThrowIfCancellationRequested();
+            
             string filePath = GetComponentFilePath(id);
             if (!File.Exists(filePath))
             {
@@ -102,13 +111,15 @@ namespace HydroGarden.Foundation.Core.Stores
                     // Attempt to load from topology directory
                     return await LoadTopologyAsync(ct);
                 }
+                _logger.Log($"No file found for component {id}");
                 return null;
             }
 
             try
             {
-                string json = await File.ReadAllTextAsync(filePath, ct);
-                var component = JsonSerializer.Deserialize<ComponentStore>(json, _serializerOptions);
+                // Use a file stream for more efficient I/O
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                var component = await JsonSerializer.DeserializeAsync<ComponentStore>(fileStream, _serializerOptions, ct);
                 
                 if (component?.Properties != null)
                 {
@@ -204,8 +215,15 @@ namespace HydroGarden.Foundation.Core.Stores
         /// <inheritdoc />
         public async Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default)
         {
+            // Check for cancellation before proceeding
+            ct.ThrowIfCancellationRequested();
+            
             string filePath = GetComponentFilePath(id);
             string tempFile = $"{filePath}.tmp";
+            string backupFile = $"{filePath}.bak";
+            
+            // Create directory if it doesn't exist
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? _componentsPath);
 
             // Create a normalized copy of properties with consistent types
             var normalizedProperties = new Dictionary<string, object>();
@@ -233,14 +251,55 @@ namespace HydroGarden.Foundation.Core.Stores
 
             try
             {
-                string json = JsonSerializer.Serialize(component, _serializerOptions);
-                await File.WriteAllTextAsync(tempFile, json, ct);
+                // Back up existing file if it exists
+                if (File.Exists(filePath))
+                {
+                    File.Copy(filePath, backupFile, true);
+                }
+                
+                // Use FileStream for more efficient I/O and async operations
+                using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+                {
+                    await JsonSerializer.SerializeAsync(fileStream, component, _serializerOptions, ct);
+                    await fileStream.FlushAsync(ct);
+                }
+                
+                // Use atomic file move operation for data integrity
                 File.Move(tempFile, filePath, true);
+                
+                // Remove backup file if everything succeeded
+                if (File.Exists(backupFile))
+                {
+                    File.Delete(backupFile);
+                }
+                
+                // Consider creating a backup if enough time has elapsed
+                await CheckAndCreateBackupIfNeededAsync(ct);
             }
             catch (Exception? ex)
             {
                 _logger.Log(ex, $"Error saving component {id} to file");
-                if (File.Exists(tempFile)) File.Delete(tempFile);
+                
+                // Clean up temporary file if it exists
+                if (File.Exists(tempFile)) 
+                {
+                    try { File.Delete(tempFile); } catch { /* Ignore cleanup errors */ }
+                }
+                
+                // Try to restore from backup if available
+                if (File.Exists(backupFile) && !File.Exists(filePath))
+                {
+                    try 
+                    { 
+                        _logger.Log($"Attempting to restore {id} from backup");
+                        File.Move(backupFile, filePath, false); 
+                    } 
+                    catch (Exception restoreEx) 
+                    { 
+                        _logger.Log(restoreEx, $"Failed to restore {id} from backup"); 
+                    }
+                }
+                
                 throw;
             }
         }
@@ -280,6 +339,8 @@ namespace HydroGarden.Foundation.Core.Stores
         /// <summary>
         /// Creates a backup of the current data
         /// </summary>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>A task representing the backup operation</returns>
         public async Task CreateBackupAsync(CancellationToken ct = default)
         {
             var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
@@ -316,8 +377,26 @@ namespace HydroGarden.Foundation.Core.Stores
             }
 
             _logger.Log($"Created backup at {backupDir}");
+            
+            // Update last backup timestamp
+            _lastBackupTimestamp = DateTime.UtcNow.Ticks;
         }
 
+        /// <summary>
+        /// Checks if a backup is needed based on the elapsed time and creates one if necessary
+        /// </summary>
+        private async Task CheckAndCreateBackupIfNeededAsync(CancellationToken ct)
+        {
+            var currentTime = DateTime.UtcNow.Ticks;
+            var elapsedTicks = currentTime - _lastBackupTimestamp;
+            var elapsedTime = new TimeSpan(elapsedTicks);
+            
+            if (elapsedTime >= _backupInterval)
+            {
+                await CreateBackupAsync(ct);
+            }
+        }
+        
         /// <summary>
         /// Loads topology data from the dedicated topology directory
         /// </summary>
@@ -327,15 +406,18 @@ namespace HydroGarden.Foundation.Core.Stores
             string metadataFilePath = GetTopologyMetadataFilePath();
             
             if (!File.Exists(connectionsFilePath))
+            {
+                _logger.Log("Topology connections file not found");
                 return null;
+            }
 
             try
             {
                 var result = new Dictionary<string, object>();
                 
-                // Load connections
-                string connectionsJson = await File.ReadAllTextAsync(connectionsFilePath, ct);
-                var connectionsData = JsonSerializer.Deserialize<TopologyStore>(connectionsJson, _serializerOptions);
+                // Load connections using FileStream for efficiency
+                using var fileStream = new FileStream(connectionsFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                var connectionsData = await JsonSerializer.DeserializeAsync<TopologyStore>(fileStream, _serializerOptions, ct);
                 if (connectionsData != null)
                 {
                     result["Connections"] = connectionsData.Connections;
@@ -346,8 +428,8 @@ namespace HydroGarden.Foundation.Core.Stores
                 // Load additional metadata if exists
                 if (File.Exists(metadataFilePath))
                 {
-                    string metadataJson = await File.ReadAllTextAsync(metadataFilePath, ct);
-                    var metadataObj = JsonSerializer.Deserialize<JsonElement>(metadataJson, _serializerOptions);
+                    using var metadataStream = new FileStream(metadataFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                    var metadataObj = await JsonSerializer.DeserializeAsync<JsonElement>(metadataStream, _serializerOptions, ct);
                     // Add any additional metadata as needed
                 }
 
@@ -372,6 +454,10 @@ namespace HydroGarden.Foundation.Core.Stores
         {
             string connectionsFilePath = GetConnectionsFilePath();
             string tempFile = $"{connectionsFilePath}.tmp";
+            string backupFile = $"{connectionsFilePath}.bak";
+            
+            // Create directory if it doesn't exist
+            Directory.CreateDirectory(Path.GetDirectoryName(connectionsFilePath) ?? _topologyPath);
             
             try
             {
@@ -400,10 +486,27 @@ namespace HydroGarden.Foundation.Core.Stores
                     topologyStore.LastUpdated = DateTime.UtcNow;
                 }
 
-                // Save connections file
-                string json = JsonSerializer.Serialize(topologyStore, _serializerOptions);
-                await File.WriteAllTextAsync(tempFile, json, ct);
+                // Back up existing file if it exists
+                if (File.Exists(connectionsFilePath))
+                {
+                    File.Copy(connectionsFilePath, backupFile, true);
+                }
+                
+                // Save connections file using FileStream for efficiency
+                using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+                {
+                    await JsonSerializer.SerializeAsync(fileStream, topologyStore, _serializerOptions, ct);
+                    await fileStream.FlushAsync(ct);
+                }
+                
+                // Use atomic file move operation
                 File.Move(tempFile, connectionsFilePath, true);
+                
+                // Remove backup file if everything succeeded
+                if (File.Exists(backupFile))
+                {
+                    File.Delete(backupFile);
+                }
 
                 // Save any additional metadata if needed
                 // ...
@@ -413,7 +516,27 @@ namespace HydroGarden.Foundation.Core.Stores
             catch (Exception? ex)
             {
                 _logger.Log(ex, "Error saving topology data");
-                if (File.Exists(tempFile)) File.Delete(tempFile);
+                
+                // Clean up temporary file if it exists
+                if (File.Exists(tempFile))
+                {
+                    try { File.Delete(tempFile); } catch { /* Ignore cleanup errors */ }
+                }
+                
+                // Try to restore from backup if available
+                if (File.Exists(backupFile) && !File.Exists(connectionsFilePath))
+                {
+                    try 
+                    { 
+                        _logger.Log("Attempting to restore topology from backup");
+                        File.Move(backupFile, connectionsFilePath, false); 
+                    }
+                    catch (Exception restoreEx) 
+                    { 
+                        _logger.Log(restoreEx, "Failed to restore topology from backup"); 
+                    }
+                }
+                
                 throw;
             }
         }

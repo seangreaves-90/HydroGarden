@@ -4,7 +4,8 @@ using System.Text.Json.Serialization;
 namespace HydroGarden.Foundation.Core.Serialization
 {
     /// <summary>
-    /// JSON converter for ensuring numeric values maintain consistent types
+    /// JSON converter for ensuring numeric values maintain consistent types across serialization boundaries.
+    /// Particularly handles numeric property type consistency for properties like FlowRate that should always be double.
     /// </summary>
     public class NumericJsonConverter : JsonConverter<object>
     {
@@ -18,8 +19,18 @@ namespace HydroGarden.Foundation.Core.Serialization
             switch (reader.TokenType)
             {
                 case JsonTokenType.Number:
-                    // Always parse numbers as doubles for consistency
-                    if (reader.TryGetDouble(out double doubleValue))
+                    // Keep the implementation simple - preserve numeric types accurately
+                    // (Property type-specific handling is done in JsonStore and JsonStoreTransaction)
+                    if (reader.TryGetInt64(out long longValue))
+                    {
+                        // If the value fits in an int, return as int
+                        if (longValue >= int.MinValue && longValue <= int.MaxValue)
+                        {
+                            return (int)longValue;
+                        }
+                        return longValue;
+                    }
+                    else if (reader.TryGetDouble(out double doubleValue))
                     {
                         return doubleValue;
                     }
@@ -44,10 +55,10 @@ namespace HydroGarden.Foundation.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
         {
-            // Ensure known numeric types are handled specially
+            // Keep the implementation simple - write numeric values with their original type
+            // (Property type-specific handling is done in JsonStore and JsonStoreTransaction)
             if (value is int intValue)
             {
-                // Special handling for certain property names
                 writer.WriteNumberValue(intValue);
                 return;
             }
@@ -65,5 +76,7 @@ namespace HydroGarden.Foundation.Core.Serialization
             // For other types, use default serialization
             JsonSerializer.Serialize(writer, value, value.GetType(), options);
         }
+        // Type-specific property handling is done in the JsonStore and JsonStoreTransaction classes
+        // This converter just ensures that numeric values are properly preserved during serialization/deserialization
     }
 }
