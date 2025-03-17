@@ -102,13 +102,11 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.SuccessCount.Should().Be(6); // Now 6 due to subscription matching changes
+            result.SuccessCount.Should().Be(3); // Should be 3 after our fix
             
-            // Handlers should have been called
+            // Handlers should have been called in order
             processingSteps.Should().HaveCount(3);
-            processingSteps.Should().Contain("Handler1");
-            processingSteps.Should().Contain("Handler2");
-            processingSteps.Should().Contain("Handler3");
+            processingSteps.Should().ContainInOrder(new[] { "Handler1", "Handler2", "Handler3" });
         }
 
         [Fact]
@@ -300,7 +298,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             // Assert
             result.Should().NotBeNull();
             result!.EventId.Should().Be(eventId);
-            result.HandlerCount.Should().Be(4);
+            result.HandlerCount.Should().Be(2); // After our fix, handler count should be 2
             result.SuccessCount.Should().Be(1); // Only one handler succeeded
             result.HasErrors.Should().BeTrue();
             result.Errors.Should().ContainSingle(e => e is InvalidOperationException);

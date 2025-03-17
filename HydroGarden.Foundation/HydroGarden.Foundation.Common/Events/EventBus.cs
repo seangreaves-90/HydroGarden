@@ -71,7 +71,6 @@ namespace HydroGarden.Foundation.Common.Events
         /// <inheritdoc/>
         public Guid Subscribe<TEvent>(IEventHandler<IEvent> handler, IEventSubscriptionOptions? options) where TEvent : IEvent
         {
-
             ArgumentNullException.ThrowIfNull(handler);
 
             // Create subscription with the handler
@@ -116,7 +115,11 @@ namespace HydroGarden.Foundation.Common.Events
                     [subscription],
                     (_, list) =>
                     {
-                        list.Add(subscription);
+                        // Check if the subscription is already in the list (by ID) to avoid duplicates
+                        if (!list.Any(existing => existing.Id == subscription.Id))
+                        {
+                            list.Add(subscription);
+                        }
                         return list;
                     });
 
@@ -414,17 +417,35 @@ namespace HydroGarden.Foundation.Common.Events
                 return Task.FromResult<IReadOnlyList<IEventSubscription>>([]);
             }
 
-            // Create a list of all relevant subscriptions, combining both type-specific and generic
+            // Use a HashSet to ensure unique subscriptions by ID
+            HashSet<Guid> includedIds = new HashSet<Guid>();
             List<EventSubscription> mergedSubscriptions = [];
-            if (hasTypeSpecificSubscriptions)
+            
+            // Add type-specific subscriptions first
+            if (hasTypeSpecificSubscriptions && typeSubscriptions != null)
             {
-                mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
-                _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
+                foreach (var subscription in typeSubscriptions)
+                {
+                    if (includedIds.Add(subscription.Id)) // Only add if not already included
+                    {
+                        mergedSubscriptions.Add(subscription);
+                    }
+                }
+                _logger.Log($"Found {typeSubscriptions.Count} type-specific subscriptions for {evt.EventType}, added {mergedSubscriptions.Count} unique ones");
             }
-            if (hasGenericSubscriptions)
+            
+            // Then add generic subscriptions that haven't been included yet
+            if (hasGenericSubscriptions && genericSubscriptions != null)
             {
-                mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
-                _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
+                int beforeCount = mergedSubscriptions.Count;
+                foreach (var subscription in genericSubscriptions)
+                {
+                    if (includedIds.Add(subscription.Id)) // Only add if not already included
+                    {
+                        mergedSubscriptions.Add(subscription);
+                    }
+                }
+                _logger.Log($"Found {genericSubscriptions.Count} generic subscriptions, added {mergedSubscriptions.Count - beforeCount} unique ones");
             }
 
             // Delegate subscription matching to the router

@@ -87,7 +87,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var eventsPerSecond = eventCount / (elapsedMs / 1000.0);
             
             // Each event should have been processed once per handler
-            processedEvents.Count.Should().Be(eventCount);
+            processedEvents.Count.Should().Be(eventCount, "Each event should be processed exactly once");
             
             // Verify all tasks completed successfully
             publishTasks.Should().AllSatisfy(task => task.IsCompleted.Should().BeTrue());
@@ -313,7 +313,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<CancellationToken>()),
                 Times.Exactly(eventCount));
                 
-            // Update verification for longRunningHandler as well
+            // The long running handler will be called exactly once per event
             longRunningHandler.Verify(
                 h => h.HandleEventAsync(
                     It.IsAny<object>(),
