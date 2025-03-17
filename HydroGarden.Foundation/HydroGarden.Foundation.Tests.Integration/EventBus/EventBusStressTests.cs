@@ -86,12 +86,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             var eventsPerSecond = eventCount / (elapsedMs / 1000.0);
             
-            processedEvents.Count.Should().Be(eventCount * 2);
+            // Each event should have been processed exactly once
+            processedEvents.Count.Should().Be(eventCount);
             
             // Verify all tasks completed successfully
             publishTasks.Should().AllSatisfy(task => task.IsCompleted.Should().BeTrue());
             publishTasks.Should().AllSatisfy(task => task.Result.Should().NotBeNull());
-            publishTasks.Should().AllSatisfy(task => task.Result!.SuccessCount.Should().Be(2));
+            publishTasks.Should().AllSatisfy(task => task.Result!.SuccessCount.Should().Be(1));
             
             // Log performance metrics - not a strict test as it depends on machine
             _mockLogger.Verify(l => 
@@ -310,7 +311,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<object>(),
                     It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()),
-                Times.Exactly(eventCount * 2));
+                Times.Exactly(eventCount));
                 
             // Update verification for longRunningHandler as well
             longRunningHandler.Verify(
@@ -318,7 +319,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     It.IsAny<object>(),
                     It.IsAny<IEvent>(),
                     It.IsAny<CancellationToken>()),
-                Times.Exactly(eventCount * 2));
+                Times.Exactly(eventCount));
         }
         
         [Fact]

@@ -406,11 +406,10 @@ namespace HydroGarden.Foundation.Common.Events
             // Get subscriptions for this specific event type
             bool hasTypeSpecificSubscriptions = _subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions);
 
-            // Initialize generic subscriptions to avoid potential unassigned variable error
             List<EventSubscription>? genericSubscriptions = null;
             
-            // Only look for generic subscriptions if no type-specific ones exist to avoid duplicates
-            bool hasGenericSubscriptions = !hasTypeSpecificSubscriptions && _subscriptionsByType.TryGetValue(EventType.Custom, out genericSubscriptions);
+            // Always consider generic subscriptions in addition to type-specific ones
+            bool hasGenericSubscriptions = _subscriptionsByType.TryGetValue(EventType.Custom, out genericSubscriptions);
 
             if (!hasTypeSpecificSubscriptions && !hasGenericSubscriptions)
             {
@@ -418,17 +417,17 @@ namespace HydroGarden.Foundation.Common.Events
                 return Task.FromResult<IReadOnlyList<IEventSubscription>>([]);
             }
 
-            // Use the most specific subscriptions available
+            // Create a list of all relevant subscriptions, combining both type-specific and generic
             List<EventSubscription> mergedSubscriptions = [];
             if (hasTypeSpecificSubscriptions)
             {
-                mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
-                _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
+            mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
+            _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
             }
-            else if (hasGenericSubscriptions)
+            if (hasGenericSubscriptions)
             {
-                mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
-                _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
+            mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
+            _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
             }
 
             // Delegate subscription matching to the router
