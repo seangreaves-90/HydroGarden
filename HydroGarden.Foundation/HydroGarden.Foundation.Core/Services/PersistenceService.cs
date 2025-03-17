@@ -510,14 +510,11 @@ namespace HydroGarden.Foundation.Core.Services
             async () => {
                 if (!_isInitialized) await InitializeAsync(ct);
             
-                await _transactionLock.WaitAsync(ct);
-                try
+                // We don't need to acquire the transaction lock here if we use a thread-safe copy
+                // This prevents deadlocks with the transaction processing
+                lock (_connections)
                 {
-                return _connections.Values.ToList();
-                }
-                    finally
-                {
-                    _transactionLock.Release();
+                    return _connections.Values.ToList(); // Create a thread-safe copy
                 }
             },
             "PERSISTENCE_GET_CONNECTIONS_FAILED",
@@ -537,15 +534,10 @@ namespace HydroGarden.Foundation.Core.Services
             async () => {
                 if (!_isInitialized) await InitializeAsync(ct);
             
-            await _transactionLock.WaitAsync(ct);
-                try
+                lock (_connections)
                 {
                     _connections.TryGetValue(connectionId, out var connection);
-                return connection;
-                }
-                    finally
-                {
-                    _transactionLock.Release();
+                    return connection; // Return a direct reference to the connection
                 }
             },
             "PERSISTENCE_GET_CONNECTION_FAILED",
@@ -839,29 +831,45 @@ namespace HydroGarden.Foundation.Core.Services
                 if (_isCommitted || _isRolledBack)
                     throw new InvalidOperationException("Transaction is already finalized");
 
-                // Save topology data
-                var topologyProperties = new Dictionary<string, object>
+                try
                 {
-                    [CONNECTIONS_KEY] = _workingConnections.Values.ToList(),
-                    [TOPOLOGY_VERSION_KEY] = _baseTopologyVersion + 1,
-                    [TOPOLOGY_LAST_UPDATED_KEY] = DateTime.UtcNow
-                };
+                    // Save topology data
+                    var topologyProperties = new Dictionary<string, object>
+                    {
+                        [CONNECTIONS_KEY] = _workingConnections.Values.ToList(),
+                        [TOPOLOGY_VERSION_KEY] = _baseTopologyVersion + 1,
+                        [TOPOLOGY_LAST_UPDATED_KEY] = DateTime.UtcNow
+                    };
 
-                await _storeTransaction.SaveAsync(TOPOLOGY_STORE_ID, topologyProperties);
+                    await _storeTransaction.SaveAsync(TOPOLOGY_STORE_ID, topologyProperties);
 
-                // Commit the store transaction
-                await _storeTransaction.CommitAsync(ct);
+                    // Commit the store transaction
+                    await _storeTransaction.CommitAsync(ct);
 
-                // Update parent service state
-                _service._connections.Clear();
-                foreach (var conn in _workingConnections.Values)
-                {
-                    _service._connections[conn.ConnectionId] = conn;
+                    // Update parent service state
+                    lock (_service._connections)
+                    {
+                        _service._connections.Clear();
+                        foreach (var conn in _workingConnections.Values)
+                        {
+                            _service._connections[conn.ConnectionId] = conn;
+                        }
+                    }
+                    _service._topologyVersion = _baseTopologyVersion + 1;
+                    _service._topologyLastUpdated = DateTime.UtcNow;
+
+                    _isCommitted = true;
+                    
+                    // Release the lock immediately after commit to avoid deadlocks
+                    // when calling GetAllConnectionsAsync right after commit
+                    _transactionLock.Release();
                 }
-                _service._topologyVersion = _baseTopologyVersion + 1;
-                _service._topologyLastUpdated = DateTime.UtcNow;
-
-                _isCommitted = true;
+                catch
+                {
+                    _isRolledBack = true;
+                    _transactionLock.Release();
+                    throw;
+                }
             }
 
             /// <inheritdoc />
@@ -870,8 +878,16 @@ namespace HydroGarden.Foundation.Core.Services
                 if (_isCommitted || _isRolledBack)
                     throw new InvalidOperationException("Transaction is already finalized");
 
-                await _storeTransaction.RollbackAsync(ct);
-                _isRolledBack = true;
+                try 
+                {
+                    await _storeTransaction.RollbackAsync(ct);
+                    _isRolledBack = true;
+                }
+                finally
+                {
+                    // Release the lock immediately after rollback to avoid deadlocks
+                    _transactionLock.Release();
+                }
             }
 
             /// <inheritdoc />
@@ -890,7 +906,11 @@ namespace HydroGarden.Foundation.Core.Services
                 }
                 finally
                 {
-                    _transactionLock.Release();
+                    // Only release the lock if it hasn't been released by CommitAsync or RollbackAsync
+                    if (!_isCommitted && !_isRolledBack)
+                    {
+                        _transactionLock.Release();
+                    }
                     _isDisposed = true;
                 }
             }
