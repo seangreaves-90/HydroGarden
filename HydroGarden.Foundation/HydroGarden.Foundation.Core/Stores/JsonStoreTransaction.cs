@@ -11,7 +11,9 @@ namespace HydroGarden.Foundation.Core.Stores
     public class JsonStoreTransaction : IStoreTransaction
     {
         private readonly JsonStore _store; // Reference to the store handling this transaction
-        private readonly JsonStore.JsonStoreStructure _workingState; // Local working copy of the store state
+        private readonly SemaphoreSlim _lock; // Lock to be released on disposal
+        private readonly Dictionary<Guid, Dictionary<string, object>> _propertyChanges; // Property changes to commit
+        private readonly Dictionary<Guid, Dictionary<string, IPropertyMetadata>> _metadataChanges; // Metadata changes to commit
         private bool _isCommitted; // Tracks whether the transaction has been committed
         private bool _isRolledBack; // Tracks whether the transaction has been rolled back
         private bool _isDisposed; // Tracks whether the transaction has been disposed
@@ -20,138 +22,126 @@ namespace HydroGarden.Foundation.Core.Stores
         /// Initializes a new instance of the <see cref="JsonStoreTransaction"/> class.
         /// </summary>
         /// <param name="store">The JSON store associated with this transaction.</param>
-        /// <param name="currentState">The current state of the store.</param>
-        internal JsonStoreTransaction(JsonStore store, JsonStore.JsonStoreStructure currentState)
+        /// <param name="lock">The semaphore lock to release when the transaction completes.</param>
+        internal JsonStoreTransaction(JsonStore store, SemaphoreSlim @lock)
         {
             _store = store;
-            _workingState = new JsonStore.JsonStoreStructure
-            {
-                Devices = currentState.Devices.Select(d => new JsonStore.DeviceStore
-                {
-                    Id = d.Id,
-                    Properties = new Dictionary<string, object>(d.Properties),
-                    Metadata = new Dictionary<string, IPropertyMetadata>(d.Metadata)
-                }).ToList()
-            };
+            _lock = @lock;
+            _propertyChanges = new Dictionary<Guid, Dictionary<string, object>>();
+            _metadataChanges = new Dictionary<Guid, Dictionary<string, IPropertyMetadata>>();
         }
 
-        /// <summary>
-        /// Saves the provided properties in the working state using the given ID.
-        /// </summary>
-        /// <param name="id">The unique identifier for the component.</param>
-        /// <param name="properties">The properties to save.</param>
+        /// <inheritdoc />
         public Task SaveAsync(Guid id, IDictionary<string, object> properties)
         {
-            var device = _workingState.Devices.FirstOrDefault(d => d.Id == id);
-            if (device != null)
+            if (_isCommitted || _isRolledBack)
+                throw new InvalidOperationException("Transaction already finalized");
+            
+            // Store the changes in memory
+            var propertyDict = new Dictionary<string, object>();
+            
+            // Ensure property types are preserved correctly
+            foreach (var kvp in properties)
             {
-                device.Properties = new Dictionary<string, object>(properties);
+            // Ensure numeric values maintain their type (int vs double)
+            if (kvp.Value is int intValue)
+            {
+            // Convert int to double for all numeric properties to ensure consistency
+                propertyDict[kvp.Key] = (double)intValue;
             }
             else
             {
-                _workingState.Devices.Add(new JsonStore.DeviceStore
-                {
-                    Id = id,
-                    Properties = new Dictionary<string, object>(properties),
-                    Metadata = new Dictionary<string, IPropertyMetadata>()
-                });
-            }
+                propertyDict[kvp.Key] = kvp.Value;
+                }
+                }
+            
+            _propertyChanges[id] = propertyDict;
+            
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Saves the provided properties and metadata in the working state using the given ID.
-        /// </summary>
-        /// <param name="id">The unique identifier for the component.</param>
-        /// <param name="properties">The properties to save.</param>
-        /// <param name="metadata">Optional metadata associated with the properties.</param>
+        /// <inheritdoc />
         public Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata)
         {
-            var device = _workingState.Devices.FirstOrDefault(d => d.Id == id);
-            if (device != null)
+            if (_isCommitted || _isRolledBack)
+                throw new InvalidOperationException("Transaction already finalized");
+            
+            // Store the property changes
+            _propertyChanges[id] = new Dictionary<string, object>(properties);
+            
+            // Store the metadata changes if provided
+            if (metadata != null)
             {
-                device.Properties = new Dictionary<string, object>(properties);
-                if (metadata != null)
-                {
-                    device.Metadata = new Dictionary<string, IPropertyMetadata>(metadata);
-                }
+                _metadataChanges[id] = new Dictionary<string, IPropertyMetadata>(metadata);
             }
-            else
-            {
-                _workingState.Devices.Add(new JsonStore.DeviceStore
-                {
-                    Id = id,
-                    Properties = new Dictionary<string, object>(properties),
-                    Metadata = metadata != null
-                        ? new Dictionary<string, IPropertyMetadata>(metadata)
-                        : new Dictionary<string, IPropertyMetadata>()
-                });
-            }
+            
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Commits the transaction by persisting the working state to the store.
-        /// </summary>
-        /// <param name="ct">Cancellation token.</param>
+        /// <inheritdoc />
         public async Task CommitAsync(CancellationToken ct = default)
         {
-            if (_isCommitted || _isRolledBack) throw new InvalidOperationException("Transaction already finalized.");
+            if (_isCommitted || _isRolledBack)
+                throw new InvalidOperationException("Transaction already finalized");
 
-            // 🟢 Ensure conversion is applied before committing the transaction
-            foreach (var device in _workingState.Devices)
+            try
             {
-                device.Properties = device.Properties.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => ConvertJsonElement(kvp.Value) // 🟢 Convert before storing
-                );
-            }
-
-            await _store.SaveStoreAsync(_workingState, ct);
-            _isCommitted = true;
-        }
-
-
-        private object ConvertJsonElement(object obj)
-        {
-            if (obj is JsonElement jsonElement)
-            {
-                return jsonElement.ValueKind switch
+                // Process changes
+                foreach (var (id, properties) in _propertyChanges)
                 {
-                    JsonValueKind.String => jsonElement.GetString()?.Trim() ?? string.Empty,
-                    JsonValueKind.Number => jsonElement.TryGetDouble(out double d) ? d : (double)jsonElement.GetInt64(), // Force double conversion
-                    JsonValueKind.True => true,
-                    JsonValueKind.False => false,
-                    JsonValueKind.Null => null!,
-                    _ => jsonElement.GetRawText()
-                };
+                    // See if we have metadata for this entity
+                    if (_metadataChanges.TryGetValue(id, out var metadata))
+                    {
+                        await _store.SaveWithMetadataAsync(id, properties, metadata, ct);
+                    }
+                    else
+                    {
+                        await _store.SaveAsync(id, properties, ct);
+                    }
+                }
+
+                _isCommitted = true;
             }
-            return obj;
+            catch (Exception)
+            {
+                // If an error occurs during commit, consider the transaction rolled back
+                _isRolledBack = true;
+                throw;
+            }
         }
 
-
-        /// <summary>
-        /// Rolls back the transaction by marking it as rolled back.
-        /// Note: This does not revert the changes explicitly, but prevents committing them.
-        /// </summary>
-        /// <param name="ct">Cancellation token.</param>
+        /// <inheritdoc />
         public Task RollbackAsync(CancellationToken ct = default)
         {
+            if (_isCommitted)
+                throw new InvalidOperationException("Transaction already committed");
+
             _isRolledBack = true;
+            _propertyChanges.Clear();
+            _metadataChanges.Clear();
+            
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Disposes of the transaction, ensuring rollback if not committed.
-        /// </summary>
+        /// <inheritdoc />
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
 
-            // If transaction is not committed or rolled back, perform a rollback
-            if (!_isCommitted && !_isRolledBack) await RollbackAsync();
-
-            _isDisposed = true;
+            try
+            {
+                // If the transaction wasn't explicitly committed or rolled back, roll it back
+                if (!_isCommitted && !_isRolledBack)
+                {
+                    await RollbackAsync();
+                }
+            }
+            finally
+            {
+                // Always release the lock
+                _lock.Release();
+                _isDisposed = true;
+            }
         }
     }
 }
