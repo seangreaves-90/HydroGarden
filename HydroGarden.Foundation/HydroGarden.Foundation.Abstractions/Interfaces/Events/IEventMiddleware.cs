@@ -1,45 +1,86 @@
-namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
+﻿namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
 {
     /// <summary>
-    /// Defines a middleware component that can process events in a pipeline.
+    /// Represents middleware in the event processing pipeline.
     /// </summary>
     public interface IEventMiddleware
     {
         /// <summary>
-        /// Gets the unique identifier for this middleware.
+        /// Gets the unique identifier for the middleware.
         /// </summary>
         Guid Id { get; }
-        
+
         /// <summary>
-        /// Gets the display name of this middleware.
+        /// Gets the priority of the middleware. Higher values mean higher priority.
         /// </summary>
-        string Name { get; }
-        
+        int Priority { get; }
+
         /// <summary>
-        /// Gets the order in which this middleware should be executed in the pipeline.
-        /// Lower values are executed earlier.
+        /// Processes an event asynchronously.
         /// </summary>
-        int Order { get; }
-        
-        /// <summary>
-        /// Processes an event and calls the next middleware in the pipeline.
-        /// </summary>
-        /// <param name="sender">The original sender of the event.</param>
-        /// <param name="event">The event to process.</param>
-        /// <param name="next">A delegate to the next middleware in the pipeline.</param>
+        /// <param name="sender">The sender of the event.</param>
+        /// <param name="evt">The event to process.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
-        /// <returns>A result indicating the outcome of the event processing.</returns>
-        Task<IEventProcessingResult> ProcessAsync(
-            object sender, 
-            IEvent @event, 
-            Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> next, 
-            CancellationToken cancellationToken = default);
-        
+        /// <returns>The result of processing the event.</returns>
+        Task<IMiddlewareProcessingResult> ProcessEventAsync(object? sender, IEvent evt, CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// Represents the result of middleware processing of an event.
+    /// </summary>
+    public interface IMiddlewareProcessingResult
+    {
         /// <summary>
-        /// Determines whether this middleware should be applied to the given event.
+        /// Gets the event after processing.
         /// </summary>
-        /// <param name="event">The event to check.</param>
-        /// <returns>True if this middleware should be applied, false otherwise.</returns>
-        bool ShouldApply(IEvent @event);
+        IEvent Event { get; }
+
+        /// <summary>
+        /// Gets whether the processing was successful.
+        /// </summary>
+        bool Success { get; }
+
+        /// <summary>
+        /// Gets whether further processing should be stopped.
+        /// </summary>
+        bool ShouldStopProcessing { get; }
+
+        /// <summary>
+        /// Gets the exception that occurred during processing, if any.
+        /// </summary>
+        Exception? Exception { get; }
+    }
+
+    /// <summary>
+    /// Default implementation of middleware processing result.
+    /// </summary>
+    public class MiddlewareProcessingResult : IMiddlewareProcessingResult
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MiddlewareProcessingResult"/> class.
+        /// </summary>
+        /// <param name="event">The processed event.</param>
+        /// <param name="success">Whether processing was successful.</param>
+        /// <param name="shouldStopProcessing">Whether further processing should be stopped.</param>
+        /// <param name="exception">Any exception that occurred.</param>
+        public MiddlewareProcessingResult(IEvent @event, bool success, bool shouldStopProcessing, Exception? exception = null)
+        {
+            Event = @event;
+            Success = success;
+            ShouldStopProcessing = shouldStopProcessing;
+            Exception = exception;
+        }
+
+        /// <inheritdoc/>
+        public IEvent Event { get; }
+
+        /// <inheritdoc/>
+        public bool Success { get; }
+
+        /// <inheritdoc/>
+        public bool ShouldStopProcessing { get; }
+
+        /// <inheritdoc/>
+        public Exception? Exception { get; }
     }
 }

@@ -82,7 +82,7 @@ namespace HydroGarden.Foundation.Common.Events
                     catch (Exception? ex)
                     {
                         _logger.Log(ex, $"[EventQueueProcessor] Error processing event {queueItem.Event.EventId}");
-                        queueItem.Result.Errors.Add(ex);
+                        queueItem.Result.AddError(ex);
                     }
                     finally
                     {

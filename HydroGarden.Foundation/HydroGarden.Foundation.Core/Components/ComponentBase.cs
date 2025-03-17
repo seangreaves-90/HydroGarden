@@ -223,15 +223,27 @@ namespace HydroGarden.Foundation.Core.Components
 
             try
             {
+                // Create the state change event with high priority to ensure it's processed
+                var routingData = EventRoutingData.CreateBuilder()
+                    .WithPriority(EventPriority.High)
+                    .Build();
+                    
                 var evt = new HydroGardenStateChangedEvent(
-                Id,
-                Id,
-                oldState,
-                newState,
-                DateTimeOffset.UtcNow
+                    Id,
+                    Id,
+                    oldState,
+                    newState,
+                    DateTimeOffset.UtcNow,
+                    routingData
                 );
 
-                await _eventBus.PublishAsync(this, evt);
+                // Wait for the event to be published to ensure state transitions are properly observed
+                var result = await _eventBus.PublishAsync(this, evt);
+                
+                if (result == null || result.HasErrors)
+                {
+                    Logger.Log($"Warning: State change event publication may have failed: {oldState} -> {newState}");
+                }
             }
             catch (Exception ex)
             {
