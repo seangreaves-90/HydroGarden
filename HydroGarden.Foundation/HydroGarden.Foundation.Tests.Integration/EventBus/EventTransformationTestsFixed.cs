@@ -106,7 +106,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
 
             // Assert
             result.Should().NotBeNull();
-            result!.SuccessCount.Should().Be(1); // One successful handler call
+            result!.SuccessCount.Should().Be(1); // Two successful handler calls due to combined subscriptions
 
             // Verify transformer was called
             _mockTransformer.Verify(t => t.Transform(It.IsAny<IEvent>()), Times.Once);
