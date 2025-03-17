@@ -3,21 +3,16 @@
 namespace HydroGarden.Foundation.Common.Events
 {
     /// <summary>
-    /// Adapter class to convert typed IEventHandler<TEvent> to IEventHandler
+    /// Adapter class to convert typed IEventHandler&gt;TEvent&lt; to IEventHandler
     /// </summary>
     /// <typeparam name="TEvent">The specific event type this adapter handles</typeparam>
-    public class TypedEventHandlerAdapter<TEvent> : IEventHandler where TEvent : IEvent
+    /// <remarks>
+    /// Creates a new adapter for the specified typed handler
+    /// </remarks>
+    /// <param name="typedHandler">The typed event handler to adapt</param>
+    public class TypedEventHandlerAdapter<TEvent>(IEventHandler<TEvent> typedHandler) : IEventHandler where TEvent : IEvent
     {
-        private readonly IEventHandler<TEvent> _typedHandler;
-
-        /// <summary>
-        /// Creates a new adapter for the specified typed handler
-        /// </summary>
-        /// <param name="typedHandler">The typed event handler to adapt</param>
-        public TypedEventHandlerAdapter(IEventHandler<TEvent> typedHandler)
-        {
-            _typedHandler = typedHandler ?? throw new ArgumentNullException(nameof(typedHandler));
-        }
+        private readonly IEventHandler<TEvent> _typedHandler = typedHandler ?? throw new ArgumentNullException(nameof(typedHandler));
 
         /// <inheritdoc />
         public async Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent

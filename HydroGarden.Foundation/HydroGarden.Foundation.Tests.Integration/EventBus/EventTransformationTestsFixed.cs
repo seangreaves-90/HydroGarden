@@ -98,7 +98,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns(Task.CompletedTask);
 
             // Create an adapter for IEventHandler to IEventHandler<IEvent>
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter);
 
             // Act - Publish event normally
@@ -166,7 +166,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Callback(() => handlerCallCount++)
                 .Returns(Task.CompletedTask);
 
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter);
 
             // Act - Publish valid event
@@ -262,13 +262,13 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns(Task.CompletedTask);
             
             // Subscribe with specific event type options
-            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object, typeof(IEvent));
+            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object);
             _eventBus.Subscribe<IEvent>(commandAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.Command }
             });
             
-            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object, typeof(IEvent));
+            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object);
             _eventBus.Subscribe<IEvent>(stateAdapter, new EventSubscriptionOptions
             {
                 EventTypes = new[] { EventType.StateChange }
@@ -325,7 +325,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Callback<object, IEvent, CancellationToken>((_, e, _) => capturedEvent = e)
                 .Returns(Task.CompletedTask);
             
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             eventBusWithoutTransformer.Subscribe<IEvent>(adapter);
             
             // Act - Publish event

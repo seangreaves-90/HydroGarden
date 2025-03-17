@@ -111,7 +111,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create a test event from the source
@@ -207,7 +207,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create a test event from the source
@@ -319,7 +319,7 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 IncludeConnectedSources = true
             };
             
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter, options);
             
             // Create high priority event with a first byte > 128

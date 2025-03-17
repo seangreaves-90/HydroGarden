@@ -68,7 +68,7 @@ namespace HydroGarden.Foundation.Common.Events
                 if (applicableMiddleware.Count == 0)
                 {
                     _logger.Log($"No applicable middleware for event {processedEvent.EventId}");
-                    return new EventProcessingResult(processedEvent, processedEvent, true, null);
+                    return new EventProcessingResult(@event, processedEvent, true, null);
                 }
 
                 // Process event through each middleware in order
@@ -76,12 +76,13 @@ namespace HydroGarden.Foundation.Common.Events
                 {
                     try
                     {
+                        _logger.Log($"Processing event {processedEvent.EventId} with middleware {middleware.Middleware.GetType().Name}");
                         var middlewareResult = await middleware.Middleware.ProcessEventAsync(sender, processedEvent, cancellationToken);
                         
                         // If middleware indicates processing should stop, return its result
                         if (middlewareResult.ShouldStopProcessing)
                         {
-                            _logger.Log($"Middleware {middleware.Middleware.Id} stopped processing for event {processedEvent.EventId}");
+                            _logger.Log($"Middleware {middleware.Middleware.GetType().Name} stopped processing for event {processedEvent.EventId}");
                             return new EventProcessingResult(
                                 @event, 
                                 middlewareResult.Event, 
@@ -90,11 +91,16 @@ namespace HydroGarden.Foundation.Common.Events
                         }
 
                         // Update the event for the next middleware
-                        processedEvent = middlewareResult.Event;
+                        if (!ReferenceEquals(processedEvent, middlewareResult.Event))
+                        {
+                            _logger.Log($"Event {processedEvent.EventId} was transformed by {middleware.Middleware.GetType().Name}");
+                            // Event was changed - use the new event for further processing
+                            processedEvent = middlewareResult.Event;
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _logger.Log(ex, $"Error in middleware {middleware.Middleware.Id} for event {processedEvent.EventId}");
+                        _logger.Log(ex, $"Error in middleware {middleware.Middleware.GetType().Name} for event {processedEvent.EventId}");
                         return new EventProcessingResult(@event, processedEvent, false, ex);
                     }
                 }

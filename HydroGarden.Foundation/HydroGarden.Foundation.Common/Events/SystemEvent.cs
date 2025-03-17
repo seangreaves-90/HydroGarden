@@ -5,40 +5,33 @@ namespace HydroGarden.Foundation.Common.Events
     /// <summary>
     /// Represents a system event within the HydroGarden system.
     /// </summary>
-    public class SystemEvent : HydroGardenEventBase, ISystemEvent
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="SystemEvent"/> class.
+    /// </remarks>
+    /// <param name="deviceId">The device ID.</param>
+    /// <param name="eventSubType">The subtype of the system event.</param>
+    /// <param name="eventData">The event data.</param>
+    /// <param name="routingData">Optional routing data.</param>
+    public class SystemEvent(
+        Guid deviceId,
+        string eventSubType,
+        IDictionary<string, object> eventData,
+        IEventRoutingData? routingData = null) : HydroGardenEventBase(deviceId, routingData), ISystemEvent
     {
         /// <summary>
         /// Gets the subtype of the system event.
         /// </summary>
-        public string EventSubType { get; }
+        public string EventSubType { get; } = eventSubType;
 
         /// <summary>
         /// Gets the event data.
         /// </summary>
-        public IDictionary<string, object> EventData { get; }
+        public IDictionary<string, object> EventData { get; } = eventData;
 
         /// <summary>
         /// Gets the event type.
         /// </summary>
         public override EventType EventType => EventType.System;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SystemEvent"/> class.
-        /// </summary>
-        /// <param name="deviceId">The device ID.</param>
-        /// <param name="eventSubType">The subtype of the system event.</param>
-        /// <param name="eventData">The event data.</param>
-        /// <param name="routingData">Optional routing data.</param>
-        public SystemEvent(
-            Guid deviceId,
-            string eventSubType,
-            IDictionary<string, object> eventData,
-            IEventRoutingData? routingData = null)
-            : base(deviceId, routingData)
-        {
-            EventSubType = eventSubType;
-            EventData = eventData;
-        }
 
         /// <summary>
         /// Creates a new recovery attempt system event.

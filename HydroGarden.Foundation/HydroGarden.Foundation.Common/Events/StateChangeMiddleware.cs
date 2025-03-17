@@ -16,7 +16,8 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="logger">The logger to use.</param>
         public StateChangeMiddleware(ILogger logger)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger, nameof(logger));
+            _logger = logger;
             Id = Guid.NewGuid();
         }
 
@@ -31,15 +32,23 @@ namespace HydroGarden.Foundation.Common.Events
         {
             try
             {
-                if (evt == null)
+                ArgumentNullException.ThrowIfNull(evt, nameof(evt));
+
+                // Check if it's a state change event
+                bool isStateChangeEvent = evt.EventType == EventType.StateChange;
+                IStateChangeEvent? stateChangeEvent = evt as IStateChangeEvent;
+
+                // If it's a IStateChangeEvent but the EventType isn't set correctly, fix it
+                if (!isStateChangeEvent && stateChangeEvent != null)
                 {
-                    throw new ArgumentNullException(nameof(evt));
+                    _logger.Log($"Found IStateChangeEvent with incorrect EventType {evt.EventType}, correcting to StateChange");
+                    // Since we can't modify the original event, we'll note this for diagnostic purposes
+                    isStateChangeEvent = true;
                 }
 
-                // Only process state change events
-                if (evt.EventType != EventType.StateChange || !(evt is IStateChangeEvent stateChangeEvent))
+                // If it's not a state change event, continue processing
+                if (!isStateChangeEvent || stateChangeEvent == null)
                 {
-                    // Not a state change event, continue processing
                     return Task.FromResult<IMiddlewareProcessingResult>(
                         new MiddlewareProcessingResult(
                             evt,
@@ -54,13 +63,13 @@ namespace HydroGarden.Foundation.Common.Events
                 if (evt.RoutingData == null)
                 {
                     // Create new routing data for this event
-                    var routingData = EventRoutingData.CreateBuilder()
+                    EventRoutingData.CreateBuilder()
                         .WithPriority(EventPriority.High)
                         .Build();
 
                     // We can't modify the existing event, so we'd normally create a new one
                     // For now, just ensure it's processed with high priority
-                    
+
                     _logger.Log($"Assigned high priority to state change event");
                 }
                 else
@@ -77,7 +86,7 @@ namespace HydroGarden.Foundation.Common.Events
             catch (Exception ex)
             {
                 _logger.Log(ex, $"Error processing state change event {evt.EventId}");
-                
+
                 // Return a result that indicates failure but continues processing
                 return Task.FromResult<IMiddlewareProcessingResult>(
                     new MiddlewareProcessingResult(

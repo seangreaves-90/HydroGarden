@@ -39,16 +39,5 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         /// <returns>Result of the publish operation</returns>
         Task<IPublishResult?> PublishAsync(object? sender, IEvent evt, CancellationToken ct = default);
         
-        /// <summary>
-        /// Sets the topology service for event routing.
-        /// </summary>
-        /// <param name="topologyService">The topology service to use for routing events.</param>
-        void SetTopologyService(ITopologyService topologyService);
-        
-        /// <summary>
-        /// Gets the topology service used by this event bus.
-        /// </summary>
-        /// <returns>The topology service, or null if not configured.</returns>
-        ITopologyService? GetTopologyService();
     }
 }

@@ -89,9 +89,9 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns(Task.CompletedTask);
             
             // Subscribe all handlers using adapters
-            var adapter1 = new GenericEventHandlerAdapter<IEvent>(handler1.Object, typeof(IEvent));
-            var adapter2 = new GenericEventHandlerAdapter<IEvent>(handler2.Object, typeof(IEvent));
-            var adapter3 = new GenericEventHandlerAdapter<IEvent>(handler3.Object, typeof(IEvent));
+            var adapter1 = new GenericEventHandlerAdapter<IEvent>(handler1.Object);
+            var adapter2 = new GenericEventHandlerAdapter<IEvent>(handler2.Object);
+            var adapter3 = new GenericEventHandlerAdapter<IEvent>(handler3.Object);
             _eventBus.Subscribe<IEvent>(adapter1);
             _eventBus.Subscribe<IEvent>(adapter2);
             _eventBus.Subscribe<IEvent>(adapter3);
@@ -201,8 +201,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                 .Returns(Task.CompletedTask);
 
             // Subscribe handlers with specific event types using adapters
-            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object, typeof(IEvent));
-            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object, typeof(IEvent));
+            var commandAdapter = new GenericEventHandlerAdapter<IEvent>(commandHandler.Object);
+            var stateAdapter = new GenericEventHandlerAdapter<IEvent>(stateHandler.Object);
             
             eventBus.Subscribe<IEvent>(commandAdapter, new EventSubscriptionOptions
             {
@@ -289,8 +289,8 @@ namespace HydroGarden.Foundation.Tests.Integration.EventBus
                     .Returns(Task.CompletedTask);
             
             // Subscribe both handlers with adapters
-            var failingAdapter = new GenericEventHandlerAdapter<IEvent>(failingHandler.Object, typeof(IEvent));
-            var reportingAdapter = new GenericEventHandlerAdapter<IEvent>(reportingHandler.Object, typeof(IEvent));
+            var failingAdapter = new GenericEventHandlerAdapter<IEvent>(failingHandler.Object);
+            var reportingAdapter = new GenericEventHandlerAdapter<IEvent>(reportingHandler.Object);
             _eventBus.Subscribe<IEvent>(failingAdapter);
             _eventBus.Subscribe<IEvent>(reportingAdapter);
             

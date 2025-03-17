@@ -10,15 +10,12 @@ namespace HydroGarden.Foundation.Common.Events.Routing
     /// This router handles basic routing based on event type and source ID matching.
     /// It does not use topology information for connected components.
     /// </remarks>
-    public class DirectEventRouter : BaseEventRouter
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="DirectEventRouter"/> class.
+    /// </remarks>
+    /// <param name="logger">The logger to use.</param>
+    public class DirectEventRouter(ILogger logger) : BaseEventRouter(logger)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DirectEventRouter"/> class.
-        /// </summary>
-        /// <param name="logger">The logger to use.</param>
-        public DirectEventRouter(ILogger logger) : base(logger)
-        {
-        }
 
         /// <inheritdoc/>
         protected override Task<bool> MatchesSubscriptionCoreAsync(

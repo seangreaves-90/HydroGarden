@@ -160,7 +160,7 @@ namespace HydroGarden.Foundation.Common.Events.Routing
                 }
             }
 
-            return Array.Empty<IEventSubscription>();
+            return [];
         }
 
         private async Task<IReadOnlyList<IEventSubscription>> GetAllRequiredMatchingSubscriptionsAsync(

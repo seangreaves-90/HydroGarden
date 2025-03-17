@@ -20,18 +20,15 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
             _typedHandler = typedHandler ?? throw new ArgumentNullException(nameof(typedHandler));
             _untypedHandler = null;
         }
-        
+
         /// <summary>
         /// Creates a new adapter for the specified untyped handler
         /// </summary>
         /// <param name="untypedHandler">The untyped event handler to adapt</param>
-        /// <param name="eventType">The event type this handler should handle</param>
-        public GenericEventHandlerAdapter(IEventHandler untypedHandler, Type eventType)
+        public GenericEventHandlerAdapter(IEventHandler untypedHandler)
         {
             _untypedHandler = untypedHandler ?? throw new ArgumentNullException(nameof(untypedHandler));
             _typedHandler = null;
-            // The type parameter TEvent is used for type safety but we ignore it here
-            // eventType is stored just for documentation
         }
 
         /// <inheritdoc />
@@ -48,7 +45,7 @@ namespace HydroGarden.Foundation.Common.Events.Adapters
             else if (_untypedHandler != null)
             {
                 // For untyped handlers, use the base HandleEventAsync method
-                return _untypedHandler.HandleEventAsync<IEvent>(null, @event, ct);
+                return _untypedHandler.HandleEventAsync(null, @event, ct);
             }
 
             return Task.CompletedTask;

@@ -85,7 +85,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
                 .Throws(new InvalidOperationException("Simulated handler failure"));
 
             // Subscribe the handler
-            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object, typeof(IEvent));
+            var adapter = new GenericEventHandlerAdapter<IEvent>(mockHandler.Object);
             _eventBus.Subscribe<IEvent>(adapter);
 
             // Set up event store to capture persisted events

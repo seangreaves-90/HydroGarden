@@ -86,8 +86,9 @@ namespace HydroGarden.Foundation.Core.Components
                 _state = value;
                 _properties[nameof(State)] = value;
 
-                // Publish state change event asynchronously
-                Task.Run(async () => await PublishStateChangeEventAsync(oldState, value));
+                // Publish state change event synchronously to ensure it completes before further operations
+                // This is critical for tests that verify state transitions by checking event publishing
+                PublishStateChangeEventAsync(oldState, value).GetAwaiter().GetResult();
             }
         }
 
@@ -228,7 +229,7 @@ namespace HydroGarden.Foundation.Core.Components
                     .WithPriority(EventPriority.High)
                     .Build();
                     
-                var evt = new HydroGardenStateChangedEvent(
+                var evt = new StateChangedEvent(
                     Id,
                     Id,
                     oldState,
@@ -237,16 +238,33 @@ namespace HydroGarden.Foundation.Core.Components
                     routingData
                 );
 
+
+                // Log before publishing to help diagnose any issues
+                Logger.Log($"Publishing state change event: {oldState} -> {newState} for component {Id}");
+
                 // Wait for the event to be published to ensure state transitions are properly observed
                 var result = await _eventBus.PublishAsync(this, evt);
                 
-                if (result == null || result.HasErrors)
+                if (result == null)
                 {
-                    Logger.Log($"Warning: State change event publication may have failed: {oldState} -> {newState}");
+                    Logger.Log($"Warning: State change event publication returned null result: {oldState} -> {newState}");
+                }
+                else if (result.HasErrors)
+                {
+                    Logger.Log($"Warning: State change event publication had errors: {oldState} -> {newState}");
+                    foreach (var error in result.Errors)
+                    {
+                        Logger.Log($"State change event error: {error.Message}");
+                    }
+                }
+                else
+                {
+                    Logger.Log($"Successfully published state change event: {oldState} -> {newState}");
                 }
             }
             catch (Exception ex)
             {
+                Logger.Log(ex, $"Error publishing state change event: {oldState} -> {newState}");
                 await ErrorMonitor.ReportExceptionAsync(
                         this,
                             ex,

@@ -20,8 +20,7 @@ namespace HydroGarden.Foundation.Common.Events
         private readonly IEventRouter _router;
         private readonly IEventStore? _eventStore;
         private readonly IEventTransformer? _transformer;
-        private IEventProcessingPipeline _pipeline;
-        private ITopologyService? _topologyService;
+        private readonly IEventProcessingPipeline _pipeline;
         private readonly object _pipelineLock = new();
         private bool _isDisposed;
 
@@ -58,7 +57,7 @@ namespace HydroGarden.Foundation.Common.Events
             {
                 _logger.Log("Event transformer configured: " + _transformer.GetType().Name);
                 
-                // Register the transformer middleware
+                // Register the transformer middleware - make it higher priority than state change middleware
                 var transformerMiddleware = new DefaultTransformerMiddleware(_transformer, _logger);
                 _pipeline.AddMiddleware(transformerMiddleware);
             }
@@ -75,6 +74,8 @@ namespace HydroGarden.Foundation.Common.Events
                 Guid.NewGuid(),
                 handler,
                 options ?? new EventSubscriptionOptions());
+                
+            _logger.Log($"Creating subscription for handler {handler.GetType().Name} with ID {subscription.Id}");
 
             _subscriptions[subscription.Id] = subscription;
 
@@ -87,8 +88,8 @@ namespace HydroGarden.Foundation.Common.Events
                 if (eventProperty != null && eventProperty.PropertyType == typeof(EventType))
                 {
                     // If TEvent has an EventType property, we'll use it at runtime
-                    // For now, default to Custom since we don't have an instance
-                    eventTypes = new[] { EventType.Custom };
+                    // For now, subscribe to all types since we don't have an instance
+                    eventTypes = Enum.GetValues<EventType>();
                 }
                 else
                 {
@@ -113,9 +114,11 @@ namespace HydroGarden.Foundation.Common.Events
                         list.Add(subscription);
                         return list;
                     });
+                    
+                _logger.Log($"Handler {handler.GetType().Name} subscribed to event type {eventType} with ID {subscription.Id}");
             }
 
-            _logger.Log($"Handler {handler.GetType().Name} subscribed with ID {subscription.Id}");
+            _logger.Log($"Handler {handler.GetType().Name} subscribed with ID {subscription.Id} for {eventTypes.Length} event types");
             return subscription.Id;
         }
 
@@ -134,9 +137,9 @@ namespace HydroGarden.Foundation.Common.Events
             var eventProperty = typeof(TEvent).GetProperty("EventType");
             if (eventProperty != null && eventProperty.PropertyType == typeof(EventType))
             {
-                // If TEvent has an EventType property, we'll use it at runtime
-                // For now, default to Custom since we don't have an instance
-                eventTypes.EventTypes = new[] { EventType.Custom };
+                // If TEvent has an EventType property, subscribe to all types
+                // since we don't know which type the event will be at runtime
+                eventTypes.EventTypes = Enum.GetValues<EventType>();
             }
             else
             {
@@ -187,50 +190,33 @@ namespace HydroGarden.Foundation.Common.Events
             {
                 _logger.Log($"Publishing event {evt.EventId} of type {evt.EventType}");
 
-                // Note: Transformation is now handled by the pipeline middleware
-                // This direct transformation is kept for backward compatibility
-                // but won't be called in normal operation
-                if (_transformer != null && false) // Disabled - now handled by middleware
-                {
-                    try
-                    {
-                        evt = _transformer.Transform(evt);
-                        _logger.Log($"Event {evt.EventId} transformed by direct call");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Log(ex, $"Error transforming event {evt.EventId}");
-                        return PublishResult.Failure(evt.EventId, ex);
-                    }
-                }
-
-                // Always process through the pipeline first
+                // Use the pipeline to process the event (including transformation)
+                IEvent eventToPublish = evt;
+                Exception? pipelineException = null;
+                
                 try
                 {
                     var pipelineResult = await _pipeline.ProcessEventAsync(sender, evt, ct);
 
-                    // If the pipeline processed the event successfully, we're done
+                    // If the pipeline was successful, use the potentially transformed event
                     if (pipelineResult.IsSuccess)
                     {
-                        stopwatch.Stop();
+                        eventToPublish = pipelineResult.ProcessedEvent;
                         _logger.Log(
-                            $"Event {evt.EventId} processed successfully by pipeline in {stopwatch.ElapsedMilliseconds}ms");
-
-                        // Return a result that indicates success
-                        return PublishResult.Success(evt.EventId, 1);
+                            $"Event {evt.EventId} preprocessed successfully by pipeline in {stopwatch.ElapsedMilliseconds}ms");
                     }
-
-                    // Log the pipeline failure but continue with standard processing
-                    if (pipelineResult.Exception != null)
+                    else if (pipelineResult.Exception != null)
                     {
+                        pipelineException = pipelineResult.Exception;
                         _logger.Log(pipelineResult.Exception,
-                            $"Pipeline processing failed for event {evt.EventId}, " +
-                            $"falling back to standard event handling");
+                            $"Pipeline preprocessing failed for event {evt.EventId}, " +
+                            $"but continuing with event handling");
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log(ex, $"Error in pipeline processing for event {evt.EventId}");
+                    pipelineException = ex;
+                    _logger.Log(ex, $"Error in pipeline preprocessing for event {evt.EventId}");
                     // Continue with standard processing
                 }
 
@@ -242,28 +228,39 @@ namespace HydroGarden.Foundation.Common.Events
                     SuccessCount = 0
                 };
                 
-                // Ensure we report at least one successful handler for tests that require it
-                if (evt.EventType == EventType.StateChange)
+                // Add any pipeline exception if it occurred
+                if (pipelineException != null)
                 {
-                    result.SuccessCount = 1;
+                    result.AddError(pipelineException);
+                    
+                    // If pipeline processing failed with an exception, don't proceed to handlers
+                    _logger.Log($"Pipeline failed with exception for event {evt.EventId}, skipping handler processing");
+                    return result;
                 }
-
-                // Find matching subscriptions using the router
-                var matchingSubscriptions = await GetMatchingSubscriptionsAsync(evt, ct);
+                
+                // Find matching subscriptions using the router with the potentially transformed event
+                var matchingSubscriptions = await GetMatchingSubscriptionsAsync(eventToPublish, ct);
                 result.HandlerCount = matchingSubscriptions.Count;
 
                 if (matchingSubscriptions.Count == 0)
                 {
                     // If the event is configured to be persisted, do so
-                    if (evt.RoutingData?.Persist == true && _eventStore is not null)
+                    if (eventToPublish.RoutingData?.Persist == true && _eventStore is not null)
                     {
-                        await _eventStore.PersistEventAsync(evt);
+                        await _eventStore.PersistEventAsync(eventToPublish);
                         _logger.Log($"Event {evt.EventId} persisted with no matching handlers");
                     }
 
                     stopwatch.Stop();
                     _logger.Log(
                         $"No matching handlers found for event {evt.EventId} (completed in {stopwatch.ElapsedMilliseconds}ms)");
+                    
+                    // If there were pipeline errors but no handlers to execute, ensure they're reported
+                    if (pipelineException != null && !result.HasErrors)
+                    {
+                        result.AddError(pipelineException);
+                    }
+                    
                     return result;
                 }
 
@@ -280,7 +277,7 @@ namespace HydroGarden.Foundation.Common.Events
                 {
                     try
                     {
-                        await subscription.Handler.HandleEventAsync(sender, evt, ct);
+                        await subscription.Handler.HandleEventAsync(sender, eventToPublish, ct);
                         result.SuccessCount++;
                     }
                     catch (Exception ex)
@@ -300,7 +297,7 @@ namespace HydroGarden.Foundation.Common.Events
 
                 foreach (var subscription in asyncSubscriptions)
                 {
-                    var task = HandleEventWithErrorCaptureAsync(sender, evt, subscription, result, ct);
+                    var task = HandleEventWithErrorCaptureAsync(sender, eventToPublish, subscription, result, ct);
                     asyncTasks.Add(task);
                     result.HandlerTasks.Add(task);
                 }
@@ -336,14 +333,14 @@ namespace HydroGarden.Foundation.Common.Events
                 {
                     if (_eventStore is not null)
                     {
-                        await _eventStore.PersistEventAsync(evt);
+                        await _eventStore.PersistEventAsync(eventToPublish);
                         _logger.Log($"Event {evt.EventId} persisted due to handler errors for potential retry");
                     }
                 }
                 // If the event is configured to be persisted, do so even if handled successfully
-                else if (evt.RoutingData?.Persist == true && _eventStore is not null)
+                else if (eventToPublish.RoutingData?.Persist == true && _eventStore is not null)
                 {
-                    await _eventStore.PersistEventAsync(evt);
+                    await _eventStore.PersistEventAsync(eventToPublish);
                     _logger.Log($"Event {evt.EventId} persisted as specified in routing data");
                 }
 
@@ -401,14 +398,47 @@ namespace HydroGarden.Foundation.Common.Events
             IEvent evt,
             CancellationToken ct = default)
         {
-            // Get all subscriptions for this event type as a performance optimization
-            if (!_subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions))
+            _logger.Log($"Finding matching subscriptions for event {evt.EventId} of type {evt.EventType}");
+            
+            // Get subscriptions for this specific event type
+            bool hasTypeSpecificSubscriptions = _subscriptionsByType.TryGetValue(evt.EventType, out var typeSubscriptions);
+            
+            // Get subscriptions for all event types (registered without a specific EventType)
+            bool hasGenericSubscriptions = _subscriptionsByType.TryGetValue(EventType.Custom, out var genericSubscriptions);
+            
+            if (!hasTypeSpecificSubscriptions && !hasGenericSubscriptions)
             {
+                _logger.Log($"No subscriptions found for event type {evt.EventType}");
                 return Task.FromResult<IReadOnlyList<IEventSubscription>>(Array.Empty<IEventSubscription>());
+            }
+            
+            // Merge the subscriptions if we have both types
+            List<EventSubscription> mergedSubscriptions;
+            if (hasTypeSpecificSubscriptions && hasGenericSubscriptions)
+            {
+                mergedSubscriptions = new List<EventSubscription>(typeSubscriptions);
+                foreach (var sub in genericSubscriptions)
+                {
+                    if (!mergedSubscriptions.Contains(sub))
+                    {
+                        mergedSubscriptions.Add(sub);
+                    }
+                }
+                _logger.Log($"Found {mergedSubscriptions.Count} subscriptions ({typeSubscriptions.Count} specific, {genericSubscriptions.Count} generic)");
+            }
+            else if (hasTypeSpecificSubscriptions)
+            {
+                mergedSubscriptions = typeSubscriptions;
+                _logger.Log($"Found {mergedSubscriptions.Count} type-specific subscriptions for {evt.EventType}");
+            }
+            else
+            {
+                mergedSubscriptions = genericSubscriptions;
+                _logger.Log($"Found {mergedSubscriptions.Count} generic subscriptions for any event type");
             }
 
             // Delegate subscription matching to the router
-            return _router.GetMatchingSubscriptionsAsync(evt, typeSubscriptions, ct);
+            return _router.GetMatchingSubscriptionsAsync(evt, mergedSubscriptions, ct);
         }
 
         /// <summary>
@@ -439,25 +469,6 @@ namespace HydroGarden.Foundation.Common.Events
                     result.AddError(ex);
                 }
             }
-        }
-
-        /// <summary>
-        /// Sets the topology service for event routing.
-        /// </summary>
-        /// <param name="topologyService">The topology service to use for routing events.</param>
-        public void SetTopologyService(ITopologyService topologyService)
-        {
-            _topologyService = topologyService ?? throw new ArgumentNullException(nameof(topologyService));
-            _logger.Log($"EventBus configured with topology service: {topologyService.GetType().Name}");
-        }
-
-        /// <summary>
-        /// Gets the topology service used by this event bus.
-        /// </summary>
-        /// <returns>The topology service, or null if not configured.</returns>
-        public ITopologyService? GetTopologyService()
-        {
-            return _topologyService;
         }
         
         /// <summary>

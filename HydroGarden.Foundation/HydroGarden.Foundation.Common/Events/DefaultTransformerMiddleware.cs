@@ -27,7 +27,7 @@ namespace HydroGarden.Foundation.Common.Events
         public Guid Id { get; }
 
         /// <inheritdoc/>
-        public int Priority => 1000; // High priority so it runs first
+        public int Priority => 2500; // Higher priority than state change middleware (2000) but lower than validation (3000)
 
         /// <inheritdoc/>
         public Task<IMiddlewareProcessingResult> ProcessEventAsync(object? sender, IEvent evt, CancellationToken cancellationToken = default)
@@ -41,12 +41,21 @@ namespace HydroGarden.Foundation.Common.Events
 
                 // Transform the event
                 var transformedEvent = _transformer.Transform(evt);
-                if (transformedEvent == null)
-                {
-                    throw new InvalidOperationException("Event transformer returned null");
-                }
 
-                _logger.Log($"Event {evt.EventId} transformed from type {evt.EventType} to {transformedEvent.EventType}");
+                // Log the transformation details
+                _logger.Log($"Event {evt.EventId} transformed by {_transformer.GetType().Name}");
+                
+                // If the event type changed, log it
+                if (transformedEvent.EventType != evt.EventType)
+                {
+                    _logger.Log($"Event type changed from {evt.EventType} to {transformedEvent.EventType}");
+                }
+                
+                // Ensure the transformer didn't change the event ID - very important
+                if (transformedEvent.EventId != evt.EventId)
+                {
+                    _logger.Log($"Warning: Transformer changed event ID from {evt.EventId} to {transformedEvent.EventId}. This may cause issues.");
+                }
 
                 return Task.FromResult<IMiddlewareProcessingResult>(
                     new MiddlewareProcessingResult(
@@ -56,8 +65,12 @@ namespace HydroGarden.Foundation.Common.Events
             }
             catch (Exception ex)
             {
-                _logger.Log(ex, $"Error transforming event {evt.EventId}");
-                
+                if (evt != null)
+                {
+                    _logger.Log(ex, $"Error transforming event {evt.EventId}");
+
+
+                }
                 // Return a result that indicates failure
                 return Task.FromResult<IMiddlewareProcessingResult>(
                     new MiddlewareProcessingResult(
