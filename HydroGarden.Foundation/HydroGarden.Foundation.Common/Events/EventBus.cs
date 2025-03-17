@@ -420,13 +420,13 @@ namespace HydroGarden.Foundation.Common.Events
             List<EventSubscription> mergedSubscriptions = [];
             if (hasTypeSpecificSubscriptions)
             {
-            mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
-            _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
+                mergedSubscriptions.AddRange(typeSubscriptions ?? Enumerable.Empty<EventSubscription>());
+                _logger.Log($"Found {typeSubscriptions?.Count ?? 0} type-specific subscriptions for {evt.EventType}");
             }
             if (hasGenericSubscriptions)
             {
-            mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
-            _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
+                mergedSubscriptions.AddRange(collection: genericSubscriptions ?? Enumerable.Empty<EventSubscription>());
+                _logger.Log($"Found {genericSubscriptions?.Count ?? 0} generic subscriptions for any event type");
             }
 
             // Only include subscriptions that match the current event type or are generic
