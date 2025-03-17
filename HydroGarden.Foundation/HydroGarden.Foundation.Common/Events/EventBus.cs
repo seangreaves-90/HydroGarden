@@ -1,10 +1,11 @@
-﻿using HydroGarden.Foundation.Abstractions.Interfaces;
+using HydroGarden.Foundation.Common.Events.Adapters;﻿using System.Collections.Concurrent;
+using System.Diagnostics;
+using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events.Routing;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
+using HydroGarden.Foundation.Common.Events.Adapters;
 using HydroGarden.Logger.Abstractions;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace HydroGarden.Foundation.Common.Events
 {
@@ -139,7 +140,7 @@ namespace HydroGarden.Foundation.Common.Events
                 throw new ArgumentNullException(nameof(handler));
                 
             // Create adapter to convert typed handler to standard handler
-            var adapter = new Events.TypedEventHandlerAdapter<TEvent>(handler);
+            var adapter = new TypedEventHandlerAdapter<TEvent>(handler);
             
             // Get the event type from the TEvent type using reflection
             var eventProperty = typeof(TEvent).GetProperty("EventType");
@@ -283,7 +284,7 @@ namespace HydroGarden.Foundation.Common.Events
                 if (matchingSubscriptions.Count == 0)
                 {
                     // If the event is configured to be persisted, do so
-                    if (evt.RoutingData?.Persist == true && _eventStore != null)
+                    if (evt.RoutingData?.Persist == true && _eventStore is not null)
                     {
                         await _eventStore.PersistEventAsync(evt);
                         _logger.Log($"Event {evt.EventId} persisted with no matching handlers");
@@ -360,15 +361,15 @@ namespace HydroGarden.Foundation.Common.Events
                 // If event had errors and we have an event store, persist for retry
                 if (hasErrors || result.HasErrors)
                 {
-                    if (_eventStore != null)
-                    {
+                if (_eventStore is not null)
+                {
                         await _eventStore.PersistEventAsync(evt);
                         _logger.Log($"Event {evt.EventId} persisted due to handler errors for potential retry");
                     }
                 }
 
                 // If the event is configured to be persisted, do so even if handled successfully
-                else if (evt.RoutingData?.Persist == true && _eventStore != null)
+                else if (evt.RoutingData?.Persist == true && _eventStore is not null)
                 {
                     await _eventStore.PersistEventAsync(evt);
                     _logger.Log($"Event {evt.EventId} persisted as specified in routing data");
@@ -395,7 +396,7 @@ namespace HydroGarden.Foundation.Common.Events
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ProcessFailedEventsAsync(CancellationToken ct = default)
         {
-            if (_eventStore == null)
+            if (_eventStore is null)
             {
                 _logger.Log("Cannot process failed events: event store is not configured");
                 return;

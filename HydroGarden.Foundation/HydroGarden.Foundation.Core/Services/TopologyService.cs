@@ -48,8 +48,13 @@ namespace HydroGarden.Foundation.Core.Services
         public TopologyService(ILogger logger, IPersistenceService persistenceService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _propertyAccessService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
-            _topologyRepository = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
+            
+            if (persistenceService == null)
+                throw new ArgumentNullException(nameof(persistenceService));
+                
+            // Explicit casts to the required interfaces
+            _propertyAccessService = (IPropertyAccessService)persistenceService;
+            _topologyRepository = (ITopologyRepository)persistenceService;
             _conditionEvaluator = new ConditionEvaluator(_propertyAccessService);
         }
 

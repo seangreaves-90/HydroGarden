@@ -218,7 +218,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
     {
         protected readonly Mock<ILogger> MockLogger;
         protected readonly Mock<IEventStore> MockStore;
-        protected readonly Mock<IEventRetryPolicy> MockRetryPolicy;
+
         protected readonly Mock<IEventTransformer> MockTransformer;
         protected readonly Mock<ITopologyService> MockTopologyService;
         protected readonly Mock<IErrorMonitor> MockErrorMonitor;
@@ -229,7 +229,7 @@ namespace HydroGarden.Foundation.Tests.Unit.EventBus
         {
             MockLogger = new Mock<ILogger>();
             MockStore = new Mock<IEventStore>();
-            MockRetryPolicy = new Mock<IEventRetryPolicy>();
+
             MockTransformer = new Mock<IEventTransformer>();
             MockTopologyService = new Mock<ITopologyService>();
             MockErrorMonitor = new Mock<IErrorMonitor>();

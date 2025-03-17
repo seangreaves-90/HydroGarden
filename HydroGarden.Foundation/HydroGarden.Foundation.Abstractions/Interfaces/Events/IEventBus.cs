@@ -40,19 +40,5 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Events
         Task<IPublishResult?> PublishAsync(object? sender, IEvent evt, CancellationToken ct = default);
     }
 
-    public interface IEventStore
-    {
-        Task PersistEventAsync(IEvent evt);
-        Task<IEvent?> RetrieveFailedEventAsync();
-    }
 
-    public interface IEventRetryPolicy
-    {
-        Task<bool> ShouldRetryAsync(IEvent evt, int attemptCount);
-    }
-
-    public interface IEventTransformer
-    {
-        IEvent Transform(IEvent evt);
-    }
 }

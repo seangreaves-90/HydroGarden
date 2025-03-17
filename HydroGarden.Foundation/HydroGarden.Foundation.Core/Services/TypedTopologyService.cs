@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
-using HydroGarden.Foundation.Common.Events;
+using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -9,7 +9,7 @@ namespace HydroGarden.Foundation.Core.Services
     /// <summary>
     /// Implementation of the topology service that uses the new typed event handlers
     /// </summary>
-    public class TypedTopologyService : TopologyService, IEventHandler<PropertyChangedEvent>
+    public class TypedTopologyService : TopologyService, IEventHandler<IPropertyChangedEvent>
     {
         private readonly IEventBus _eventBus;
 
@@ -30,7 +30,7 @@ namespace HydroGarden.Foundation.Core.Services
             _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
             
             // Subscribe to PropertyChangedEvent events
-            _eventBus.Subscribe<PropertyChangedEvent>(this);
+            _eventBus.Subscribe<IPropertyChangedEvent>(this);
         }
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace HydroGarden.Foundation.Core.Services
         /// </summary>
         /// <param name="event">The property changed event</param>
         /// <param name="ct">Cancellation token</param>
-        public async Task HandleAsync(PropertyChangedEvent @event, CancellationToken ct = default)
+        public async Task HandleAsync(IPropertyChangedEvent @event, CancellationToken ct = default)
         {
             // Here we could implement reaction to property changes
             // For example, we could revalidate connections that depend on the changed property
