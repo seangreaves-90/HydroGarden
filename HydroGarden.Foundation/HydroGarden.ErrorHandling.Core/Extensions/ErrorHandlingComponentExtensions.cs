@@ -27,7 +27,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Extensions
             string errorCode,
             string errorMessage,
             ErrorSource errorSource = ErrorSource.Unknown,
-            Dictionary<string, object?> context = null,
+            Dictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             try

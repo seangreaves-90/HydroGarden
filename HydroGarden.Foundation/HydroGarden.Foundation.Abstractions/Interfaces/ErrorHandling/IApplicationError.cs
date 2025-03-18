@@ -68,7 +68,7 @@
         /// <summary>
         /// Gets additional contextual information about the error.
         /// </summary>
-        public IDictionary<string, object> Context { get; }
+        public Dictionary<string, object?> Context { get; }
         
         /// <summary>
         /// Gets the timestamp when the error occurred.

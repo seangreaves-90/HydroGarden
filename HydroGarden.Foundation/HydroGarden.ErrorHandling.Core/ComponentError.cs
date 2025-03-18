@@ -26,7 +26,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         public ErrorSource Source { get; }
         
         /// <inheritdoc />
-        public IDictionary<string, object> Context { get; }
+        public Dictionary<string, object?> Context { get; }
         
         /// <inheritdoc />
         public DateTimeOffset Timestamp { get; }
@@ -65,7 +65,7 @@ namespace HydroGarden.Foundation.ErrorHandling
 
             // Initialize context from provided context or create an empty one
             Context = context != null 
-                ? new Dictionary<string, object>(context) 
+                ? new Dictionary<string, object?>(context) 
                 : [];
                 
             // Only enrich the context if we're given an exception or the context isn't empty
@@ -83,7 +83,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             Exception? exception = null,
             Guid? correlationId = null)
         {
@@ -107,7 +107,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             Exception? exception = null,
             Guid? correlationId = null)
         {
@@ -131,7 +131,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             Exception? exception = null,
             Guid? correlationId = null)
         {

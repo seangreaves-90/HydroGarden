@@ -23,7 +23,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             Exception? exception = null,
-            IDictionary<string, object>? context = null)
+            Dictionary<string, object?>? context = null)
         {
             return new ComponentError(
                 deviceId,

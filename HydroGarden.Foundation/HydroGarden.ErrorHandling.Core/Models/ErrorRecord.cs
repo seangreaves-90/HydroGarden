@@ -86,7 +86,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Models
         /// <summary>
         /// Gets the context information about the error (from interface).
         /// </summary>
-        public IDictionary<string, object> Context { get; } = new Dictionary<string, object>();
+        public Dictionary<string, object?> Context { get; } = new Dictionary<string, object>();
 
         /// <summary>
         /// Gets the exception associated with this error, if any.

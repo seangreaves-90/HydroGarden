@@ -55,25 +55,31 @@ public interface IRecoveryStrategy
 }
 ```
 
-### IHydroGardenComponent
+### IComponent
 
 The base interface for all components in the system.
 
 ```csharp
-public interface IHydroGardenComponent : IDisposable
+public interface IComponent : IDisposable, IAsyncDisposable
 {
     Guid Id { get; }
-    string Name { get; }
-    string AssemblyType { get; }
+    string? Name { get; }
+    string? AssemblyType { get; }
     ComponentState State { get; }
 
-    Task SetPropertyAsync(string name, object value, IPropertyMetadata metadata);
+    Task SetPropertyAsync(string name, object? value, IPropertyMetadata? metadata = null);
     Task<T?> GetPropertyAsync<T>(string name);
     IPropertyMetadata? GetPropertyMetadata(string name);
-    IDictionary<string, object> GetProperties();
+    Dictionary<string, object?> GetProperties();
     IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata();
-    Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
-    void SetEventHandler(IHydroGardenPropertyChangedEventHandler handler);
+    Task LoadPropertiesAsync(IDictionary<string, object?> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
+    void SetEventHandler(IPropertyChangedEventHandler<IEvent> handler);
+    Task<bool> TransitionToStateAsync(ComponentState newState, CancellationToken ct = default);
+    Task<bool> InitializeAsync(CancellationToken ct = default);
+    Task<bool> StartAsync(CancellationToken ct = default);
+    Task<bool> StopAsync(CancellationToken ct = default);
+    Task<bool> HandleErrorAsync(IApplicationError error, CancellationToken ct = default);
+    Task<bool> RecoverFromErrorAsync(CancellationToken ct = default);
 }
 ```
 
@@ -82,11 +88,13 @@ public interface IHydroGardenComponent : IDisposable
 Represents a physical or virtual IoT device in the system.
 
 ```csharp
-public interface IIoTDevice : IHydroGardenComponent
+public interface IIoTDevice : IComponent
 {
     Task InitializeAsync(CancellationToken ct = default);
     Task StartAsync(CancellationToken ct = default);
     Task StopAsync(CancellationToken ct = default);
+    Task<bool> TryRecoverAsync(CancellationToken ct = default);
+    Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
 }
 ```
 
@@ -97,9 +105,11 @@ The central messaging system interface.
 ```csharp
 public interface IEventBus
 {
-    Guid Subscribe(IHydroGardenPropertyChangedEventHandler handler, IEventSubscriptionOptions? options = null);
+    Guid Subscribe(IPropertyChangedEventHandler<IEvent> handler, IEventSubscriptionOptions? options = null);
     bool Unsubscribe(Guid subscriptionId);
-    Task<IPublishResult> PublishAsync(object sender, IHydroGardenEvent evt, CancellationToken ct = default);
+    Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default);
+    void SetEventProcessingPipeline(IEventProcessingPipeline pipeline);
+    IEventProcessingPipeline? GetEventProcessingPipeline();
 }
 ```
 
@@ -133,14 +143,14 @@ public interface IEventRoutingData
 }
 ```
 
-### IHydroGardenPropertyChangedEventHandler
+### IPropertyChangedEventHandler
 
 Interface for handling property change events.
 
 ```csharp
-public interface IHydroGardenPropertyChangedEventHandler : IAsyncDisposable
+public interface IPropertyChangedEventHandler<T> : IAsyncDisposable where T : IEvent
 {
-    Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent e, CancellationToken ct = default);
+    Task HandleEventAsync(object sender, T e, CancellationToken ct = default);
 }
 ```
 

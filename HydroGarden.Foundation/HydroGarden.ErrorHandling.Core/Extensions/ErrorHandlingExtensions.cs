@@ -89,7 +89,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Extensions
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             Exception? exception = null,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             var error = ErrorFactory.CreateDeviceError(
@@ -151,7 +151,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Extensions
             Guid deviceId,
             string message,
             Exception? exception = null,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             return monitor.ReportDeviceErrorAsync(
@@ -179,7 +179,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Extensions
             Guid deviceId,
             string message,
             Exception? exception = null,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             return monitor.ReportDeviceErrorAsync(

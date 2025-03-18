@@ -418,6 +418,110 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         {
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// Disposes of the device resources, cancelling any ongoing operations
+        /// and cleanup device-specific resources.
+        /// </summary>
+        /// <param name="disposing">True if called from Dispose(); false if from finalizer</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (!Disposed) // Check to avoid duplicate Dispose
+            {
+                if (disposing)
+                {
+                    try
+                    {
+                        // Cancel any ongoing operations
+                        if (!OperationsCts.IsCancellationRequested)
+                        {
+                            OperationsCts.Cancel();
+                        }
+                        
+                        // Dispose the cancellation token source
+                        OperationsCts.Dispose();
+                        
+                        // Dispose the recovery semaphore
+                        _recoverySemaphore.Dispose();
+                        
+                        // Clear recovery tracking collections
+                        _lastRecoveryAttempts.Clear();
+                        
+                        // Clear property validators
+                        RemovePropertyValidator("ConnectionStatus");
+                        RemovePropertyValidator("NetworkStrength");
+                        
+                        // Allow device-specific disposal
+                        OnDeviceDispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but don't rethrow from Dispose
+                        Logger.Log($"Error during device disposal: {ex.Message}");
+                    }
+                }
+                
+                // Call base to handle state transitions, etc.
+                base.Dispose(disposing);
+            }
+        }
+        
+        /// <summary>
+        /// Asynchronously disposes of the device resources.
+        /// </summary>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            try 
+            {
+                // Cancel any ongoing operations
+                if (!OperationsCts.IsCancellationRequested)
+                {
+                    await OperationsCts.CancelAsync();
+                }
+                
+                // Dispose resources asynchronously when possible
+                OperationsCts.Dispose();
+                
+                if (_recoverySemaphore is IAsyncDisposable asyncSemaphore)
+                    await asyncSemaphore.DisposeAsync();
+                else
+                    _recoverySemaphore.Dispose();
+                
+                // Clear recovery tracking collections
+                _lastRecoveryAttempts.Clear();
+                
+                // Clear property validators
+                RemovePropertyValidator("ConnectionStatus");
+                RemovePropertyValidator("NetworkStrength");
+                
+                // Allow device-specific disposal
+                await OnDeviceDisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                // Log but don't rethrow from Dispose
+                Logger.Log($"Error during async device disposal: {ex.Message}");
+            }
+            
+            // Call base implementation
+            await base.DisposeAsyncCore();
+        }
+        
+        /// <summary>
+        /// Override this method to implement device-specific disposal logic.
+        /// </summary>
+        protected virtual void OnDeviceDispose()
+        {
+            // No default implementation
+        }
+        
+        /// <summary>
+        /// Override this method to implement device-specific asynchronous disposal logic.
+        /// </summary>
+        protected virtual ValueTask OnDeviceDisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
         
         /// <summary>
         /// Device-specific initialization logic - override in derived classes.
@@ -595,27 +699,5 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             }
         }
 
-        /// <summary>
-        /// Device-specific cleanup logic during disposal.
-        /// </summary>
-        protected override void OnDispose()
-        {
-            try
-            {
-                // Cancel any ongoing operations
-                OperationsCts.Cancel();
-                OperationsCts.Dispose();
-                
-                // Release resources
-                _recoverySemaphore.Dispose();
-                
-                // You can override this in derived classes to implement
-                // additional device-specific cleanup
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error during device disposal: {ex.Message}");
-            }
-        }
     }
 }

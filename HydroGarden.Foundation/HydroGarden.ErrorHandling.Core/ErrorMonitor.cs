@@ -112,14 +112,13 @@ namespace HydroGarden.Foundation.ErrorHandling
         }
 
         /// <inheritdoc/>
-        public async Task ReportExceptionAsync(
-            object source,
+        public async Task ReportExceptionAsync(object source,
             Exception exception,
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             ErrorSource errorSource = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
+            IDictionary<string, object> context = null,
             CancellationToken ct = default)
         {
 

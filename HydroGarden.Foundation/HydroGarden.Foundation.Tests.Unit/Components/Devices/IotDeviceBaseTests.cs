@@ -132,7 +132,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
                     It.IsAny<string>(),
                     It.IsAny<ErrorSeverity>(),
                     It.IsAny<ErrorSource>(),
-                    It.IsAny<IDictionary<string, object>>(),
+                    It.IsAny<IDictionary<string, object?>>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
                 

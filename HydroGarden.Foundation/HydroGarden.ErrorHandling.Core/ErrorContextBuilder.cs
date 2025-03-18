@@ -127,7 +127,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Adds multiple properties from a dictionary.
         /// </summary>
-        public ErrorContextBuilder WithProperties(IDictionary<string, object?> properties)
+        public ErrorContextBuilder WithProperties(IDictionary<string, object?>? properties)
         {
             foreach (var (key, value) in properties)
             {
@@ -181,7 +181,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Builds the final context dictionary.
         /// </summary>
-        public Dictionary<string, object?> Build()
+        public Dictionary<string, object?>? Build()
         {
             // Add timestamp information
             _context["ContextCreatedAt"] = DateTimeOffset.UtcNow.ToString("o");

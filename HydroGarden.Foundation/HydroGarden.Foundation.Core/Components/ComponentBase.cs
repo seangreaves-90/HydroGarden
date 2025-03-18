@@ -28,6 +28,7 @@ namespace HydroGarden.Foundation.Core.Components
         private const int MaxOptimisticRetries = 3;
         private readonly SemaphoreSlim _stateTransitionLock = new(1, 1);
         private readonly ConcurrentDictionary<string, Func<object?, IPropertyMetadata, bool>> _propertyValidators = new();
+        protected bool Disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ComponentBase"/> class with optional event bus integration.
@@ -57,11 +58,8 @@ namespace HydroGarden.Foundation.Core.Components
             _properties[nameof(AssemblyType)] = AssemblyType;
             _properties[nameof(State)] = _state;
 
-            // Add metadata for built-in properties
-            _propertyMetadata[nameof(Id)] = ConstructDefaultPropertyMetadata(nameof(Id));
-            _propertyMetadata[nameof(Name)] = ConstructDefaultPropertyMetadata(nameof(Name));
-            _propertyMetadata[nameof(AssemblyType)] = ConstructDefaultPropertyMetadata(nameof(AssemblyType));
-            _propertyMetadata[nameof(State)] = ConstructDefaultPropertyMetadata(nameof(State));
+            // Initialize metadata for built-in properties
+            InitializeBuiltInPropertyMetadata();
         }
 
         /// <inheritdoc/>
@@ -109,18 +107,18 @@ namespace HydroGarden.Foundation.Core.Components
 
                     // Create error object and report it
                     var error = ErrorFactory.CreateDeviceError(
-                        Id,
-                        "STATE_TRANSITION_INVALID",
-                        $"Invalid state transition attempted: {_state} -> {newState}",
-                        ErrorSeverity.Warning,
-                        null,
-                        new Dictionary<string, object>
-                        {
-                            ["CurrentState"] = _state,
-                            ["AttemptedState"] = newState,
-                            ["ComponentId"] = Id,
-                            ["ComponentName"] = Name
-                        });
+                    Id,
+                    "STATE_TRANSITION_INVALID",
+                    $"Invalid state transition attempted: {_state} -> {newState}",
+                    ErrorSeverity.Warning,
+                    null,
+                    new Dictionary<string, object?>
+                    {
+                        ["CurrentState"] = _state,
+                        ["AttemptedState"] = newState,
+                        ["ComponentId"] = Id,
+                        ["ComponentName"] = Name
+                    });
 
                     await ErrorMonitor.ReportErrorAsync(error, ct);
                     return false;
@@ -140,7 +138,7 @@ namespace HydroGarden.Foundation.Core.Components
                     $"Error during state transition {_state} -> {newState}",
                     ErrorSeverity.Error,
                     ex,
-                    new Dictionary<string, object>
+                    new Dictionary<string, object?>
                     {
                         ["CurrentState"] = _state,
                         ["AttemptedState"] = newState,
@@ -227,7 +225,7 @@ namespace HydroGarden.Foundation.Core.Components
                 var routingData = EventRoutingData.CreateBuilder()
                     .WithPriority(EventPriority.High)
                     .Build();
-                    
+
                 var evt = new StateChangedEvent(
                     Id,
                     Id,
@@ -243,8 +241,8 @@ namespace HydroGarden.Foundation.Core.Components
 
                 // Wait for the event to be published to ensure state transitions are properly observed
                 var result = await EventBus.PublishAsync(this, evt);
-                
-                if (result == null)
+
+                if (result is null)
                 {
                     Logger.Log($"Warning: State change event publication returned null result: {oldState} -> {newState}");
                 }
@@ -253,7 +251,7 @@ namespace HydroGarden.Foundation.Core.Components
                     Logger.Log($"Warning: State change event publication had errors: {oldState} -> {newState}");
                     foreach (var error in result.Errors)
                     {
-                        Logger.Log($"State change event error: {error.Message}");
+                        Logger.Log($"State change event error: {error?.Message}");
                     }
                 }
                 else
@@ -271,7 +269,7 @@ namespace HydroGarden.Foundation.Core.Components
                         $"Failed to publish state change event: {ex.Message}",
                         ErrorSeverity.Warning,
                         ErrorSource.Service,
-                        new Dictionary<string, object>
+                        new Dictionary<string, object?>
                         {
                             ["ComponentId"] = Id,
                             ["ComponentName"] = Name,
@@ -327,12 +325,9 @@ namespace HydroGarden.Foundation.Core.Components
             var success = await this.ExecuteWithErrorHandlingAsync(ErrorMonitor,
                 async () =>
                 {
-                    var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
+                    var oldValue = _properties.GetValueOrDefault(name);
 
-                    if (metadata == null)
-                    {
-                        metadata = _propertyMetadata.GetValueOrDefault(name) ?? ConstructDefaultPropertyMetadata(name);
-                    }
+                    metadata ??= _propertyMetadata.GetValueOrDefault(name) ?? ConstructDefaultPropertyMetadata(name);
 
                     // Validate property value before updating
                     if (!ValidateProperty(name, value, metadata))
@@ -365,7 +360,7 @@ namespace HydroGarden.Foundation.Core.Components
                 "PROPERTY_UPDATE_FAILED",
                 $"Failed to update property '{name}'",
                 ErrorSource.Device,
-                new Dictionary<string, object>
+                new Dictionary<string, object?>
                 {
                     ["PropertyName"] = name,
                     ["PropertyType"] = value?.GetType().Name ?? "null",
@@ -454,7 +449,7 @@ namespace HydroGarden.Foundation.Core.Components
                 $"Failed to update property {name} after {MaxOptimisticRetries} attempts due to concurrent modifications",
                 ErrorSeverity.Warning,
                 null,
-                new Dictionary<string, object>
+                new Dictionary<string, object?>
                 {
                     ["PropertyName"] = name,
                     ["AttemptCount"] = attempts,
@@ -518,7 +513,7 @@ namespace HydroGarden.Foundation.Core.Components
                     {
                         try
                         {
-                            setter.Invoke(this, new[] { value });
+                            setter.Invoke(this, [value]);
                         }
                         catch (Exception ex)
                         {
@@ -569,7 +564,7 @@ namespace HydroGarden.Foundation.Core.Components
             _propertyMetadata.GetValueOrDefault(name);
 
         /// <inheritdoc/>
-        public virtual Dictionary<string, object> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);
+        public virtual Dictionary<string, object?> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);
 
         /// <inheritdoc/>
         public virtual IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata() => _propertyMetadata.ToDictionary(x => x.Key, x => x.Value);
@@ -600,23 +595,19 @@ namespace HydroGarden.Foundation.Core.Components
                     }
 
                     // Ensure core properties are present
-                    if (!_properties.ContainsKey(nameof(Id)))
-                        _properties[nameof(Id)] = Id;
+                    _properties.TryAdd(nameof(Id), Id);
 
-                    if (!_properties.ContainsKey(nameof(Name)))
-                        _properties[nameof(Name)] = Name;
+                    _properties.TryAdd(nameof(Name), Name);
 
-                    if (!_properties.ContainsKey(nameof(AssemblyType)))
-                        _properties[nameof(AssemblyType)] = AssemblyType;
+                    _properties.TryAdd(nameof(AssemblyType), AssemblyType);
 
-                    if (!_properties.ContainsKey(nameof(State)))
-                        _properties[nameof(State)] = _state;
+                    _properties.TryAdd(nameof(State), _state);
                     return Task.CompletedTask;
                 },
                 "PROPERTY_LOAD_FAILED",
                 "Failed to load properties",
                 ErrorSource.Device,
-                new Dictionary<string, object>
+                new Dictionary<string, object?>
                 {
                     ["ComponentId"] = Id,
                     ["ComponentName"] = Name,
@@ -662,7 +653,7 @@ namespace HydroGarden.Foundation.Core.Components
                                 $"Failed to publish property change event through EventBus: {ex.Message}",
                                 ErrorSeverity.Warning,
                                 ErrorSource.Service,
-                                new Dictionary<string, object>
+                                new Dictionary<string, object?>
                                 {
                                     ["ComponentId"] = Id,
                                     ["ComponentName"] = Name,
@@ -675,7 +666,10 @@ namespace HydroGarden.Foundation.Core.Components
 
             try
             {
-                await PropertyChangedEventHandler?.HandleEventAsync(this, evt)!;
+                if (PropertyChangedEventHandler != null)
+                {
+                    await PropertyChangedEventHandler.HandleEventAsync(this, evt);
+                }
             }
             catch (Exception ex)
             {
@@ -686,7 +680,7 @@ namespace HydroGarden.Foundation.Core.Components
                     $"Failed to handle property change event: {ex.Message}",
                     ErrorSeverity.Warning,
                     ErrorSource.Service,
-                    new Dictionary<string, object>
+                    new Dictionary<string, object?>
                     {
                         ["ComponentId"] = Id,
                         ["ComponentName"] = Name,
@@ -831,28 +825,74 @@ namespace HydroGarden.Foundation.Core.Components
             return Task.FromResult(true);
         }
 
-        /// <inheritdoc/>
-        public virtual async void Dispose()
+        protected virtual void Dispose(bool disposing)
         {
-            // Try to transition to disposed state
-            await TransitionToStateAsync(ComponentState.Disposed);
+            if (!Disposed)
+            {
+                if (disposing)
+                {
+                    if (PropertyChangedEventHandler is IDisposable propertyChangedEventHandlerDisposable)
+                        propertyChangedEventHandlerDisposable.Dispose();
+                    else if (PropertyChangedEventHandler != null)
+                        _ = PropertyChangedEventHandler.DisposeAsync().AsTask();
+                    _stateTransitionLock.Dispose();
+                }
 
-            // Clean up resources
-            _stateTransitionLock.Dispose();
-            PropertyChangedEventHandler = null;
+                // Transition to Disposed state and publish state change event (only once)
+                var oldState = State;
+                if (oldState != ComponentState.Disposed)
+                {
+                    // Directly set state property to avoid duplicate events
+                    _state = ComponentState.Disposed;
+                    _properties[nameof(State)] = ComponentState.Disposed;
+                    
+                    // Publish a single event for the state change
+                    PublishStateChangeEventAsync(oldState, ComponentState.Disposed).Wait();
+                }
 
-            // Call component-specific disposal logic
-            OnDispose();
+                Disposed = true;
+            }
+        }
 
+        public virtual void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual async ValueTask DisposeAsyncCore()
+        {
+            if (PropertyChangedEventHandler != null) await PropertyChangedEventHandler.DisposeAsync();
+            if (_stateTransitionLock is IAsyncDisposable stateTransitionLockAsyncDisposable)
+                await stateTransitionLockAsyncDisposable.DisposeAsync();
+            else
+                _stateTransitionLock.Dispose();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore();
+            Dispose(false);
             GC.SuppressFinalize(this);
         }
 
         /// <summary>
-        /// Override this method to implement component-specific disposal logic.
+        /// Initializes built-in property metadata without using virtual methods
         /// </summary>
-        protected virtual void OnDispose()
+        private void InitializeBuiltInPropertyMetadata()
         {
-            // No default implementation
+            // Define built-in property metadata directly instead of using the virtual method
+            // to avoid the virtual call in constructor problem
+            var idMetadata = new PropertyMetadata(false, true, "Component ID", "The unique identifier of the component");
+            var nameMetadata = new PropertyMetadata(true, true, "Component Name", "The name of the component");
+            var assemblyTypeMetadata = new PropertyMetadata(false, true, "Component Type", "The assembly type of the component");
+            var stateMetadata = new PropertyMetadata(false, true, "Component State", "The current state of the component");
+
+            // Add metadata for built-in properties
+            _propertyMetadata[nameof(Id)] = idMetadata;
+            _propertyMetadata[nameof(Name)] = nameMetadata;
+            _propertyMetadata[nameof(AssemblyType)] = assemblyTypeMetadata;
+            _propertyMetadata[nameof(State)] = stateMetadata;
         }
     }
 }

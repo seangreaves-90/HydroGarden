@@ -11,7 +11,7 @@
         /// <param name="error">The error to report.</param>
         /// <param name="ct">A cancellation token.</param>
         Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
-        
+
         /// <summary>
         /// Reports an exception as an error.
         /// </summary>
@@ -23,14 +23,13 @@
         /// <param name="errorSource">The source of the error.</param>
         /// <param name="context">Additional context for the error.</param>
         /// <param name="ct">A cancellation token.</param>
-        Task ReportExceptionAsync(
-            object source,
+        Task ReportExceptionAsync(object source,
             Exception exception,
             string errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             ErrorSource errorSource = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
+            IDictionary<string, object> context = null,
             CancellationToken ct = default);
         
         /// <summary>

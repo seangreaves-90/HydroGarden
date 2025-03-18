@@ -78,7 +78,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// Retrieves all property values of the component.
         /// </summary>
         /// <returns>A dictionary containing property names and values.</returns>
-        Dictionary<string, object> GetProperties();
+        Dictionary<string, object?> GetProperties();
 
         /// <summary>
         /// Retrieves metadata for all properties of the component.
