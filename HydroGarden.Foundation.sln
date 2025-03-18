@@ -23,7 +23,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestConsole", "HydroGarden.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.Tests.Integration", "HydroGarden.Foundation\HydroGarden.Foundation.Tests.Integration\HydroGarden.Foundation.Tests.Integration.csproj", "{2D1AD1FE-0139-4FA7-945C-106C59C6AC8F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.ErrorHandling", "HydroGarden.Foundation\HydroGarden.ErrorHandling.Core\HydroGarden.Foundation.ErrorHandling.csproj", "{9F3A6F36-BE97-44E6-9EF8-6C555B08CDAF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Foundation.ErrorHandling", "HydroGarden.Foundation\HydroGarden.Foundation.ErrorHandling\HydroGarden.Foundation.ErrorHandling.csproj", "{9F3A6F36-BE97-44E6-9EF8-6C555B08CDAF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HydroGarden.Logger", "HydroGarden.Foundation\HydroGarden.Logger\HydroGarden.Logger.csproj", "{A1F8CD26-6BFD-4F34-AF91-894CB524804A}"
 EndProject

@@ -3,9 +3,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Common.Events;
-using HydroGarden.Foundation.Core;
 using HydroGarden.Foundation.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Events;
 using HydroGarden.Foundation.ErrorHandling.Extensions;
 using HydroGarden.Logger.Abstractions;
 

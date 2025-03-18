@@ -1,7 +1,9 @@
-﻿namespace HydroGarden.Foundation.ErrorHandling
+using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
+
+namespace HydroGarden.Foundation.ErrorHandling
 {
     /// <summary>
-    /// Represents the current alert status based on error rates.
+    /// Represents the alert status based on monitored errors.
     /// </summary>
     public class AlertStatus
     {
@@ -9,10 +11,41 @@
         /// Gets or sets a value indicating whether there are active alerts.
         /// </summary>
         public bool HasActiveAlerts { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the list of active alerts.
         /// </summary>
-        public List<ErrorAlert> Alerts { get; set; } = new List<ErrorAlert>();
+        public IReadOnlyCollection<ErrorAlert> Alerts { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Represents an active error alert.
+    /// </summary>
+    public class ErrorAlert
+    {
+        /// <summary>
+        /// Gets or sets the error code.
+        /// </summary>
+        public string ErrorCode { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the error count.
+        /// </summary>
+        public int Count { get; set; }
+
+        /// <summary>
+        /// Gets or sets the error severity.
+        /// </summary>
+        public ErrorSeverity Severity { get; set; }
+
+        /// <summary>
+        /// Gets or sets the first occurrence timestamp.
+        /// </summary>
+        public DateTimeOffset FirstOccurrence { get; set; }
+
+        /// <summary>
+        /// Gets or sets the last occurrence timestamp.
+        /// </summary>
+        public DateTimeOffset LastOccurrence { get; set; }
     }
 }

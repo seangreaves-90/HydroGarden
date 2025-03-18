@@ -5,7 +5,6 @@ using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Abstractions.Interfaces.Services;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Common.PropertyMetadata;
-using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using System.Threading.Channels;
 using HydroGarden.Foundation.ErrorHandling.Extensions;

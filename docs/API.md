@@ -217,12 +217,12 @@ public interface IStore
 
 ## Event Interfaces
 
-### IHydroGardenEvent
+### IEvent
 
 Base interface for all events.
 
 ```csharp
-public interface IHydroGardenEvent
+public interface IEvent
 {
     Guid DeviceId { get; }
     Guid EventId { get; }
@@ -233,12 +233,12 @@ public interface IHydroGardenEvent
 }
 ```
 
-### IHydroGardenPropertyChangedEvent
+### IPropertyChangedEvent
 
 Interface for property change events.
 
 ```csharp
-public interface IHydroGardenPropertyChangedEvent : IHydroGardenEvent
+public interface IPropertyChangedEvent : IEvent
 {
     string PropertyName { get; }
     Type PropertyType { get; }
@@ -248,48 +248,49 @@ public interface IHydroGardenPropertyChangedEvent : IHydroGardenEvent
 }
 ```
 
-### IHydroGardenLifecycleEvent
+### IStateChangeEvent
 
 Interface for lifecycle events.
 
 ```csharp
-public interface IHydroGardenLifecycleEvent : IHydroGardenEvent
+public interface IStateChangeEvent : IEvent
 {
-    ComponentState State { get; }
-    string? Details { get; }
+    ComponentState OldState { get; }
+    ComponentState NewState { get; }
 }
 ```
 
-### IHydroGardenCommandEvent
+### ICommandEvent
 
 Interface for command events.
 
 ```csharp
-public interface IHydroGardenCommandEvent : IHydroGardenEvent
+public interface ICommandEvent : IEvent
 {
     string CommandName { get; }
     IDictionary<string, object?>? Parameters { get; }
 }
 ```
 
-### IHydroGardenTelemetryEvent
+### ITelemetryEvent
 
 Interface for telemetry events.
 
 ```csharp
-public interface IHydroGardenTelemetryEvent : IHydroGardenEvent
+public interface ITelemetryEvent : IEvent
 {
     IDictionary<string, object> Readings { get; }
     IDictionary<string, string>? Units { get; }
+    IDictionary<string, object>? Metadata { get; set; }
 }
 ```
 
-### IHydroGardenAlertEvent
+### IAlertEvent
 
 Interface for alert events.
 
 ```csharp
-public interface IHydroGardenAlertEvent : IHydroGardenEvent
+public interface IAlertEvent : IEvent
 {
     AlertSeverity Severity { get; }
     string Message { get; }

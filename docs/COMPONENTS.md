@@ -4,15 +4,16 @@ This document provides detailed information about the key components in the Hydr
 
 ## Core Components
 
-### HydroGardenComponentBase
+### ComponentBase
 
 The foundation class for all components in the system.
 
 **Features:**
-- Property management with change tracking
-- Event publication for property changes
-- Lifecycle state management
-- Integration with the event system
+- Property management with change tracking and validation
+- Event publication for property changes and state transitions
+- Lifecycle state management with defined transition rules
+- Error handling and recovery mechanisms
+- Enhanced disposal pattern with both sync and async options
 
 **Derived Components:**
 - IoT devices (sensors, pumps, etc.)
@@ -25,15 +26,40 @@ public class pHSensor : IoTDeviceBase
 {
     private double _currentValue;
     
-    public pHSensor(Guid id, string name, IHydroGardenLogger logger = null)
-        : base(id, name, logger)
+    public pHSensor(Guid id, string? name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
+        : base(id, name, errorMonitor, eventBus, logger)
     {
+        // Register property validator for pH values
+        RegisterPropertyValidator("CurrentValue", (value, _) => 
+            value is double pH && pH >= 0 && pH <= 14);
+    }
+    
+    protected override async Task OnInitializeAsync(CancellationToken ct)
+    {
+        await SetPropertyAsync("CurrentValue", 7.0);
+        await SetPropertyAsync("Unit", "pH");
+        return await base.OnInitializeAsync(ct);
     }
     
     public async Task UpdateReadingAsync(double value)
     {
-        _currentValue = value;
-        await SetPropertyAsync("CurrentValue", value);
+        try 
+        {
+            _currentValue = value;
+            await SetPropertyAsync("CurrentValue", value);
+            await SetPropertyAsync("Timestamp", DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            await ErrorMonitor.ReportExceptionAsync(
+                this,
+                ex,
+                "PH_UPDATE_ERROR",
+                $"Failed to update pH reading: {ex.Message}",
+                ErrorSeverity.Error,
+                ErrorSource.Device);
+            throw;
+        }
     }
 }
 ```
