@@ -3,6 +3,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Foundation.ErrorHandling.Exceptions;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 using Moq;
 using Xunit;
 

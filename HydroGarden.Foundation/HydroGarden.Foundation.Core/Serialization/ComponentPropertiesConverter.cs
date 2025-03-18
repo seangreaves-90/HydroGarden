@@ -15,7 +15,7 @@ namespace HydroGarden.Foundation.Core.Serialization
         public override bool CanConvert(Type typeToConvert) => typeof(ComponentBase).IsAssignableFrom(typeToConvert);
 
         /// <inheritdoc/>
-        public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions? options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
                 throw new JsonException("Expected StartObject token");
@@ -40,7 +40,7 @@ namespace HydroGarden.Foundation.Core.Serialization
 
                 if (jsonObj.TryGetProperty("Properties", out var propertiesElement))
                 {
-                    var properties = JsonSerializer.Deserialize<Dictionary<string, object>>(propertiesElement.GetRawText(), options);
+                    Dictionary<string, object?>? properties = JsonSerializer.Deserialize<Dictionary<string, object>>(propertiesElement.GetRawText(), options);
                     if (properties != null)
                         component.LoadPropertiesAsync(properties).Wait();
                 }

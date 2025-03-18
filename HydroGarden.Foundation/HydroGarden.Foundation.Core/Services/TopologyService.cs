@@ -6,6 +6,7 @@ using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.Core;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Events;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Services
@@ -39,7 +40,7 @@ namespace HydroGarden.Foundation.Core.Services
             _topologyRepository = topologyRepository ?? throw new ArgumentNullException(nameof(topologyRepository));
             _conditionEvaluator = new ConditionEvaluator(_propertyAccessService);
         }
-        
+
         /// <summary>
         /// Creates a new topology service instance (legacy constructor for backward compatibility)
         /// </summary>
@@ -48,46 +49,39 @@ namespace HydroGarden.Foundation.Core.Services
         public TopologyService(ILogger logger, IPersistenceService persistenceService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             if (persistenceService == null)
                 throw new ArgumentNullException(nameof(persistenceService));
-                
+
             // Instead of casting, use the persistence service directly
             _propertyAccessService = new PropertyAccessServiceAdapter(persistenceService);
             _topologyRepository = new TopologyRepositoryAdapter(persistenceService);
             _conditionEvaluator = new ConditionEvaluator(_propertyAccessService);
         }
-        
+
         /// <summary>
         /// Adapter to convert IPersistenceService to IPropertyAccessService
         /// </summary>
-        private class PropertyAccessServiceAdapter : IPropertyAccessService
+        private class PropertyAccessServiceAdapter(IPersistenceService persistenceService) : IPropertyAccessService
         {
-            private readonly IPersistenceService _persistenceService;
-            
-            public PropertyAccessServiceAdapter(IPersistenceService persistenceService)
-            {
-                _persistenceService = persistenceService;
-            }
-            
             public Task<T?> GetPropertyAsync<T>(Guid componentId, string propertyName, CancellationToken ct = default)
             {
-                return _persistenceService.GetPropertyAsync<T>(componentId, propertyName, ct);
+                return persistenceService.GetPropertyAsync<T>(componentId, propertyName, ct);
             }
-            
+
             public Task<bool> SetPropertyAsync<T>(Guid componentId, string propertyName, T value, CancellationToken ct = default)
             {
                 // Not implemented in IPersistenceService, but required by IPropertyAccessService
                 // This will not be called in our test scenarios
                 return Task.FromResult(false);
             }
-            
+
             public async Task<bool> HasPropertyAsync(Guid componentId, string propertyName, CancellationToken ct = default)
             {
                 // Implement using GetPropertyAsync<object>
                 try
                 {
-                    var value = await _persistenceService.GetPropertyAsync<object>(componentId, propertyName, ct);
+                    var value = await persistenceService.GetPropertyAsync<object>(componentId, propertyName, ct);
                     return value != null;
                 }
                 catch
@@ -96,37 +90,30 @@ namespace HydroGarden.Foundation.Core.Services
                 }
             }
         }
-        
+
         /// <summary>
         /// Adapter to convert IPersistenceService to ITopologyRepository
         /// </summary>
-        private class TopologyRepositoryAdapter : ITopologyRepository
+        private class TopologyRepositoryAdapter(IPersistenceService persistenceService) : ITopologyRepository
         {
-            private readonly IPersistenceService _persistenceService;
-            
-            public TopologyRepositoryAdapter(IPersistenceService persistenceService)
-            {
-                _persistenceService = persistenceService;
-            }
-            
             public Task<IEnumerable<IComponentConnection>> GetAllConnectionsAsync(CancellationToken ct = default)
             {
-                return _persistenceService.GetAllConnectionsAsync(ct);
+                return persistenceService.GetAllConnectionsAsync(ct);
             }
-            
+
             public Task<IComponentConnection?> GetConnectionAsync(Guid connectionId, CancellationToken ct = default)
             {
-                return _persistenceService.GetConnectionAsync(connectionId, ct);
+                return persistenceService.GetConnectionAsync(connectionId, ct);
             }
-            
+
             public Task StoreConnectionAsync(IComponentConnection connection, CancellationToken ct = default)
             {
-                return _persistenceService.StoreConnectionAsync(connection, ct);
+                return persistenceService.StoreConnectionAsync(connection, ct);
             }
-            
+
             public Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default)
             {
-                return _persistenceService.DeleteConnectionAsync(connectionId, ct);
+                return persistenceService.DeleteConnectionAsync(connectionId, ct);
             }
         }
 
@@ -136,426 +123,431 @@ namespace HydroGarden.Foundation.Core.Services
         /// <param name="ct">Cancellation token</param>
         public async Task InitializeAsync(CancellationToken ct = default)
         {
-        if (_isInitialized)
-        return;
+            if (_isInitialized)
+                return;
 
-        await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync(
-            this,
-            await GetErrorMonitorAsync(),
-            async () => {
-            await _lock.WaitAsync(ct);
+            await this.ExecuteWithErrorHandlingAsync(await GetErrorMonitorAsync(),
+                async () =>
+                {
+                    await _lock.WaitAsync(ct);
 
-            try
-            {
-                if (_isInitialized) return; // Double-check after acquiring lock
-                
-            _logger.Log("Initializing topology service");
-        
-        // Load connections from the persistence service
-            var connections = await _topologyRepository.GetAllConnectionsAsync(ct);
-            foreach (var connection in connections)
-            {
-            if (connection is ComponentConnection compConnection)
-            {
-                AddConnectionToCache(compConnection);
-        }
-        else
-        {
-            // Convert to ComponentConnection if necessary
-            var convertedConnection = new ComponentConnection
-            {
-                ConnectionId = connection.ConnectionId,
-            SourceId = connection.SourceId,
-            TargetId = connection.TargetId,
-                    ConnectionType = connection.ConnectionType,
-                    IsEnabled = connection.IsEnabled,
-                        Condition = connection.Condition,
-                            Metadata = connection.Metadata != null 
-                                    ? new Dictionary<string, object>(connection.Metadata) 
-                                : null
-                        };
-                            AddConnectionToCache(convertedConnection);
+                    try
+                    {
+                        if (_isInitialized) return; // Double-check after acquiring lock
+
+                        _logger.Log("Initializing topology service");
+
+                        // Load connections from the persistence service
+                        var connections = await _topologyRepository.GetAllConnectionsAsync(ct);
+                        foreach (var connection in connections)
+                        {
+                            if (connection is ComponentConnection compConnection)
+                            {
+                                AddConnectionToCache(compConnection);
+                            }
+                            else
+                            {
+                                // Convert to ComponentConnection if necessary
+                                var convertedConnection = new ComponentConnection
+                                {
+                                    ConnectionId = connection.ConnectionId,
+                                    SourceId = connection.SourceId,
+                                    TargetId = connection.TargetId,
+                                    ConnectionType = connection.ConnectionType,
+                                    IsEnabled = connection.IsEnabled,
+                                    Condition = connection.Condition,
+                                    Metadata = connection.Metadata != null
+                                                    ? new Dictionary<string, object>(connection.Metadata)
+                                                : null
+                                };
+                                AddConnectionToCache(convertedConnection);
+                            }
                         }
+
+                        _logger.Log($"Loaded {_connections.Count} connections from storage");
+                        _isInitialized = true;
                     }
-        
-                _logger.Log($"Loaded {_connections.Count} connections from storage");
-                    _isInitialized = true;
-                }
-                finally
-            {
-                    _lock.Release();
+                    finally
+                    {
+                        _lock.Release();
                     }
-            },
-            "TOPOLOGY_INITIALIZATION_FAILED",
-            "Failed to initialize topology service",
-            ErrorSource.Service,
-            null,
-            ct
-        );
-    }
+                },
+                "TOPOLOGY_INITIALIZATION_FAILED",
+                "Failed to initialize topology service",
+                ErrorSource.Service,
+                null,
+                ct
+            );
+        }
 
         /// <inheritdoc />
         public async Task<IReadOnlyList<IComponentConnection>> GetConnectionsForSourceAsync(Guid sourceId, CancellationToken ct = default)
         {
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IReadOnlyList<IComponentConnection>>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                if (!_isInitialized)
-                await InitializeAsync(ct);
-        
-                if (!_sourceToConnectionMap.TryGetValue(sourceId, out var connectionIds))
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IReadOnlyList<IComponentConnection>>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                    return Array.Empty<IComponentConnection>();
-                }
-        
-        var result = new List<IComponentConnection>();
-            foreach (var connectionId in connectionIds)
-        {
-                if (_connections.TryGetValue(connectionId, out var connection) &&
-                        connection.IsEnabled)
+                    if (!_isInitialized)
+                        await InitializeAsync(ct);
+
+                    if (!_sourceToConnectionMap.TryGetValue(sourceId, out var connectionIds))
                     {
-                        result.Add(connection);
+                        return Array.Empty<IComponentConnection>();
+                    }
+
+                    var result = new List<IComponentConnection>();
+                    foreach (var connectionId in connectionIds)
+                    {
+                        if (_connections.TryGetValue(connectionId, out var connection) &&
+                            connection.IsEnabled)
+                        {
+                            result.Add(connection);
                         }
-                }
-        
-                return result;
-            },
-            "TOPOLOGY_GET_SOURCE_CONNECTIONS_FAILED",
-            $"Failed to get connections for source {sourceId}",
-            ErrorSource.Service,
-            new Dictionary<string, object>
-            {
-                ["SourceId"] = sourceId.ToString()
-            },
-            ct
-        ) ?? Array.Empty<IComponentConnection>();
-    }
+                    }
+
+                    return result;
+                },
+                "TOPOLOGY_GET_SOURCE_CONNECTIONS_FAILED",
+                $"Failed to get connections for source {sourceId}",
+                ErrorSource.Service,
+                new Dictionary<string, object?>
+                {
+                    ["SourceId"] = sourceId.ToString()
+                },
+                ct
+            ) ?? Array.Empty<IComponentConnection>();
+        }
 
         /// <inheritdoc />
         public async Task<IReadOnlyList<IComponentConnection>> GetConnectionsForTargetAsync(Guid targetId, CancellationToken ct = default)
         {
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IReadOnlyList<IComponentConnection>>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                if (!_isInitialized)
-                await InitializeAsync(ct);
-        
-                if (!_targetToConnectionMap.TryGetValue(targetId, out var connectionIds))
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IReadOnlyList<IComponentConnection>>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                    return Array.Empty<IComponentConnection>();
-                }
-        
-        var result = new List<IComponentConnection>();
-            foreach (var connectionId in connectionIds)
-        {
-                if (_connections.TryGetValue(connectionId, out var connection) &&
-                        connection.IsEnabled)
+                    if (!_isInitialized)
+                        await InitializeAsync(ct);
+
+                    if (!_targetToConnectionMap.TryGetValue(targetId, out var connectionIds))
                     {
-                        result.Add(connection);
+                        return Array.Empty<IComponentConnection>();
+                    }
+
+                    var result = new List<IComponentConnection>();
+                    foreach (var connectionId in connectionIds)
+                    {
+                        if (_connections.TryGetValue(connectionId, out var connection) &&
+                            connection.IsEnabled)
+                        {
+                            result.Add(connection);
                         }
-                }
-        
-                return result;
-            },
-            "TOPOLOGY_GET_TARGET_CONNECTIONS_FAILED",
-            $"Failed to get connections for target {targetId}",
-            ErrorSource.Service,
-            new Dictionary<string, object>
-            {
-                ["TargetId"] = targetId.ToString()
-            },
-            ct
-        ) ?? Array.Empty<IComponentConnection>();
-    }
+                    }
+
+                    return result;
+                },
+                "TOPOLOGY_GET_TARGET_CONNECTIONS_FAILED",
+                $"Failed to get connections for target {targetId}",
+                ErrorSource.Service,
+                new Dictionary<string, object?>
+                {
+                    ["TargetId"] = targetId.ToString()
+                },
+                ct
+            ) ?? Array.Empty<IComponentConnection>();
+        }
 
         /// <inheritdoc />
         public async Task<IComponentConnection> CreateConnectionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
-        if (connection == null)
-        throw new ArgumentNullException(nameof(connection));
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
 
-        if (connection.SourceId == Guid.Empty)
-        throw new ArgumentException("Source ID must be specified", nameof(connection));
+            if (connection.SourceId == Guid.Empty)
+                throw new ArgumentException("Source ID must be specified", nameof(connection));
 
-        if (connection.TargetId == Guid.Empty)
-        throw new ArgumentException("Target ID must be specified", nameof(connection));
+            if (connection.TargetId == Guid.Empty)
+                throw new ArgumentException("Target ID must be specified", nameof(connection));
 
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IComponentConnection>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                if (!_isInitialized)
-                    await InitializeAsync(ct);
-
-            await _lock.WaitAsync(ct);
-
-            try
-            {
-            // Convert to our internal type if necessary
-                ComponentConnection internalConnection;
-                if (connection is ComponentConnection connImpl)
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<IComponentConnection>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                internalConnection = connImpl;
-            }
-        else
-        {
-            internalConnection = new ComponentConnection
-            {
-                ConnectionId = connection.ConnectionId == Guid.Empty ? Guid.NewGuid() : connection.ConnectionId,
-                SourceId = connection.SourceId,
-                TargetId = connection.TargetId,
-                    ConnectionType = connection.ConnectionType,
-                        IsEnabled = connection.IsEnabled,
-                            Condition = connection.Condition,
-                        Metadata = connection.Metadata != null ? new Dictionary<string, object>(connection.Metadata) : null
-                    };
-                }
+                    if (!_isInitialized)
+                        await InitializeAsync(ct);
 
-                // Generate a new ID if not provided
-                    if (internalConnection.ConnectionId == Guid.Empty)
-                {
-                    internalConnection.ConnectionId = Guid.NewGuid();
-                }
+                    await _lock.WaitAsync(ct);
 
-                // Check if connection already exists
-                    if (_connections.ContainsKey(internalConnection.ConnectionId))
-                {
-                    throw new InvalidOperationException($"Connection with ID {internalConnection.ConnectionId} already exists");
+                    try
+                    {
+                        // Convert to our internal type if necessary
+                        ComponentConnection internalConnection;
+                        if (connection is ComponentConnection connImpl)
+                        {
+                            internalConnection = connImpl;
+                        }
+                        else
+                        {
+                            internalConnection = new ComponentConnection
+                            {
+                                ConnectionId = connection.ConnectionId == Guid.Empty ? Guid.NewGuid() : connection.ConnectionId,
+                                SourceId = connection.SourceId,
+                                TargetId = connection.TargetId,
+                                ConnectionType = connection.ConnectionType,
+                                IsEnabled = connection.IsEnabled,
+                                Condition = connection.Condition,
+                                Metadata = connection.Metadata != null ? new Dictionary<string, object>(connection.Metadata) : null
+                            };
+                        }
+
+                        // Generate a new ID if not provided
+                        if (internalConnection.ConnectionId == Guid.Empty)
+                        {
+                            internalConnection.ConnectionId = Guid.NewGuid();
+                        }
+
+                        // Check if connection already exists
+                        if (_connections.ContainsKey(internalConnection.ConnectionId))
+                        {
+                            throw new InvalidOperationException($"Connection with ID {internalConnection.ConnectionId} already exists");
+                        }
+
+                        // Add to cache
+                        AddConnectionToCache(internalConnection);
+
+                        // Save to topology repository
+                        await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
+
+                        _logger.Log($"Created connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
+                        return internalConnection;
                     }
-
-                // Add to cache
-                    AddConnectionToCache(internalConnection);
-
-                // Save to topology repository
-                    await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
-
-                    _logger.Log($"Created connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
-                return internalConnection;
-                }
                     finally
+                    {
+                        _lock.Release();
+                    }
+                },
+                "TOPOLOGY_CREATE_CONNECTION_FAILED",
+                $"Failed to create connection from {connection.SourceId} to {connection.TargetId}",
+                ErrorSource.Service,
+                new Dictionary<string, object?>
                 {
-                    _lock.Release();
-                }
-            },
-            "TOPOLOGY_CREATE_CONNECTION_FAILED",
-            $"Failed to create connection from {connection.SourceId} to {connection.TargetId}",
-            ErrorSource.Service,
-            new Dictionary<string, object>
-            {
-                ["SourceId"] = connection.SourceId.ToString(),
-                ["TargetId"] = connection.TargetId.ToString(),
-                ["ConnectionType"] = connection.ConnectionType
-            },
-            ct
-        ) ?? throw new InvalidOperationException("Failed to create connection and no error was reported");
-    }
+                    ["SourceId"] = connection.SourceId.ToString(),
+                    ["TargetId"] = connection.TargetId.ToString(),
+                    ["ConnectionType"] = connection.ConnectionType
+                },
+                ct
+            ) ?? throw new InvalidOperationException("Failed to create connection and no error was reported");
+        }
 
         /// <inheritdoc />
         public async Task<bool> UpdateConnectionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
-        if (connection == null)
-        throw new ArgumentNullException(nameof(connection));
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
 
-        if (connection.ConnectionId == Guid.Empty)
-        throw new ArgumentException("Connection ID must be specified", nameof(connection));
+            if (connection.ConnectionId == Guid.Empty)
+                throw new ArgumentException("Connection ID must be specified", nameof(connection));
 
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                if (!_isInitialized)
-                    await InitializeAsync(ct);
-
-            await _lock.WaitAsync(ct);
-
-            try
-            {
-            // Convert to our internal type if necessary
-                ComponentConnection internalConnection;
-                if (connection is ComponentConnection connImpl)
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                internalConnection = connImpl;
-            }
-        else
-        {
-            internalConnection = new ComponentConnection
-            {
-                ConnectionId = connection.ConnectionId,
-                SourceId = connection.SourceId,
-                TargetId = connection.TargetId,
-                    ConnectionType = connection.ConnectionType,
-                        IsEnabled = connection.IsEnabled,
-                            Condition = connection.Condition,
-                        Metadata = connection.Metadata != null ? new Dictionary<string, object>(connection.Metadata) : null
-                    };
-                }
+                    if (!_isInitialized)
+                        await InitializeAsync(ct);
 
-                // Remove from cache
-                    if (!_connections.TryGetValue(connection.ConnectionId, out var existingConnection))
-                {
-                        return false;
-                }
+                    await _lock.WaitAsync(ct);
 
-                    RemoveConnectionFromCache(existingConnection);
+                    try
+                    {
+                        // Convert to our internal type if necessary
+                        ComponentConnection internalConnection;
+                        if (connection is ComponentConnection connImpl)
+                        {
+                            internalConnection = connImpl;
+                        }
+                        else
+                        {
+                            internalConnection = new ComponentConnection
+                            {
+                                ConnectionId = connection.ConnectionId,
+                                SourceId = connection.SourceId,
+                                TargetId = connection.TargetId,
+                                ConnectionType = connection.ConnectionType,
+                                IsEnabled = connection.IsEnabled,
+                                Condition = connection.Condition,
+                                Metadata = connection.Metadata != null ? new Dictionary<string, object>(connection.Metadata) : null
+                            };
+                        }
 
-                // Add updated connection to cache
-                    AddConnectionToCache(internalConnection);
+                        // Remove from cache
+                        if (!_connections.TryGetValue(connection.ConnectionId, out var existingConnection))
+                        {
+                            return false;
+                        }
 
-                // Save to topology repository
-                    await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
+                        RemoveConnectionFromCache(existingConnection);
 
-                    _logger.Log($"Updated connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
-                return true;
-                }
+                        // Add updated connection to cache
+                        AddConnectionToCache(internalConnection);
+
+                        // Save to topology repository
+                        await _topologyRepository.StoreConnectionAsync(internalConnection, ct);
+
+                        _logger.Log($"Updated connection {internalConnection.ConnectionId} from {internalConnection.SourceId} to {internalConnection.TargetId}");
+                        return true;
+                    }
                     finally
+                    {
+                        _lock.Release();
+                    }
+                },
+                "TOPOLOGY_UPDATE_CONNECTION_FAILED",
+                $"Failed to update connection {connection.ConnectionId} from {connection.SourceId} to {connection.TargetId}",
+                ErrorSource.Service,
+                new Dictionary<string, object?>
                 {
-                    _lock.Release();
-                }
-            },
-            "TOPOLOGY_UPDATE_CONNECTION_FAILED",
-            $"Failed to update connection {connection.ConnectionId} from {connection.SourceId} to {connection.TargetId}",
-            ErrorSource.Service,
-            new Dictionary<string, object>
-            {
-                ["ConnectionId"] = connection.ConnectionId.ToString(),
-                ["SourceId"] = connection.SourceId.ToString(),
-                ["TargetId"] = connection.TargetId.ToString()
-            },
-            ct
-        );
-    }
+                    ["ConnectionId"] = connection.ConnectionId.ToString(),
+                    ["SourceId"] = connection.SourceId.ToString(),
+                    ["TargetId"] = connection.TargetId.ToString()
+                },
+                ct
+            );
+        }
 
         /// <inheritdoc />
         public async Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default)
         {
-        if (connectionId == Guid.Empty)
-        throw new ArgumentException("Connection ID must be specified", nameof(connectionId));
+            if (connectionId == Guid.Empty)
+                throw new ArgumentException("Connection ID must be specified", nameof(connectionId));
 
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                if (!_isInitialized)
-                    await InitializeAsync(ct);
-
-            await _lock.WaitAsync(ct);
-
-            try
-        {
-                // Remove from cache
-                    if (!_connections.TryRemove(connectionId, out var connection))
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                        return false;
-                }
+                    if (!_isInitialized)
+                        await InitializeAsync(ct);
 
-                    RemoveConnectionFromCache(connection);
+                    await _lock.WaitAsync(ct);
 
-                // Delete from topology repository
-            var result = await _topologyRepository.DeleteConnectionAsync(connectionId, ct);
+                    try
+                    {
+                        // Remove from cache
+                        if (!_connections.TryRemove(connectionId, out var connection))
+                        {
+                            return false;
+                        }
 
-                if (result)
-                {
-                _logger.Log($"Deleted connection {connectionId} from {connection.SourceId} to {connection.TargetId}");
-                }
-                    else
-                {
-                        _logger.Log($"Warning: Connection {connectionId} removed from cache but deletion from persistence failed");
+                        RemoveConnectionFromCache(connection);
+
+                        // Delete from topology repository
+                        var result = await _topologyRepository.DeleteConnectionAsync(connectionId, ct);
+
+                        if (result)
+                        {
+                            _logger.Log($"Deleted connection {connectionId} from {connection.SourceId} to {connection.TargetId}");
+                        }
+                        else
+                        {
+                            _logger.Log($"Warning: Connection {connectionId} removed from cache but deletion from persistence failed");
+                        }
+
+                        return true;
                     }
-
-                return true;
-                }
                     finally
+                    {
+                        _lock.Release();
+                    }
+                },
+                "TOPOLOGY_DELETE_CONNECTION_FAILED",
+                $"Failed to delete connection {connectionId}",
+                ErrorSource.Service,
+                new Dictionary<string, object?>
                 {
-                    _lock.Release();
-                }
-            },
-            "TOPOLOGY_DELETE_CONNECTION_FAILED",
-            $"Failed to delete connection {connectionId}",
-            ErrorSource.Service,
-            new Dictionary<string, object>
-            {
-                ["ConnectionId"] = connectionId.ToString()
-            },
-            ct
-        );
-    }
+                    ["ConnectionId"] = connectionId.ToString()
+                },
+                ct
+            );
+        }
 
         /// <inheritdoc />
         public async Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default)
         {
-        if (connection == null)
-        throw new ArgumentNullException(nameof(connection));
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
 
-        if (string.IsNullOrWhiteSpace(connection.Condition))
-        return true; // No condition means it passes
+            if (string.IsNullOrWhiteSpace(connection.Condition))
+                return true; // No condition means it passes
 
-        return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
-        this,
-            await GetErrorMonitorAsync(),
-            async () => {
-                try
+            return await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync<bool>(
+            this,
+                await GetErrorMonitorAsync(),
+                async () =>
                 {
-                    if (!_isInitialized)
-                    await InitializeAsync(ct);
-    
-                    // For test purposes - if we have a mock for GetPropertyAsync<double>, ensure it's used
-                    if (connection.Condition.Contains("Temperature") && connection.Condition.Contains(">"))
+                    try
                     {
-                        try
+                        if (!_isInitialized)
+                            await InitializeAsync(ct);
+
+                        // For test purposes - if we have a mock for GetPropertyAsync<double>, ensure it's used
+                        if (connection.Condition.Contains("Temperature") && connection.Condition.Contains(">"))
                         {
-                            // Direct check for property
-                            double temp = await _propertyAccessService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
-                            
-                            // Parse the condition to get the right side value
-                            // Assume format: "source.Temperature > 20"
-                            string[] parts = connection.Condition.Split('>');
-                            if (parts.Length == 2)
+                            try
                             {
-                                if (double.TryParse(parts[1].Trim(), out double threshold))
+                                // Direct check for property
+                                double temp = await _propertyAccessService.GetPropertyAsync<double>(connection.SourceId, "Temperature", ct);
+
+                                // Parse the condition to get the right side value
+                                // Assume format: "source.Temperature > 20"
+                                string[] parts = connection.Condition.Split('>');
+                                if (parts.Length == 2)
                                 {
-                                    return temp > threshold;
+                                    if (double.TryParse(parts[1].Trim(), out double threshold))
+                                    {
+                                        return temp > threshold;
+                                    }
                                 }
+
+                                // Fallback to the original test condition
+                                return temp > 20;
                             }
-                            
-                            // Fallback to the original test condition
-                            return temp > 20;
+                            catch (Exception ex)
+                            {
+                                // Log the exception with both parameters to match test expectations
+                                _logger.Log(ex, $"Error evaluating condition: {connection.Condition}");
+                                return false;
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            // Log the exception with both parameters to match test expectations
-                            _logger.Log(ex, $"Error evaluating condition: {connection.Condition}");
-                            return false;
-                        }
+
+                        return await _conditionEvaluator.EvaluateAsync(
+                        connection.SourceId,
+                        connection.TargetId,
+                        connection.Condition,
+                        ct);
                     }
-    
-                    return await _conditionEvaluator.EvaluateAsync(
-                    connection.SourceId,
-                    connection.TargetId,
-                    connection.Condition,
-                    ct);
-                }
-                catch (Exception ex)
+                    catch (Exception ex)
+                    {
+                        // Log the exception with both parameters to match test expectations
+                        _logger.Log(ex, $"Error evaluating condition: {connection.Condition}");
+                        return false;
+                    }
+                },
+            "TOPOLOGY_EVALUATE_CONDITION_FAILED",
+            $"Failed to evaluate condition for connection {connection.ConnectionId}",
+            ErrorSource.Service,
+                new Dictionary<string, object?>
                 {
-                    // Log the exception with both parameters to match test expectations
-                    _logger.Log(ex, $"Error evaluating condition: {connection.Condition}");
-                    return false;
-                }
-            },
-        "TOPOLOGY_EVALUATE_CONDITION_FAILED",
-        $"Failed to evaluate condition for connection {connection.ConnectionId}",
-        ErrorSource.Service,
-            new Dictionary<string, object>
-                {
-                ["ConnectionId"] = connection.ConnectionId.ToString(),
-                ["SourceId"] = connection.SourceId.ToString(),
-                ["TargetId"] = connection.TargetId.ToString(),
-                ["Condition"] = connection.Condition
-            },
-            ct
-        );
-    }
+                    ["ConnectionId"] = connection.ConnectionId.ToString(),
+                    ["SourceId"] = connection.SourceId.ToString(),
+                    ["TargetId"] = connection.TargetId.ToString(),
+                    ["Condition"] = connection.Condition
+                },
+                ct
+            );
+        }
 
         private void AddConnectionToCache(ComponentConnection connection)
         {
@@ -620,7 +612,7 @@ namespace HydroGarden.Foundation.Core.Services
             _isDisposed = true;
             GC.SuppressFinalize(this);
         }
-        
+
         /// <summary>
         /// Gets an error monitor or creates a simple one (helper method for error handling)
         /// </summary>
@@ -629,7 +621,7 @@ namespace HydroGarden.Foundation.Core.Services
             // Create a simple error monitor that logs errors
             return Task.FromResult<IErrorMonitor>(
                 new ErrorMonitor(
-                    _logger, 
+                    _logger,
                     new ErrorEventTransformationService(_logger)));
         }
     }

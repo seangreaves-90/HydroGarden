@@ -1,8 +1,7 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.ErrorHandling.Common;
-using HydroGarden.Foundation.ErrorHandling.Exceptions;
 
-namespace HydroGarden.Foundation.ErrorHandling
+namespace HydroGarden.Foundation.ErrorHandling.Extensions
 {
     /// <summary>
     /// Extension methods for error handling.
@@ -30,7 +29,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string? message = null,
             ErrorSeverity severity = ErrorSeverity.Error,
             ErrorSource errorSource = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
+            IDictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             // Create a context builder for rich error context

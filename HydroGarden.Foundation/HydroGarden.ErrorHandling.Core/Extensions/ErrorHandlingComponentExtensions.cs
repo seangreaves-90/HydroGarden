@@ -1,7 +1,6 @@
 ﻿using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Exceptions;
 
-namespace HydroGarden.Foundation.ErrorHandling
+namespace HydroGarden.Foundation.ErrorHandling.Extensions
 {
     /// <summary>
     /// Extension methods for simplified error handling in components.
@@ -28,7 +27,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string errorCode,
             string errorMessage,
             ErrorSource errorSource = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
+            Dictionary<string, object?> context = null,
             CancellationToken ct = default)
         {
             try
@@ -87,7 +86,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             string errorCode,
             string errorMessage,
             ErrorSource errorSource = ErrorSource.Unknown,
-            IDictionary<string, object>? context = null,
+            IDictionary<string, object?>? context = null,
             CancellationToken ct = default)
         {
             try

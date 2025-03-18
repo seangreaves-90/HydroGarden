@@ -172,7 +172,7 @@ namespace HydroGarden.Foundation.ErrorHandling
             Exception exception,
             Guid? deviceId = null,
             string? errorCode = null,
-            IDictionary<string, object>? context = null)
+            IDictionary<string, object?>? context = null)
         {
 
             ArgumentNullException.ThrowIfNull(exception);

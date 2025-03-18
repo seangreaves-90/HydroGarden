@@ -30,10 +30,10 @@ namespace HydroGarden.Foundation.Common.Events
         /// <param name="eventStore">Optional event store for persisting events.</param>
         /// <param name="transformer">Optional event transformer that will be applied during event publishing.</param>
         public EventBus(
-            ILogger logger,
-            IEventRouter router,
-            IEventStore? eventStore = null,
-            IEventTransformer? transformer = null)
+    ILogger logger,
+    IEventRouter router,
+    IEventStore? eventStore = null,
+    IEventTransformer? transformer = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _router = router ?? throw new ArgumentNullException(nameof(router));
@@ -43,11 +43,16 @@ namespace HydroGarden.Foundation.Common.Events
             // Initialize the event processing pipeline
             _pipeline = new DefaultEventProcessingPipeline(_logger);
 
+            InitializeMiddleware(transformer1).GetAwaiter().GetResult();
+        }
+
+        private async Task InitializeMiddleware(IEventTransformer? transformer1)
+        {
             // Add the validation middleware first (highest priority)
-            _pipeline.AddMiddleware(new EventValidationMiddleware(_logger));
+            await _pipeline.AddMiddleware(new EventValidationMiddleware(_logger));
 
             // Add the state change middleware to ensure proper handling of state change events
-            _pipeline.AddMiddleware(new StateChangeMiddleware(_logger));
+            await _pipeline.AddMiddleware(new StateChangeMiddleware(_logger));
 
             _logger.Log("EventBus initialized with router: " + _router.GetType().Name);
 
@@ -57,7 +62,7 @@ namespace HydroGarden.Foundation.Common.Events
 
                 // Register the transformer middleware - make it higher priority than state change middleware
                 var transformerMiddleware = new DefaultTransformerMiddleware(transformer1, _logger);
-                _pipeline.AddMiddleware(transformerMiddleware);
+                await _pipeline.AddMiddleware(transformerMiddleware);
             }
         }
 
@@ -115,12 +120,25 @@ namespace HydroGarden.Foundation.Common.Events
                     [subscription],
                     (_, list) =>
                     {
-                        // Check if the subscription is already in the list (by ID) to avoid duplicates
-                        if (!list.Any(existing => existing.Id == subscription.Id))
+                        // Thread-safe implementation to avoid enumeration errors
+                        // Create a new list that contains all existing subscriptions plus this one
+                        // but avoid duplicates by checking the ID
+                        var newList = new List<EventSubscription>(list.Count + 1);
+                        bool alreadyExists = false;
+                        
+                        // Copy existing subscriptions
+                        foreach (var existing in list)
                         {
-                            list.Add(subscription);
+                            newList.Add(existing);
+                            if (existing.Id == subscription.Id)
+                                alreadyExists = true;
                         }
-                        return list;
+                        
+                        // Add the new subscription if it's not already in the list
+                        if (!alreadyExists)
+                            newList.Add(subscription);
+                            
+                        return newList;
                     });
 
                 _logger.Log($"Handler {handler.GetType().Name} subscribed to event type {eventType} with ID {subscription.Id}");
@@ -418,7 +436,7 @@ namespace HydroGarden.Foundation.Common.Events
             }
 
             // Use a HashSet to ensure unique subscriptions by ID
-            HashSet<Guid> includedIds = new HashSet<Guid>();
+            HashSet<Guid> includedIds = [];
             List<EventSubscription> mergedSubscriptions = [];
             
             // Add type-specific subscriptions first
@@ -498,22 +516,6 @@ namespace HydroGarden.Foundation.Common.Events
         }
 
         /// <summary>
-        /// Adds middleware to the event processing pipeline for specific event types.
-        /// </summary>
-        /// <param name="middleware">The middleware to add.</param>
-        /// <param name="eventTypes">The event types the middleware should process.</param>
-        public void AddPipelineMiddleware(IEventMiddleware middleware, params EventType[] eventTypes)
-        {
-
-            ArgumentNullException.ThrowIfNull(middleware);
-
-            lock (_pipelineLock)
-            {
-                _pipeline.AddMiddleware(middleware, eventTypes);
-            }
-        }
-
-        /// <summary>
         /// Disposes resources used by the event bus.
         /// </summary>
         public void Dispose()
@@ -547,5 +549,61 @@ namespace HydroGarden.Foundation.Common.Events
 
             GC.SuppressFinalize(this);
         }
+        /// <summary>
+        /// Disposes resources used by the event bus.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+
+            // Dispose pipeline
+            IAsyncDisposable? asyncDisposablePipeline = null;
+            IDisposable? disposablePipeline = null;
+
+            lock (_pipelineLock)
+            {
+                if (_pipeline is IAsyncDisposable asyncPipeline)
+                {
+                    asyncDisposablePipeline = asyncPipeline;
+                }
+                else if (_pipeline is IDisposable syncPipeline)
+                {
+                    disposablePipeline = syncPipeline;
+                }
+            }
+
+            if (asyncDisposablePipeline != null)
+            {
+                try
+                {
+                    await asyncDisposablePipeline.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Log(ex, "Error disposing event processing pipeline");
+                }
+            }
+            else if (disposablePipeline != null)
+            {
+                try
+                {
+                    disposablePipeline.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Log(ex, "Error disposing event processing pipeline");
+                }
+            }
+
+            // Clear subscriptions
+            _subscriptions.Clear();
+            _subscriptionsByType.Clear();
+        }
     }
+    
 }

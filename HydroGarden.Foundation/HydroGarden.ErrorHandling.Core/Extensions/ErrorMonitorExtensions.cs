@@ -1,4 +1,4 @@
-﻿namespace HydroGarden.Foundation.ErrorHandling
+﻿namespace HydroGarden.Foundation.ErrorHandling.Extensions
 {
     /// <summary>
     /// Advanced error monitor extensions to supplement the basic ones.

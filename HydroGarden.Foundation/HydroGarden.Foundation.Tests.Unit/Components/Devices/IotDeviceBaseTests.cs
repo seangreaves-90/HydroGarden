@@ -32,7 +32,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
                 return base.ThrottleRecoveryAttemptsAsync(errorCode, ct);
             }
 
-            public TestIoTDevice(Guid id, string name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
+            public TestIoTDevice(Guid id, string? name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
                 : base(id, name, errorMonitor, eventBus, logger)
             {
                 ShouldFailOnRecover = false;
@@ -86,7 +86,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Devices
         private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Guid _testId;
-        private readonly string _testName;
+        private readonly string? _testName;
         private readonly TestIoTDevice _sut;
         private readonly IIoTDevice _iIoTDeviceSut; // For testing interface implementation
 

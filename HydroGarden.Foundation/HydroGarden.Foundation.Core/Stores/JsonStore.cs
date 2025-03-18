@@ -97,7 +97,7 @@ private readonly TimeSpan _backupInterval;
         }
 
         /// <inheritdoc />
-        public async Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default)
+        public async Task<IDictionary<string, object?>?> LoadAsync(Guid id, CancellationToken ct = default)
         {
             // Check for cancellation before proceeding
             ct.ThrowIfCancellationRequested();
@@ -400,7 +400,7 @@ private readonly TimeSpan _backupInterval;
         /// <summary>
         /// Loads topology data from the dedicated topology directory
         /// </summary>
-        private async Task<IDictionary<string, object>?> LoadTopologyAsync(CancellationToken ct)
+        private async Task<IDictionary<string, object?>?> LoadTopologyAsync(CancellationToken ct)
         {
             string connectionsFilePath = GetConnectionsFilePath();
             string metadataFilePath = GetTopologyMetadataFilePath();

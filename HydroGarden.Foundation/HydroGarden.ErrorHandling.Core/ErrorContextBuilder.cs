@@ -9,7 +9,7 @@ namespace HydroGarden.Foundation.ErrorHandling
     /// </summary>
     public class ErrorContextBuilder
     {
-        private readonly Dictionary<string, object> _context = [];
+        private readonly Dictionary<string, object?> _context = [];
 
         /// <summary>
         /// Creates a new error context builder.
@@ -64,7 +64,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Adds operation details such as method name and parameters.
         /// </summary>
-        public ErrorContextBuilder WithOperation(string operationName, object? parameters = null)
+        public ErrorContextBuilder WithOperation(string? operationName, object? parameters = null)
         {
             _context["Operation"] = operationName;
 
@@ -103,7 +103,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// Adds error classification information to the context.
         /// </summary>
         public ErrorContextBuilder WithErrorClassification(
-            string errorCode,
+            string? errorCode,
             ErrorSeverity severity,
             ErrorSource source,
             ErrorCategory category)
@@ -118,7 +118,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Adds custom key-value pairs to the context.
         /// </summary>
-        public ErrorContextBuilder WithProperty(string key, object value)
+        public ErrorContextBuilder WithProperty(string key, object? value)
         {
             _context[key] = value;
             return this;
@@ -127,7 +127,7 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Adds multiple properties from a dictionary.
         /// </summary>
-        public ErrorContextBuilder WithProperties(IDictionary<string, object> properties)
+        public ErrorContextBuilder WithProperties(IDictionary<string, object?> properties)
         {
             foreach (var (key, value) in properties)
             {
@@ -181,12 +181,12 @@ namespace HydroGarden.Foundation.ErrorHandling
         /// <summary>
         /// Builds the final context dictionary.
         /// </summary>
-        public Dictionary<string, object> Build()
+        public Dictionary<string, object?> Build()
         {
             // Add timestamp information
             _context["ContextCreatedAt"] = DateTimeOffset.UtcNow.ToString("o");
             
-            return new Dictionary<string, object>(_context);
+            return new Dictionary<string, object?>(_context);
         }
     }
 }

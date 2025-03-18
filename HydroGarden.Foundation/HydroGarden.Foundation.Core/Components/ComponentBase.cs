@@ -2,14 +2,13 @@
 using HydroGarden.Foundation.Common.Events;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using HydroGarden.Foundation.Abstractions.Interfaces;
 using HydroGarden.Foundation.Abstractions.Interfaces.Components;
 using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.ErrorHandling;
-using HydroGarden.Foundation.ErrorHandling.Common;
 using HydroGarden.Logger.Abstractions;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 
 namespace HydroGarden.Foundation.Core.Components
 {
@@ -19,12 +18,12 @@ namespace HydroGarden.Foundation.Core.Components
     /// </summary>
     public abstract class ComponentBase : IComponent
     {
-        private readonly ConcurrentDictionary<string, object> _properties = new();
+        private readonly ConcurrentDictionary<string, object?> _properties = new();
         private readonly ConcurrentDictionary<string, IPropertyMetadata> _propertyMetadata = new();
         protected readonly ILogger Logger;
         protected readonly IErrorMonitor ErrorMonitor;
         protected IPropertyChangedEventHandler? PropertyChangedEventHandler;
-        protected readonly IEventBus? _eventBus;
+        protected readonly IEventBus? EventBus;
         private volatile ComponentState _state = ComponentState.Created;
         private const int MaxOptimisticRetries = 3;
         private readonly SemaphoreSlim _stateTransitionLock = new(1, 1);
@@ -40,7 +39,7 @@ namespace HydroGarden.Foundation.Core.Components
         /// <param name="logger">Optional logger instance.</param>
         protected ComponentBase(
             Guid id,
-            string name,
+            string? name,
             IErrorMonitor errorMonitor,
             IEventBus? eventBus = null,
             ILogger? logger = null)
@@ -50,7 +49,7 @@ namespace HydroGarden.Foundation.Core.Components
             AssemblyType = GetType().FullName ?? "UnknownType";
             Logger = logger ?? new Logger.Logging.Logger();
             ErrorMonitor = errorMonitor;
-            _eventBus = eventBus;
+            EventBus = eventBus;
 
             // Initialize built-in properties
             _properties[nameof(Id)] = id;
@@ -69,12 +68,12 @@ namespace HydroGarden.Foundation.Core.Components
         public Guid Id { get; }
 
         /// <inheritdoc/>
-        public string Name { get; }
+        public string? Name { get; }
 
 
 
         /// <inheritdoc/>
-        public string AssemblyType { get; }
+        public string? AssemblyType { get; }
 
         /// <inheritdoc/>
         public ComponentState State
@@ -216,7 +215,7 @@ namespace HydroGarden.Foundation.Core.Components
         /// <returns>A task representing the asynchronous operation.</returns>
         protected virtual async Task PublishStateChangeEventAsync(ComponentState oldState, ComponentState newState)
         {
-            if (_eventBus == null)
+            if (EventBus == null)
             {
                 Logger.Log($"Component {Id} cannot publish state change event: no event bus configured");
                 return;
@@ -243,7 +242,7 @@ namespace HydroGarden.Foundation.Core.Components
                 Logger.Log($"Publishing state change event: {oldState} -> {newState} for component {Id}");
 
                 // Wait for the event to be published to ensure state transitions are properly observed
-                var result = await _eventBus.PublishAsync(this, evt);
+                var result = await EventBus.PublishAsync(this, evt);
                 
                 if (result == null)
                 {
@@ -323,11 +322,9 @@ namespace HydroGarden.Foundation.Core.Components
         }
 
         /// <inheritdoc/>
-        public virtual async Task SetPropertyAsync(string name, object value, IPropertyMetadata? metadata = null)
+        public virtual async Task SetPropertyAsync(string name, object? value, IPropertyMetadata? metadata = null)
         {
-            var success = await ErrorHandlingComponentExtensions.ExecuteWithErrorHandlingAsync(
-                this,
-                ErrorMonitor,
+            var success = await this.ExecuteWithErrorHandlingAsync(ErrorMonitor,
                 async () =>
                 {
                     var oldValue = _properties.TryGetValue(name, out var existing) ? existing : default;
@@ -508,7 +505,7 @@ namespace HydroGarden.Foundation.Core.Components
         /// </summary>
         /// <param name="propertyName">The name of the property to update.</param>
         /// <param name="value">The new value.</param>
-        private void UpdateClassProperty(string propertyName, object value)
+        private void UpdateClassProperty(string propertyName, object? value)
         {
             var type = GetType();
             while (type != null)
@@ -572,13 +569,13 @@ namespace HydroGarden.Foundation.Core.Components
             _propertyMetadata.GetValueOrDefault(name);
 
         /// <inheritdoc/>
-        public virtual IDictionary<string, object> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);
+        public virtual Dictionary<string, object> GetProperties() => _properties.ToDictionary(x => x.Key, x => x.Value);
 
         /// <inheritdoc/>
-        public virtual IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata() => _propertyMetadata.ToDictionary(x => x.Key, x => (IPropertyMetadata)x.Value);
+        public virtual IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata() => _propertyMetadata.ToDictionary(x => x.Key, x => x.Value);
 
         /// <inheritdoc/>
-        public virtual async Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null)
+        public virtual async Task LoadPropertiesAsync(IDictionary<string, object?> properties, IDictionary<string, IPropertyMetadata>? metadata = null)
         {
             await this.ExecuteWithErrorHandlingAsync(ErrorMonitor, () =>
                 {
@@ -649,11 +646,11 @@ namespace HydroGarden.Foundation.Core.Components
             );
 
             // Try to publish using EventBus first if available
-            if (_eventBus != null)
+            if (EventBus != null)
             {
                 try
                 {
-                    await _eventBus.PublishAsync(this, evt);
+                    await EventBus.PublishAsync(this, evt);
                     return;
                 }
                 catch (Exception ex)

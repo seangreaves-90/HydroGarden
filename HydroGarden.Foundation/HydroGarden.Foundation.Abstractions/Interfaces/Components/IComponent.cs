@@ -30,12 +30,12 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// <summary>
         /// Gets the name of the component.
         /// </summary>
-        string Name { get; }
+        string? Name { get; }
 
         /// <summary>
         /// Gets the assembly type of the component.
         /// </summary>
-        string AssemblyType { get; }
+        string? AssemblyType { get; }
 
         /// <summary>
         /// Gets the current state of the component.
@@ -48,7 +48,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// <param name="name">The property name.</param>
         /// <param name="value">The property value.</param>
         /// <param name="metadata">Optional metadata for the property.</param>
-        Task SetPropertyAsync(string name, object value, IPropertyMetadata metadata);
+        Task SetPropertyAsync(string name, object? value, IPropertyMetadata metadata);
 
         /// <summary>
         /// Asynchronously retrieves a property value by name.
@@ -78,7 +78,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// Retrieves all property values of the component.
         /// </summary>
         /// <returns>A dictionary containing property names and values.</returns>
-        IDictionary<string, object> GetProperties();
+        Dictionary<string, object> GetProperties();
 
         /// <summary>
         /// Retrieves metadata for all properties of the component.
@@ -91,7 +91,7 @@ namespace HydroGarden.Foundation.Abstractions.Interfaces.Components
         /// </summary>
         /// <param name="properties">A dictionary of property values.</param>
         /// <param name="metadata">Optional dictionary of property metadata.</param>
-        Task LoadPropertiesAsync(IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
+        Task LoadPropertiesAsync(IDictionary<string, object?> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
 
         /// <summary>
         /// Assigns an event handler to the component.

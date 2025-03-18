@@ -8,6 +8,7 @@ using HydroGarden.Foundation.Common.PropertyMetadata;
 using HydroGarden.Foundation.ErrorHandling;
 using HydroGarden.Logger.Abstractions;
 using System.Threading.Channels;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 
 namespace HydroGarden.Foundation.Core.Services
 {
@@ -248,7 +249,7 @@ namespace HydroGarden.Foundation.Core.Services
                 var storedMetadata = await _store.LoadMetadataAsync(component.Id, ct);
             if (storedProperties != null)
             {
-                _deviceProperties[component.Id] = new Dictionary<string, object>(storedProperties);
+                _deviceProperties[component.Id] = new Dictionary<string, object?>(storedProperties);
         
             // Load stored metadata into our tracking dictionary
                 if (storedMetadata != null && storedMetadata.Count > 0)
@@ -619,7 +620,7 @@ namespace HydroGarden.Foundation.Core.Services
             "PERSISTENCE_GET_CONNECTION_FAILED",
             $"Failed to retrieve connection {connectionId}",
             ErrorSource.Service,
-            new Dictionary<string, object>
+            new Dictionary<string, object?>
             {
                 ["ConnectionId"] = connectionId.ToString()
             },
@@ -657,7 +658,7 @@ namespace HydroGarden.Foundation.Core.Services
             "PERSISTENCE_DELETE_CONNECTION_FAILED",
             $"Failed to delete connection {connectionId}",
             ErrorSource.Service,
-            new Dictionary<string, object>
+            new Dictionary<string, object?>
             {
                 ["ConnectionId"] = connectionId.ToString()
             },
@@ -775,9 +776,9 @@ namespace HydroGarden.Foundation.Core.Services
         /// <summary>
         /// Loads stored properties for a specific device ID.
         /// </summary>
-        private async Task<IDictionary<string, object>> LoadDevicePropertiesAsync(Guid deviceId, CancellationToken ct = default)
+        private async Task<IDictionary<string, object?>> LoadDevicePropertiesAsync(Guid deviceId, CancellationToken ct = default)
         {
-            return await _store.LoadAsync(deviceId, ct) ?? new Dictionary<string, object>();
+            return await _store.LoadAsync(deviceId, ct) ?? new Dictionary<string, object?>();
         }
 
         /// <summary>

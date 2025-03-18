@@ -18,27 +18,29 @@ namespace HydroGarden.Foundation.Common.Events
         private bool _isDisposed;
 
         /// <inheritdoc/>
-        public void AddMiddleware(IEventMiddleware middleware)
+        public Task AddMiddleware(IEventMiddleware middleware)
         {
             ArgumentNullException.ThrowIfNull(middleware);
 
             var registration = new MiddlewareRegistration(middleware, null);
             _middleware[middleware.Id] = registration;
+            return Task.FromResult(Task.CompletedTask);
         }
 
         /// <inheritdoc/>
-        public void AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes)
+        public Task AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes)
         {
             ArgumentNullException.ThrowIfNull(middleware);
 
             var registration = new MiddlewareRegistration(middleware, eventTypes);
             _middleware[middleware.Id] = registration;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
-        public bool RemoveMiddleware(Guid middlewareId)
+        public Task<bool> RemoveMiddleware(Guid middlewareId)
         {
-            return _middleware.TryRemove(middlewareId, out _);
+            return Task.FromResult(_middleware.TryRemove(middlewareId, out _));
         }
 
         /// <inheritdoc/>

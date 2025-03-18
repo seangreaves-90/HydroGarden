@@ -220,7 +220,7 @@ namespace HydroGarden.Foundation.Tests.Unit.ErrorHandling
         public void WithProperties_ShouldAddMultipleProperties()
         {
             // Arrange
-            var properties = new Dictionary<string, object>
+            var properties = new Dictionary<string, object?>
             {
                 { "Key1", "Value1" },
                 { "Key2", 42 },

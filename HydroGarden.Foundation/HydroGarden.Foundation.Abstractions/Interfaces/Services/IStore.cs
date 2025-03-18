@@ -18,7 +18,7 @@
         /// <param name="id">The unique identifier of the component.</param>
         /// <param name="ct">An optional cancellation token.</param>
         /// <returns>A task returning a dictionary of stored properties.</returns>
-        Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default);
+        Task<IDictionary<string, object?>?> LoadAsync(Guid id, CancellationToken ct = default);
 
         /// <summary>
         /// Loads metadata associated with stored properties asynchronously.

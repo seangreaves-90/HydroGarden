@@ -5,6 +5,7 @@ using HydroGarden.Foundation.Abstractions.Interfaces.ErrorHandling;
 using HydroGarden.Foundation.Abstractions.Interfaces.Events;
 using HydroGarden.Foundation.Common.Events;
 using HydroGarden.Foundation.ErrorHandling;
+using HydroGarden.Foundation.ErrorHandling.Extensions;
 using HydroGarden.Logger.Abstractions;
 
 namespace HydroGarden.Foundation.Core.Components.Devices
@@ -36,7 +37,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
         /// <param name="maxRecoveryAttempts">Maximum number of consecutive recovery attempts before requiring manual intervention.</param>
         protected IoTDeviceBase(
             Guid id,
-            string name,
+            string? name,
             IErrorMonitor errorMonitor,
             IEventBus? eventBus = null,
             ILogger? logger = null,
@@ -150,9 +151,9 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             try
             {
                 // Try EventBus first if available
-                if (_eventBus != null)
+                if (EventBus != null)
                 {
-                    await _eventBus.PublishAsync(this, alertEvent, ct);
+                    await EventBus.PublishAsync(this, alertEvent, ct);
                     return;
                 }
                 // Fall back to property changed event handler if available
@@ -568,7 +569,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
             IDictionary<string, string>? units = null,
             IDictionary<string, object>? metadata = null)
         {
-            if (_eventBus == null)
+            if (EventBus == null)
             {
                 Logger.Log("Cannot publish telemetry: No event bus configured");
                 return;
@@ -586,7 +587,7 @@ namespace HydroGarden.Foundation.Core.Components.Devices
                     telemetryEvent.Metadata = metadata;
                 }
                 
-                await _eventBus.PublishAsync(this, telemetryEvent);
+                await EventBus.PublishAsync(this, telemetryEvent);
             }
             catch (Exception ex)
             {

@@ -76,7 +76,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         public static IEvent CreateErrorEvent(
             object source,
             Guid deviceId,
-            string errorCode,
+            string? errorCode,
             string message,
             ErrorSeverity severity = ErrorSeverity.Error,
             ErrorSource errorSource = ErrorSource.Unknown,
@@ -131,7 +131,7 @@ namespace HydroGarden.Foundation.ErrorHandling.Events
         /// <summary>
         /// Derives error category from the error code pattern.
         /// </summary>
-        private static ErrorCategory DeriveCategory(string errorCode)
+        private static ErrorCategory DeriveCategory(string? errorCode)
         {
             if (string.IsNullOrEmpty(errorCode))
                 return ErrorCategory.Unknown;

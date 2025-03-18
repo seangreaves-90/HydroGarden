@@ -17,7 +17,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
     {
         private class TestComponent : ComponentBase
         {
-            public TestComponent(Guid id, string name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
+            public TestComponent(Guid id, string? name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
                 : base(id, name, errorMonitor, eventBus, logger)
             {
             }
@@ -34,7 +34,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         private readonly Mock<IErrorMonitor> _mockErrorMonitor;
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly Guid _testId;
-        private readonly string _testName;
+        private readonly string? _testName;
         private readonly TestComponent _sut;
 
         public ComponentBaseTests()
@@ -355,7 +355,7 @@ namespace HydroGarden.Foundation.Tests.Unit.Components
         public async Task LoadPropertiesAsync_EnsuresRequiredPropertiesPresent()
         {
             // Arrange
-            var properties = new Dictionary<string, object>
+            var properties = new Dictionary<string, object?>
             {
                 { "CustomProperty", "Value" }
             };

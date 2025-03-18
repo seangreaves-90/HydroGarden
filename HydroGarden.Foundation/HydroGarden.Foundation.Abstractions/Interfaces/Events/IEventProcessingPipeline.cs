@@ -9,21 +9,21 @@
         /// Adds middleware to the pipeline.
         /// </summary>
         /// <param name="middleware">The middleware to add.</param>
-        void AddMiddleware(IEventMiddleware middleware);
+        Task AddMiddleware(IEventMiddleware middleware);
 
         /// <summary>
         /// Adds middleware to the pipeline for specific event types.
         /// </summary>
         /// <param name="middleware">The middleware to add.</param>
         /// <param name="eventTypes">The event types the middleware should process.</param>
-        void AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes);
+        Task AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes);
 
         /// <summary>
         /// Removes middleware from the pipeline.
         /// </summary>
         /// <param name="middlewareId">The ID of the middleware to remove.</param>
         /// <returns>True if the middleware was removed, false if not found.</returns>
-        bool RemoveMiddleware(Guid middlewareId);
+        Task<bool> RemoveMiddleware(Guid middlewareId);
 
         /// <summary>
         /// Processes an event through the pipeline.

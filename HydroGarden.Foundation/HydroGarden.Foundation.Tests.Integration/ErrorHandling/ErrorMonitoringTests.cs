@@ -20,7 +20,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
         private readonly Mock<IEventBus> _mockEventBus;
         private readonly ErrorEventTransformationService _transformationService;
         private readonly ErrorMonitor _errorMonitor;
-        private readonly List<ErrorOccurredEvent> _publishedErrorEvents = new();
+        private readonly List<ErrorOccurredEvent> _publishedErrorEvents = [];
         
         public ErrorMonitoringTests()
         {
@@ -79,8 +79,7 @@ namespace HydroGarden.Foundation.Tests.Integration.ErrorHandling
             var error3 = ErrorFactory.CreateDeviceError(
                 deviceId,
                 errorCode,
-                "Third occurrence",
-                ErrorSeverity.Error); // Increased severity
+                "Third occurrence"); // Increased severity
             
             // Keep track of published events
             var publishedEvents = new List<IEvent>();
