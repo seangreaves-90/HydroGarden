@@ -1,91 +1,37 @@
 # HydroGarden API Reference
 
-This document provides a comprehensive reference for the APIs provided by the HydroGarden system, including core interfaces, events, and services.
+This document provides a comprehensive reference for the HydroGarden API, including key interfaces, events, and service contracts.
 
 ## Core Interfaces
 
-### Error Handling Interfaces
+### Component Interfaces
 
-### IApplicationError
+#### IComponent
 
-Interface representing an application error that can be tracked and recovered from.
-
-```csharp
-public interface IApplicationError
-{
-    Guid DeviceId { get; }
-    string? ErrorCode { get; }
-    string Message { get; }
-    ErrorSeverity Severity { get; }
-    IDictionary<string, object> Context { get; }
-    DateTimeOffset Timestamp { get; }
-    Exception? Exception { get; }
-    Guid CorrelationId { get; }
-    ErrorSource Source { get; }
-    bool IsTransient { get; }
-    void RecordRecoveryAttempt();
-}
-```
-
-### IErrorMonitor
-
-Interface for reporting and monitoring errors throughout the system.
+The foundation interface for all components in the system.
 
 ```csharp
-public interface IErrorMonitor
-{
-    Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
-    Task<IReadOnlyCollection<IApplicationError>> GetActiveErrorsForDeviceAsync(Guid deviceId, CancellationToken ct = default);
-    Task<bool> HasActiveErrorsAsync(ErrorSeverity minSeverity = ErrorSeverity.Error, CancellationToken ct = default);
-    Task<IReadOnlyCollection<IApplicationError>> GetRecentErrorsAsync(int count = 20, CancellationToken ct = default);
-    Task RegisterRecoveryAttemptAsync(Guid deviceId, string errorCode, bool isSuccessful, CancellationToken ct = default);
-}
-```
-
-### IRecoveryStrategy
-
-Interface for implementing error recovery strategies.
-
-```csharp
-public interface IRecoveryStrategy
-{
-    string Name { get; }
-    bool CanRecover(IApplicationError error);
-    Task<bool> AttemptRecoveryAsync(IApplicationError error, CancellationToken ct = default);
-}
-```
-
-### IComponent
-
-The base interface for all components in the system.
-
-```csharp
-public interface IComponent : IDisposable, IAsyncDisposable
+public interface IComponent : IDisposable
 {
     Guid Id { get; }
     string? Name { get; }
     string? AssemblyType { get; }
     ComponentState State { get; }
-
-    Task SetPropertyAsync(string name, object? value, IPropertyMetadata? metadata = null);
+    
+    Task SetPropertyAsync(string name, object? value, IPropertyMetadata metadata);
     Task<T?> GetPropertyAsync<T>(string name);
     IPropertyMetadata? GetPropertyMetadata(string name);
+    IPropertyMetadata ConstructDefaultPropertyMetadata(string name, bool isEditable, bool isVisible);
     Dictionary<string, object?> GetProperties();
     IDictionary<string, IPropertyMetadata> GetAllPropertyMetadata();
     Task LoadPropertiesAsync(IDictionary<string, object?> properties, IDictionary<string, IPropertyMetadata>? metadata = null);
     void SetEventHandler(IPropertyChangedEventHandler<IEvent> handler);
-    Task<bool> TransitionToStateAsync(ComponentState newState, CancellationToken ct = default);
-    Task<bool> InitializeAsync(CancellationToken ct = default);
-    Task<bool> StartAsync(CancellationToken ct = default);
-    Task<bool> StopAsync(CancellationToken ct = default);
-    Task<bool> HandleErrorAsync(IApplicationError error, CancellationToken ct = default);
-    Task<bool> RecoverFromErrorAsync(CancellationToken ct = default);
 }
 ```
 
-### IIoTDevice
+#### IIoTDevice
 
-Represents a physical or virtual IoT device in the system.
+Interface for IoT devices, extending the base component functionality.
 
 ```csharp
 public interface IIoTDevice : IComponent
@@ -93,131 +39,14 @@ public interface IIoTDevice : IComponent
     Task InitializeAsync(CancellationToken ct = default);
     Task StartAsync(CancellationToken ct = default);
     Task StopAsync(CancellationToken ct = default);
-    Task<bool> TryRecoverAsync(CancellationToken ct = default);
     Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
+    Task<bool> TryRecoverAsync(CancellationToken ct = default);
 }
 ```
 
-### IEventBus
+### Event Interfaces
 
-The central messaging system interface.
-
-```csharp
-public interface IEventBus
-{
-    Guid Subscribe(IPropertyChangedEventHandler<IEvent> handler, IEventSubscriptionOptions? options = null);
-    bool Unsubscribe(Guid subscriptionId);
-    Task<IPublishResult> PublishAsync(object sender, IEvent evt, CancellationToken ct = default);
-    void SetEventProcessingPipeline(IEventProcessingPipeline pipeline);
-    IEventProcessingPipeline? GetEventProcessingPipeline();
-}
-```
-
-### IEventSubscriptionOptions
-
-Options for configuring event subscriptions.
-
-```csharp
-public interface IEventSubscriptionOptions
-{
-    EventType[] EventTypes { get; set; }
-    Guid[] SourceIds { get; set; }
-    Func<IHydroGardenEvent, bool>? Filter { get; set; }
-    bool IncludeConnectedSources { get; set; }
-    bool Synchronous { get; set; }
-}
-```
-
-### IEventRoutingData
-
-Metadata for controlling how events are routed.
-
-```csharp
-public interface IEventRoutingData
-{
-    Guid[] TargetIds { get; }
-    bool Persist { get; }
-    EventPriority Priority { get; }
-    bool RequiresAcknowledgment { get; }
-    TimeSpan? Timeout { get; }
-}
-```
-
-### IPropertyChangedEventHandler
-
-Interface for handling property change events.
-
-```csharp
-public interface IPropertyChangedEventHandler<T> : IAsyncDisposable where T : IEvent
-{
-    Task HandleEventAsync(object sender, T e, CancellationToken ct = default);
-}
-```
-
-### IPersistenceService
-
-Interface for the persistence service.
-
-```csharp
-public interface IPersistenceService
-{
-    Task AddOrUpdateAsync<T>(T component, CancellationToken ct = default) where T : IIoTDevice;
-    Task ProcessPendingEventsAsync();
-    Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default);
-}
-```
-
-### ITopologyService
-
-Interface for the topology service.
-
-```csharp
-public interface ITopologyService
-{
-    Task<IReadOnlyList<IComponentConnection>> GetConnectionsForSourceAsync(Guid sourceId, CancellationToken ct = default);
-    Task<IReadOnlyList<IComponentConnection>> GetConnectionsForTargetAsync(Guid targetId, CancellationToken ct = default);
-    Task<IComponentConnection> CreateConnectionAsync(IComponentConnection connection, CancellationToken ct = default);
-    Task<bool> UpdateConnectionAsync(IComponentConnection connection, CancellationToken ct = default);
-    Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default);
-    Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default);
-}
-```
-
-### IComponentConnection
-
-Interface representing a connection between components.
-
-```csharp
-public interface IComponentConnection
-{
-    Guid ConnectionId { get; }
-    Guid SourceId { get; }
-    Guid TargetId { get; }
-    string ConnectionType { get; }
-    bool IsEnabled { get; }
-    string? Condition { get; }
-    IDictionary<string, object>? Metadata { get; }
-}
-```
-
-### IStore
-
-Interface for storage implementations.
-
-```csharp
-public interface IStore
-{
-    Task<IStoreTransaction> BeginTransactionAsync(CancellationToken ct = default);
-    Task<IDictionary<string, object>?> LoadAsync(Guid id, CancellationToken ct = default);
-    Task<IDictionary<string, IPropertyMetadata>?> LoadMetadataAsync(Guid id, CancellationToken ct = default);
-    Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default);
-    Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties, IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default);
-}
-```
-
-## Event Interfaces
-
-### IEvent
+#### IEvent
 
 Base interface for all events.
 
@@ -230,12 +59,41 @@ public interface IEvent
     Guid SourceId { get; }
     EventType EventType { get; }
     IEventRoutingData? RoutingData { get; }
+    IDictionary<string, object>? Metadata { get; }
 }
 ```
 
-### IPropertyChangedEvent
+#### IEventBus
 
-Interface for property change events.
+Central interface for event publication and subscription.
+
+```csharp
+public interface IEventBus 
+{
+    Guid Subscribe<TEvent>(IEventHandler<IEvent> handler, IEventSubscriptionOptions? options) where TEvent : IEvent;
+    Guid Subscribe<TEvent>(IEventHandler<TEvent> handler) where TEvent : IEvent;
+    bool Unsubscribe(Guid subscriptionId);
+    Task<IPublishResult?> PublishAsync(object? sender, IEvent evt, CancellationToken ct = default);
+}
+```
+
+#### IEventHandler
+
+Interface for generic event handlers.
+
+```csharp
+public interface IEventHandler : IAsyncDisposable
+{
+    Task HandleEventAsync<T>(object? sender, T evt, CancellationToken ct = default) where T : IEvent;
+}
+
+public interface IEventHandler<in TEvent> : IEventHandler where TEvent : IEvent
+{
+    Task HandleAsync(TEvent @event, CancellationToken ct = default);
+}
+```
+
+#### Specialized Event Interfaces
 
 ```csharp
 public interface IPropertyChangedEvent : IEvent
@@ -244,52 +102,27 @@ public interface IPropertyChangedEvent : IEvent
     Type PropertyType { get; }
     object? OldValue { get; }
     object? NewValue { get; }
-    IPropertyMetadata Metadata { get; }
+    new IPropertyMetadata Metadata { get; }
 }
-```
 
-### IStateChangeEvent
-
-Interface for lifecycle events.
-
-```csharp
 public interface IStateChangeEvent : IEvent
 {
     ComponentState OldState { get; }
     ComponentState NewState { get; }
 }
-```
 
-### ICommandEvent
-
-Interface for command events.
-
-```csharp
 public interface ICommandEvent : IEvent
 {
     string CommandName { get; }
     IDictionary<string, object?>? Parameters { get; }
 }
-```
 
-### ITelemetryEvent
-
-Interface for telemetry events.
-
-```csharp
 public interface ITelemetryEvent : IEvent
 {
     IDictionary<string, object> Readings { get; }
     IDictionary<string, string>? Units { get; }
-    IDictionary<string, object>? Metadata { get; set; }
 }
-```
 
-### IAlertEvent
-
-Interface for alert events.
-
-```csharp
 public interface IAlertEvent : IEvent
 {
     AlertSeverity Severity { get; }
@@ -297,63 +130,132 @@ public interface IAlertEvent : IEvent
     IDictionary<string, object>? AlertData { get; }
     bool IsAcknowledged { get; set; }
 }
-```
 
-## Error Handling Enumerations
-
-### ErrorSeverity
-
-Represents the severity level of an error.
-
-```csharp
-public enum ErrorSeverity
+public interface ISystemEvent : IEvent
 {
-    Warning,        // Operation can continue
-    Error,          // Operation failed but component can recover
-    Critical,       // Component needs external intervention
-    Catastrophic    // System stability is at risk
+    string EventSubType { get; }
+    IDictionary<string, object> EventData { get; }
+}
+
+public interface ILifecycleEvent : IEvent
+{
+    ComponentState State { get; }
+    string? Details { get; }
 }
 ```
 
-### ErrorSource
+### Error Handling Interfaces
 
-Classifies the source of an error.
+#### IApplicationError
+
+Interface for error representation.
 
 ```csharp
-public enum ErrorSource
+public interface IApplicationError
 {
-    Device,        // Hardware/IoT device errors
-    Service,       // Service/application logic errors
-    Communication, // Network/communication errors
-    UI,            // User interface errors
-    Database,      // Data persistence errors
-    Unknown        // Uncategorized errors
+    Guid DeviceId { get; }
+    string? ErrorCode { get; }
+    string Message { get; }
+    ErrorSeverity Severity { get; }
+    Dictionary<string, object?> Context { get; }
+    DateTimeOffset Timestamp { get; }
+    Exception? Exception { get; }
+    Guid CorrelationId { get; }
+    ErrorSource Source { get; }
+    ErrorCategory Category { get; }
 }
 ```
 
-### ErrorCategory
+#### IErrorMonitor
 
-Categorizes errors for better grouping and analysis.
+Interface for error reporting and monitoring.
 
 ```csharp
-public enum ErrorCategory
+public interface IErrorMonitor
 {
-    Unknown = 0,
-    Device = 10,
-    Service = 20,
-    Communication = 30,
-    EventSystem = 40,
-    Storage = 50,
-    Recovery = 60,
-    Security = 70
+    Task ReportErrorAsync(IApplicationError error, CancellationToken ct = default);
+    Task ReportExceptionAsync(object source, Exception exception, string errorCode, 
+        string message, ErrorSeverity severity = ErrorSeverity.Error, 
+        ErrorSource errorSource = ErrorSource.Unknown, 
+        IDictionary<string, object> context = null, 
+        CancellationToken ct = default);
+    Task<IReadOnlyCollection<IApplicationError>> GetRecentErrorsAsync(int limit = 10, CancellationToken ct = default);
+    Task<bool> HasActiveErrorsAsync(ErrorSeverity minSeverity = ErrorSeverity.Warning, CancellationToken ct = default);
+    Task<IReadOnlyCollection<IApplicationError>> GetActiveErrorsForDeviceAsync(Guid deviceId, CancellationToken ct = default);
+    Task ClearErrorAsync(Guid deviceId, string errorCode, CancellationToken ct = default);
 }
 ```
 
-## Component Enumerations
+#### IErrorEventTransformationService
+
+Interface for bidirectional conversion between errors and events.
+
+```csharp
+public interface IErrorEventTransformationService
+{
+    IErrorEvent TransformErrorToEvent(IApplicationError error);
+    IEvent TransformToPublishableEvent(IErrorEvent errorEvent);
+    IErrorEvent? ExtractErrorEvent(IEvent @event);
+    Task PublishErrorAsEventAsync(IApplicationError error, CancellationToken cancellationToken = default);
+}
+```
+
+### Service Interfaces
+
+#### IPersistenceService
+
+Interface for component data persistence.
+
+```csharp
+public interface IPersistenceService : IAsyncDisposable
+{
+    Task AddOrUpdateAsync<T>(T? component, CancellationToken ct = default) where T : IIoTDevice;
+    Task ProcessPendingEventsAsync();
+    Task<T?> GetPropertyAsync<T>(Guid deviceId, string propertyName, CancellationToken ct = default);
+    Task<IPersistenceTransaction> BeginTransactionAsync(CancellationToken ct = default);
+    Task StoreConnectionAsync(IComponentConnection connection, CancellationToken ct = default);
+    Task<IEnumerable<IComponentConnection>> GetAllConnectionsAsync(CancellationToken ct = default);
+    Task<IComponentConnection?> GetConnectionAsync(Guid connectionId, CancellationToken ct = default);
+    Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default);
+    Task<List<(Guid Id, string Name, IDictionary<string, object> Properties, IDictionary<string, IPropertyMetadata> Metadata)>> GetAllStoredDevicesAsync(CancellationToken ct = default);
+}
+```
+
+#### ITopologyService
+
+Interface for component relationship management.
+
+```csharp
+public interface ITopologyService : IAsyncDisposable
+{
+    Task<IReadOnlyList<IComponentConnection>> GetConnectionsForSourceAsync(Guid sourceId, CancellationToken ct = default);
+    Task<IReadOnlyList<IComponentConnection>> GetConnectionsForTargetAsync(Guid targetId, CancellationToken ct = default);
+    Task<IComponentConnection> CreateConnectionAsync(IComponentConnection connection, CancellationToken ct = default);
+    Task<bool> UpdateConnectionAsync(IComponentConnection connection, CancellationToken ct = default);
+    Task<bool> DeleteConnectionAsync(Guid connectionId, CancellationToken ct = default);
+    Task<bool> EvaluateConnectionConditionAsync(IComponentConnection connection, CancellationToken ct = default);
+}
+```
+
+#### IEventProcessingPipeline
+
+Interface for middleware-based event processing.
+
+```csharp
+public interface IEventProcessingPipeline
+{
+    Task AddMiddleware(IEventMiddleware middleware);
+    Task AddMiddleware(IEventMiddleware middleware, params EventType[]? eventTypes);
+    Task<bool> RemoveMiddleware(Guid middlewareId);
+    Task<IEventProcessingResult> ProcessEventAsync(object? sender, IEvent @event, CancellationToken cancellationToken = default);
+}
+```
+
+## Enumerations
 
 ### ComponentState
 
-Represents the possible states of a component.
+States for component lifecycle.
 
 ```csharp
 public enum ComponentState
@@ -370,7 +272,7 @@ public enum ComponentState
 
 ### EventType
 
-Classification of event types in the system.
+Types of events in the system.
 
 ```csharp
 public enum EventType
@@ -382,7 +284,58 @@ public enum EventType
     Alert,
     System,
     Timer,
-    Custom
+    Error,
+    Custom,
+    StateChange
+}
+```
+
+### ErrorSeverity
+
+Severity levels for errors.
+
+```csharp
+public enum ErrorSeverity
+{
+    Warning,        // Operation can continue
+    Error,          // Operation failed but component can recover
+    Critical,       // Component needs external intervention
+    Catastrophic    // System stability is at risk
+}
+```
+
+### ErrorSource
+
+Sources of errors.
+
+```csharp
+public enum ErrorSource
+{
+    Device,        // Hardware/IoT device errors
+    Service,       // Service/application logic errors
+    Communication, // Network/communication errors
+    UI,            // User interface errors
+    Database,      // Data persistence errors,
+    System,        // System-level errors
+    Unknown        // Uncategorized errors
+}
+```
+
+### ErrorCategory
+
+Categorization of errors.
+
+```csharp
+public enum ErrorCategory
+{
+    Unknown = 0,
+    Device = 10,
+    Service = 20,
+    Communication = 30,
+    EventSystem = 40,
+    Storage = 50,
+    Security = 60,
+    System = 70
 }
 ```
 
@@ -414,86 +367,198 @@ public enum AlertSeverity
 }
 ```
 
-## REST API (Planned)
+## Connection and Routing
 
-The REST API will provide HTTP endpoints for interacting with the HydroGarden system. This section outlines the planned API endpoints.
+### IComponentConnection
 
-### Authentication
-
-```
-POST /api/auth/login
-POST /api/auth/logout
-POST /api/auth/refresh
-```
-
-### Components
-
-```
-GET /api/components
-GET /api/components/{id}
-POST /api/components
-PUT /api/components/{id}
-DELETE /api/components/{id}
-```
-
-### Device Operations
-
-```
-POST /api/devices/{id}/initialize
-POST /api/devices/{id}/start
-POST /api/devices/{id}/stop
-PUT /api/devices/{id}/property/{propertyName}
-GET /api/devices/{id}/property/{propertyName}
-```
-
-### Topology
-
-```
-GET /api/topology
-GET /api/topology/connections
-POST /api/topology/connections
-PUT /api/topology/connections/{id}
-DELETE /api/topology/connections/{id}
-```
-
-### Events
-
-```
-POST /api/events
-GET /api/events/history
-GET /api/events/history/{id}
-```
-
-### System Configuration
-
-```
-GET /api/config
-PUT /api/config/{section}
-```
-
-## SignalR API (Planned)
-
-The SignalR API will provide real-time communication with clients. This section outlines the planned SignalR hubs and methods.
-
-### EventHub
+Interface for connections between components.
 
 ```csharp
-// Server methods
-Task SubscribeToEventsAsync(EventSubscriptionDto subscription);
-Task UnsubscribeFromEventsAsync(Guid subscriptionId);
-Task PublishCommandAsync(CommandEventDto command);
-
-// Client methods
-Task OnEventReceived(EventDto evt);
-Task OnConnectionStateChanged(ConnectionStateDto state);
-Task OnSystemStatusUpdated(SystemStatusDto status);
+public interface IComponentConnection
+{
+    Guid ConnectionId { get; }
+    Guid SourceId { get; }
+    Guid TargetId { get; }
+    string ConnectionType { get; }
+    bool IsEnabled { get; }
+    string? Condition { get; }
+    IDictionary<string, object>? Metadata { get; }
+}
 ```
 
-### Implementation Notes
+### IEventRoutingData
 
-- REST API endpoints will return standard HTTP status codes.
-- SignalR connections will use JWT authentication.
-- Event data will be serialized as JSON.
-- Resource URLs are based on a RESTful design pattern.
-- Pagination will be supported for collection endpoints.
-- Filtering options will be available for most GET endpoints.
+Interface for event routing metadata.
+
+```csharp
+public interface IEventRoutingData
+{
+    List<Guid> TargetIds { get; }
+    bool Persist { get; }
+    EventPriority Priority { get; }
+    bool RequiresAcknowledgment { get; }
+    TimeSpan? Timeout { get; }
+}
+```
+
+### IEventRouter
+
+Interface for event routing decisions.
+
+```csharp
+public interface IEventRouter
+{
+    Task<IReadOnlyList<IEventSubscription>> GetMatchingSubscriptionsAsync(
+        IEvent @event, 
+        IEnumerable<IEventSubscription> availableSubscriptions,
+        CancellationToken ct = default);
+    
+    Task<bool> MatchesSubscriptionAsync(
+        IEvent @event,
+        IEventSubscription subscription,
+        CancellationToken ct = default);
+}
+```
+
+### IEventSubscription
+
+Interface for event subscriptions.
+
+```csharp
+public interface IEventSubscription
+{
+    Guid Id { get; }
+    IEventHandler<IEvent> Handler { get; }
+    IEventSubscriptionOptions Options { get; }
+}
+```
+
+### IEventSubscriptionOptions
+
+Interface for event subscription configuration.
+
+```csharp
+public interface IEventSubscriptionOptions
+{
+    EventType[] EventTypes { get; set; }
+    Guid[] SourceIds { get; set; }
+    Func<IEvent, bool>? Filter { get; set; }
+    bool IncludeConnectedSources { get; set; }
+    bool Synchronous { get; set; }
+}
+```
+
+## Middleware
+
+### IEventMiddleware
+
+Interface for processing pipeline middleware.
+
+```csharp
+public interface IEventMiddleware
+{
+    Guid Id { get; }
+    int Priority { get; }
+    Task<IMiddlewareProcessingResult> ProcessEventAsync(object? sender, IEvent evt, CancellationToken cancellationToken = default);
+}
+```
+
+### IMiddlewareProcessingResult
+
+Interface for middleware processing results.
+
+```csharp
+public interface IMiddlewareProcessingResult
+{
+    IEvent Event { get; }
+    bool Success { get; }
+    bool ShouldStopProcessing { get; }
+    Exception? Exception { get; }
+}
+```
+
+## Property Metadata
+
+### IPropertyMetadata
+
+Interface for property metadata.
+
+```csharp
+public interface IPropertyMetadata
+{
+    bool IsEditable { get; set; }
+    bool IsVisible { get; set; }
+    string? DisplayName { get; set; }
+    string? Description { get; set; }
+}
+```
+
+## Storage
+
+### IStore
+
+Interface for low-level storage.
+
+```csharp
+public interface IStore
+{
+    Task<IStoreTransaction> BeginTransactionAsync(CancellationToken ct = default);
+    Task<IDictionary<string, object?>?> LoadAsync(Guid id, CancellationToken ct = default);
+    Task<IDictionary<string, IPropertyMetadata>?> LoadMetadataAsync(Guid id, CancellationToken ct = default);
+    Task SaveAsync(Guid id, IDictionary<string, object> properties, CancellationToken ct = default);
+    Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties,
+        IDictionary<string, IPropertyMetadata>? metadata, CancellationToken ct = default);
+}
+```
+
+### IStoreTransaction
+
+Interface for storage transactions.
+
+```csharp
+public interface IStoreTransaction : IAsyncDisposable
+{
+    Task SaveAsync(Guid id, IDictionary<string, object> properties);
+    Task SaveWithMetadataAsync(Guid id, IDictionary<string, object> properties,
+        IDictionary<string, IPropertyMetadata>? metadata);
+    Task CommitAsync(CancellationToken ct = default);
+    Task RollbackAsync(CancellationToken ct = default);
+}
+```
+
+## Result Objects
+
+### IPublishResult
+
+Interface for event publication results.
+
+```csharp
+public interface IPublishResult
+{
+    Guid EventId { get; set; }
+    int HandlerCount { get; set; }
+    int SuccessCount { get; set; }
+    bool IsComplete { get; }
+    bool TimedOut { get; set; }
+    IReadOnlyList<Exception?> Errors { get; }
+    bool HasErrors { get; }
+    List<Task> HandlerTasks { get; }
+}
+```
+
+### IEventProcessingResult
+
+Interface for event processing results.
+
+```csharp
+public interface IEventProcessingResult
+{
+    IEvent Event { get; }
+    IEvent ProcessedEvent { get; }
+    bool IsSuccess { get; }
+    bool ShouldRetry { get; }  // [Deprecated]
+    Exception? Exception { get; }
+    int RetryCount { get; }    // [Deprecated]
+    TimeSpan RetryDelay { get; } // [Deprecated]
+}
+```

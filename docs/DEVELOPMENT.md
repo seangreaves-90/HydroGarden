@@ -1,892 +1,365 @@
-# HydroGarden Development Guide
+# HydroGarden Development Guidelines
 
-This guide provides information for developers working on the HydroGarden system, including best practices, project structure, and development workflows.
+This document provides development guidelines and best practices for the HydroGarden system. For detailed architecture information, see [ARCHITECTURE.md](ARCHITECTURE.md), and for component documentation, see [COMPONENTS.md](COMPONENTS.md).
 
-## Project Structure
+## Project Setup
 
-The HydroGarden solution consists of several projects organized by responsibility:
+### Repository Structure
 
-### Foundation Layer
+The HydroGarden system is organized into the following main projects:
 
-- **HydroGarden.Foundation.Abstractions**
-  - Interfaces and abstract types that define the system contracts
-  - Event definitions
-  - Service interfaces
-  - Component interfaces
+- **HydroGarden.Foundation.Abstractions**: Core interfaces and abstractions
+- **HydroGarden.Foundation.Common**: Common implementations of core interfaces
+- **HydroGarden.Foundation.Core**: Core component implementations
+- **HydroGarden.Foundation.ErrorHandling**: Error management and recovery
+- **HydroGarden.Logger**: Logging infrastructure
+- **HydroGarden.Foundation.Tests.\***: Test projects
 
-- **HydroGarden.Foundation.Common**
-  - Common implementations shared across the system
-  - Event implementations
-  - Utility classes
-  - Extension methods
-  - Event Processing Pipeline
-  - Middleware components
+### Development Environment
 
-- **HydroGarden.Foundation.Core**
-  - Core component implementations
-  - Base classes for devices and controllers
-  - Service implementations
-  - Storage implementations
+Required tools:
+- Visual Studio 2022 or later
+- .NET 8.0 SDK
+- Git
 
-- **HydroGarden.Foundation.ErrorHandling.Core**
-  - Error handling and transformation implementations
-  - Error-Event transformation service
-  - Error monitoring implementations
-  - Recovery coordination
+Recommended extensions:
+- Roslynator (code analysis)
+- Visual Studio IntelliCode
+- Code Cleanup on Save
 
-### Testing Projects
+### Getting Started
 
-- **HydroGarden.Foundation.Tests.Unit**
-  - Unit tests for individual components
-  - Mock implementations for testing
+1. Clone the repository
+2. Open the solution file in Visual Studio
+3. Restore NuGet packages
+4. Build the solution
+5. Run unit tests to verify the setup
 
-- **HydroGarden.Foundation.Tests.Integration**
-  - Integration tests for component interactions
-  - End-to-end testing of system flows
+## Coding Standards
 
-### Application Layer
+### Naming Conventions
 
-- **HydroGarden.Service**
-  - Main application entry point
-  - Component composition
-  - Configuration management
+- **Interfaces**: Prefix with `I` (e.g., `IComponent`, `IEventBus`)
+- **Event Interfaces**: Suffix with `Event` (e.g., `IPropertyChangedEvent`)
+- **Abstract Classes**: Suffix with `Base` (e.g., `ComponentBase`, `IotDeviceBase`)
+- **Implementation Classes**: Descriptive name without prefix/suffix (e.g., `EventBus`, `TopologyService`)
+- **Extension Methods**: Suffix class with `Extensions` (e.g., `ErrorHandlingExtensions`)
 
-- **HydroGarden.UI**
-  - Web interface for the system
-  - SignalR integration
-  - API controllers
+### Code Organization
 
-### Utilities
+- Use namespaces that reflect the project structure
+- Group related classes in appropriate folders
+- Keep classes focused on a single responsibility
+- Use regions sparingly and only for logical grouping
 
-- **TestConsole**
-  - Console application for testing and demonstration
-  - Manual component interaction
+### Documentation
 
-## Event System Overview
+- Add XML documentation to all public members
+- Include summary, param, returns, and exception comments where appropriate
+- Document error conditions and edge cases
+- Keep comments up-to-date with code changes
 
-The event system is the backbone of HydroGarden, providing communication between all components.
+### Asynchronous Programming
 
-### Event Types
+- Use async/await throughout the codebase
+- Follow Task-based Asynchronous Pattern (TAP)
+- Avoid blocking calls in async methods
+- Always include cancellation token support
+- Use ConfigureAwait(false) when appropriate
 
-1. **PropertyChanged**
-   - Triggered when a component property changes
-   - Contains property name, old value, new value, and metadata
+### Error Handling
 
-2. **Lifecycle**
-   - Represents component state transitions
-   - States: Created, Initializing, Ready, Running, Stopping, Error, Disposed
+- Use the error handling framework for all errors
+- Categorize errors appropriately with ErrorSource and ErrorCategory
+- Include detailed context information for diagnostic purposes
+- Design components to be resilient to errors
+- Always provide meaningful error codes and messages
 
-3. **Command**
-   - Requests for components to perform actions
-   - Contains command name and parameters
+## Component Development
 
-4. **Telemetry**
-   - Sensor readings and measurements
-   - Contains named readings and optional units
+### Creating New Components
 
-5. **Alert**
-   - System warnings and notifications
-   - Contains severity, message, and additional data
+1. Determine whether the component should extend `ComponentBase` or `IotDeviceBase`
+2. Implement the appropriate interfaces based on component functionality
+3. Register property validators for input validation
+4. Implement lifecycle methods (Initialize, Start, Stop)
+5. Add proper error handling with the error monitoring system
+6. Write unit tests for the component
 
-### Creating Events
+### Component Lifecycle
 
-```csharp
-// Property changed event
-var propEvent = new HydroGardenPropertyChangedEvent(
-    deviceId,
-    "Temperature",
-    typeof(double),
-    oldTemp,
-    newTemp,
-    new PropertyMetadata(true, true, "Temperature", "Current temperature reading")
-);
+Components follow a defined lifecycle:
 
-// Command event
-var command = new CommandEvent(
-    pumpId,
-    "Start",
-    new Dictionary<string, object> { { "Duration", TimeSpan.FromMinutes(5) } }
-);
+1. **Created**: Initial state after construction
+2. **Initializing**: During initialization
+3. **Ready**: Initialized successfully, ready to start
+4. **Running**: Active and operational
+5. **Stopping**: During shutdown
+6. **Error**: When an error occurs
+7. **Disposed**: After resources are released
 
-// Lifecycle event
-var lifecycle = new LifecycleEvent(
-    deviceId,
-    ComponentState.Running,
-    "Device started successfully"
-);
-```
+All state transitions should be properly handled, and events should be published for significant transitions.
 
-### Publishing Events
+### Property Management
+
+- Use SetPropertyAsync for property changes to trigger events
+- Validate property values with RegisterPropertyValidator
+- Add metadata for all properties (especially user-configurable ones)
+- Include property units and descriptions where appropriate
+- Consider property persistence requirements
+
+### Example Component Template
 
 ```csharp
-// Publish an event
-await _eventBus.PublishAsync(this, propEvent);
-
-// Publish with specific routing
-var routingData = new EventRoutingData
+public class MyComponent : IotDeviceBase
 {
-    TargetIds = new[] { targetDeviceId },
-    Priority = EventPriority.High,
-    Persist = true
-};
-
-var eventWithRouting = new CommandEvent(
-    sourceId,
-    "EmergencyStop",
-    null,
-    routingData
-);
-
-await _eventBus.PublishAsync(this, eventWithRouting);
-```
-
-### Subscribing to Events
-
-```csharp
-// Basic subscription
-_eventBus.Subscribe(this, new EventSubscriptionOptions
-{
-    EventTypes = new[] { EventType.PropertyChanged },
-    SourceIds = new[] { sensorId }
-});
-
-// Advanced filtering
-_eventBus.Subscribe(this, new EventSubscriptionOptions
-{
-    EventTypes = new[] { EventType.PropertyChanged },
-    Filter = evt => 
-        evt is IHydroGardenPropertyChangedEvent propEvt && 
-        propEvt.PropertyName == "Temperature" && 
-        propEvt.NewValue is double temp && 
-        temp > 30.0
-});
-
-// Including connected sources
-_eventBus.Subscribe(this, new EventSubscriptionOptions
-{
-    EventTypes = new[] { EventType.Telemetry },
-    SourceIds = new[] { controllerId },
-    IncludeConnectedSources = true
-});
-```
-
-### Handling Events
-
-```csharp
-public class TemperatureController : HydroGardenComponentBase, IHydroGardenPropertyChangedEventHandler
-{
-    // Called for property change events
-    public async Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent evt, CancellationToken ct)
+    public MyComponent(Guid id, string? name, IErrorMonitor errorMonitor, IEventBus? eventBus = null, ILogger? logger = null)
+        : base(id, name, errorMonitor, eventBus, logger)
     {
-        if (evt.PropertyName == "Temperature" && evt.NewValue is double temperature)
-        {
-            await ProcessTemperatureChangeAsync(temperature);
-        }
-    }
-    
-    // Extension method for lifecycle events
-    public async Task HandleLifecycleEventAsync(object sender, IHydroGardenLifecycleEvent evt, CancellationToken ct)
-    {
-        if (evt.State == ComponentState.Error)
-        {
-            await HandleDeviceErrorAsync(evt.SourceId, evt.Details);
-        }
-    }
-    
-    // ...
-}
-```
-
-## Event Processing Pipeline
-
-New in Phase 2, the Event Processing Pipeline enhances event handling with middleware capabilities.
-
-### Pipeline Configuration
-
-```csharp
-// Configure the pipeline using the builder
-var pipeline = new EventPipelineBuilder(logger)
-    .AddLogging(LoggingMiddleware.LoggingLevel.Detailed)
-    .AddCircuitBreaker(failureThreshold: 5, resetTimeout: TimeSpan.FromMinutes(1))
-    .AddRetry(maxRetries: 3, initialDelay: TimeSpan.FromSeconds(1))
-    .AddDeadLetterQueue()
-    .Build();
-
-// Attach to the EventBus
-eventBus.SetEventProcessingPipeline(pipeline);
-
-// Or use extension method
-var pipeline = eventBus.UsePipeline(logger, builder => 
-{
-    builder.AddLogging()
-           .AddCircuitBreaker()
-           .AddRetry()
-           .AddDeadLetterQueue();
-});
-```
-
-### Creating Custom Middleware
-
-```csharp
-public class CustomMiddleware : IEventMiddleware
-{
-    private readonly ILogger _logger;
-    
-    public CustomMiddleware(ILogger logger)
-    {
-        _logger = logger;
-        Id = Guid.NewGuid();
-        Name = "Custom Middleware";
-        Order = 300; // Run after logging but before retry
-    }
-
-    public Guid Id { get; }
-    public string Name { get; }
-    public int Order { get; }
-
-    public async Task<IEventProcessingResult> ProcessAsync(
-        object sender,
-        IEvent @event,
-        Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> next,
-        CancellationToken cancellationToken = default)
-    {
-        // Do something before the next middleware
-        _logger.Log($"Custom middleware processing event {@event.EventId}");
-
-        // Call the next middleware in the pipeline
-        var result = await next(sender, @event, cancellationToken);
-
-        // Do something after the next middleware
-        if (!result.IsSuccess)
-        {
-            _logger.Log($"Event {@event.EventId} failed processing");
-        }
-
-        return result;
-    }
-
-    public bool ShouldApply(IEvent @event)
-    {
-        // Apply this middleware to all events except system events
-        return @event.EventType != EventType.System;
-    }
-}
-
-// Add to pipeline
-pipeline.AddMiddleware(new CustomMiddleware(logger));
-```
-
-### Using the Dead Letter Queue
-
-```csharp
-// Access the dead letter queue middleware
-var deadLetterQueueMiddleware = serviceProvider.GetRequiredService<DeadLetterQueueMiddleware>();
-
-// Get all entries
-var failedEvents = deadLetterQueueMiddleware.GetAllEntries();
-
-// Process failed events
-foreach (var entry in failedEvents)
-{
-    Console.WriteLine($"Failed event: {entry.EventId}, Error: {entry.ErrorMessage}");
-    
-    // Attempt to reprocess
-    if (entry.ProcessingAttempts < 5)
-    {
-        await eventBus.PublishAsync(this, entry.Event);
-        deadLetterQueueMiddleware.RemoveEntry(entry.Id);
-    }
-}
-```
-
-## Recovery Orchestration
-
-New in Phase 3, the Recovery Orchestration Service provides advanced error recovery capabilities.
-
-### Using the Recovery Orchestration Service
-
-```csharp
-// Attempt to recover from an error
-var recoveryStatus = await recoveryOrchestrationService.AttemptRecoveryAsync(error);
-
-if (recoveryStatus.IsSuccessful)
-{
-    Console.WriteLine($"Recovery successful using {recoveryStatus.SuccessfulStrategy}");
-}
-else
-{
-    Console.WriteLine("Recovery failed");
-}
-
-// Attempt to recover a device (handles all active errors)
-var deviceRecoveryStatus = await recoveryOrchestrationService.RecoverDeviceAsync(deviceId);
-
-// Create a recovery plan without executing it
-var plan = await recoveryOrchestrationService.CreateRecoveryPlanAsync(error);
-
-// Add custom context to the plan
-plan.Context["MaxRetries"] = 5;
-plan.Context["Priority"] = "High";
-
-// Execute the plan
-var executionStatus = await recoveryOrchestrationService.ExecuteRecoveryPlanAsync(plan);
-```
-
-### Creating Custom Recovery Strategies
-
-```csharp
-public class CustomRecoveryStrategy : RecoveryStrategyBase
-{
-    private readonly IMyService _service;
-    
-    public CustomRecoveryStrategy(ILogger logger, IMyService service)
-        : base(logger)
-    {
-        _service = service;
-    }
-    
-    public override string Name => "Custom Recovery Strategy";
-    
-    public override int Priority => 20; // Lower numbers run first
-    
-    public override ErrorTaxonomy.RecoveryComplexity ComplexityLevel =>
-        ErrorTaxonomy.RecoveryComplexity.Moderate;
-    
-    public override ErrorTaxonomy.RootCause[] SupportedRootCauses => new[]
-    {
-        ErrorTaxonomy.RootCause.ConfigurationError,
-        ErrorTaxonomy.RootCause.ValidationFailure
-    };
-    
-    public override bool CanRecover(IApplicationError error)
-    {
-        // Use base implementation first (checks root causes)
-        if (!base.CanRecover(error))
-            return false;
-            
-        // Add custom logic
-        return error.ErrorCode == "CUSTOM_ERROR_CODE";
-    }
-    
-    protected override async Task<bool> ExecuteRecoveryAsync(IApplicationError error, CancellationToken ct)
-    {
-        try
-        {
-            // Implement recovery logic
-            await _service.FixIssueAsync(error.DeviceId, ct);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Logger.Log(ex, "Custom recovery failed");
-            return false;
-        }
-    }
-}
-
-// Register the strategy
-recoveryOrchestrationService.RegisterStrategy(new CustomRecoveryStrategy(logger, myService));
-```
-
-### Analyzing Recovery Performance
-
-```csharp
-// Get overall recovery statistics
-var metrics = await recoveryOrchestrationService.GetRecoveryStatisticsAsync(
-    DateTimeOffset.UtcNow.AddDays(-7));
-    
-foreach (var (errorCode, metric) in metrics)
-{
-    Console.WriteLine($"Error {errorCode}:");
-    Console.WriteLine($"  Success rate: {metric.SuccessRate}%");
-    Console.WriteLine($"  Total attempts: {metric.TotalAttempts}");
-    Console.WriteLine($"  Best strategy: {metric.MostSuccessfulStrategy}");
-    Console.WriteLine($"  Avg recovery time: {metric.AverageRecoveryTimeMs}ms");
-}
-
-// Get device-specific recovery history
-var history = await recoveryOrchestrationService.GetRecoveryHistoryAsync(deviceId);
-foreach (var record in history)
-{
-    Console.WriteLine($"{record.Timestamp}: {(record.IsSuccessful ? "Success" : "Failed")} using {record.StrategyUsed}");
-}
-```
-
-## Error-Event Integration
-
-New in Phase 1, the Error-Event integration allows errors to be published as events and vice versa.
-
-### Creating and Reporting Errors
-
-```csharp
-// Create a device error
-var error = new ComponentError(
-    deviceId: deviceId,
-    errorCode: "DEVICE_OFFLINE",
-    message: "Device not responding to commands",
-    severity: ErrorSeverity.Error,
-    isRecoverable: true,
-    source: ErrorSource.Device,
-    isTransient: true,
-    context: new Dictionary<string, object>
-    {
-        { "LastSeenTimestamp", DateTime.UtcNow.AddMinutes(-5) },
-        { "ConnectionAttempts", 3 }
-    },
-    exception: exception
-);
-
-// Report the error to the monitoring system
-await errorMonitor.ReportErrorAsync(error);
-
-// Create a non-recoverable error using factory method
-var criticalError = ComponentError.CreateNonRecoverable(
-    deviceId: deviceId,
-    errorCode: "HARDWARE_FAILURE",
-    message: "Critical hardware failure detected",
-    severity: ErrorSeverity.Critical,
-    source: ErrorSource.Device
-);
-
-// Create a transient error using factory method
-var transientError = ComponentError.CreateTransient(
-    deviceId: deviceId,
-    errorCode: "COMM_TIMEOUT",
-    message: "Communication timeout occurred",
-    severity: ErrorSeverity.Warning,
-    source: ErrorSource.Communication
-);
-```
-
-### Publishing Errors as Events
-
-```csharp
-// Using the transformation service directly
-await errorEventTransformationService.PublishErrorAsEventAsync(applicationError);
-
-// Extension method for IErrorMonitor
-await errorMonitor.PublishErrorAsEventAsync(applicationError);
-
-// Publishing a recovery attempt
-await errorEventTransformationService.PublishRecoveryAsEventAsync(
-    deviceId,
-    "SENSOR_FAILURE",
-    isSuccessful: true,
-    message: "Sensor reconnected successfully",
-    correlationId: errorEvent.CorrelationId);
-```
-
-### Subscribing to Error Events
-
-```csharp
-// Using extension methods
-eventBus.SubscribeToErrorEvents(
-    async (error, ct) =>
-    {
-        // Handle the error
-        Console.WriteLine($"Received error: {error.ErrorCode} - {error.Message}");
-        
-        // Attempt recovery
-        if (error.ErrorCode == "DEVICE_OFFLINE")
-        {
-            await TryReconnectDeviceAsync(error.DeviceId);
-        }
-    });
-
-// Subscribe to recovery events
-eventBus.SubscribeToRecoveryEvents(
-    async (deviceId, errorCode, successful, message, correlationId, ct) =>
-    {
-        if (successful)
-        {
-            Console.WriteLine($"Device {deviceId} recovered from {errorCode}: {message}");
-        }
-        else
-        {
-            Console.WriteLine($"Recovery failed for device {deviceId}, error {errorCode}: {message}");
-        }
-    });
-```
-
-### Working with ComponentError Features
-
-```csharp
-// Check if recovery can be attempted
-if (componentError.CanAttemptRecovery())
-{
-    // Attempt recovery
-    var success = await recoveryOrchestrator.AttemptRecoveryAsync(componentError);
-    
-    // Record the recovery attempt
-    componentError.RecordRecoveryAttempt();
-    
-    // Check exponential backoff interval before next attempt
-    var backoffInterval = componentError.RecoveryBackoffInterval;
-    Console.WriteLine($"Next recovery attempt allowed after {backoffInterval.TotalSeconds} seconds");
-}
-
-// Check if error is unrecoverable
-if (componentError.IsUnrecoverable)
-{
-    // Take alternative actions for unrecoverable errors
-    await NotifyAdministratorAsync(componentError);
-}
-```
-
-## Creating New Components
-
-### IoT Device
-
-```csharp
-public class TemperatureSensor : IoTDeviceBase
-{
-    private readonly Timer _readingTimer;
-    private readonly Random _simulator = new();
-    private double _baseTemperature = 21.0;
-    
-    public TemperatureSensor(Guid id, string name, IHydroGardenLogger logger = null)
-        : base(id, name, logger)
-    {
-        _readingTimer = new Timer(OnReadingTimer, null, Timeout.Infinite, Timeout.Infinite);
+        // Register property validators
+        RegisterPropertyValidator("MyProperty", ValidateMyProperty);
     }
     
     protected override async Task OnInitializeAsync(CancellationToken ct)
     {
-        await SetPropertyAsync("CurrentTemperature", _baseTemperature);
-        await SetPropertyAsync("Unit", "°C");
-        await base.OnInitializeAsync(ct);
+        // Set initial properties
+        await SetPropertyAsync("MyProperty", defaultValue, 
+            ConstructDefaultPropertyMetadata("MyProperty", true, true));
+        
+        // Additional initialization
+        
+        return await base.OnInitializeAsync(ct);
     }
     
     protected override Task OnStartAsync(CancellationToken ct)
     {
-        _readingTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(5));
+        // Start operation
+        
         return base.OnStartAsync(ct);
     }
     
     protected override Task OnStopAsync(CancellationToken ct)
     {
-        _readingTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        // Stop operation
+        
         return base.OnStopAsync(ct);
     }
     
-    private async void OnReadingTimer(object state)
+    private bool ValidateMyProperty(object? value, IPropertyMetadata? metadata)
     {
-        try
+        // Property validation logic
+        return true;
+    }
+    
+    protected override async ValueTask DisposeAsync(bool disposing)
+    {
+        if (disposing)
         {
-            // Simulate a temperature reading
-            var reading = _baseTemperature + (_simulator.NextDouble() * 2) - 1;
-            await SetPropertyAsync("CurrentTemperature", Math.Round(reading, 1));
-            await SetPropertyAsync("Timestamp", DateTime.UtcNow);
+            // Clean up managed resources
         }
-        catch (Exception ex)
-        {
-            _logger.Log(ex, "Error updating temperature reading");
-        }
-    }
-    
-    public override void Dispose()
-    {
-        _readingTimer?.Dispose();
-        base.Dispose();
-    }
-}
-```
-
-### Controller
-
-```csharp
-public class TemperatureController : HydroGardenComponentBase, IHydroGardenPropertyChangedEventHandler
-{
-    private readonly IEventBus _eventBus;
-    private readonly Guid _heaterId;
-    private readonly Guid _chillerId;
-    private double _targetTemperature = 24.0;
-    private double _tolerance = 1.0;
-    
-    public TemperatureController(
-        Guid id, 
-        string name, 
-        IEventBus eventBus,
-        Guid heaterId,
-        Guid chillerId,
-        IHydroGardenLogger logger = null)
-        : base(id, name, logger)
-    {
-        _eventBus = eventBus;
-        _heaterId = heaterId;
-        _chillerId = chillerId;
-    }
-    
-    public async Task InitializeAsync()
-    {
-        await SetPropertyAsync("TargetTemperature", _targetTemperature);
-        await SetPropertyAsync("Tolerance", _tolerance);
         
-        // Subscribe to temperature sensor events
-        _eventBus.Subscribe(this, new EventSubscriptionOptions
-        {
-            EventTypes = new[] { EventType.PropertyChanged },
-            Filter = evt => evt is IHydroGardenPropertyChangedEvent propEvt && 
-                           propEvt.PropertyName == "CurrentTemperature"
-        });
-    }
-    
-    public async Task HandleEventAsync(object sender, IHydroGardenPropertyChangedEvent evt, CancellationToken ct)
-    {
-        if (evt.PropertyName == "CurrentTemperature" && evt.NewValue is double temperature)
-        {
-            await ProcessTemperatureAsync(temperature);
-        }
-    }
-    
-    private async Task ProcessTemperatureAsync(double temperature)
-    {
-        await SetPropertyAsync("CurrentTemperature", temperature);
-        
-        if (temperature < _targetTemperature - _tolerance)
-        {
-            // Too cold, activate heater
-            await ActivateHeaterAsync();
-            await DeactivateChillerAsync();
-        }
-        else if (temperature > _targetTemperature + _tolerance)
-        {
-            // Too hot, activate chiller
-            await DeactivateHeaterAsync();
-            await ActivateChillerAsync();
-        }
-        else
-        {
-            // Within acceptable range, deactivate both
-            await DeactivateHeaterAsync();
-            await DeactivateChillerAsync();
-        }
-    }
-    
-    private async Task ActivateHeaterAsync()
-    {
-        var command = new CommandEvent(
-            _heaterId,
-            "Activate",
-            new Dictionary<string, object> { { "Power", 100 } }
-        );
-        
-        await _eventBus.PublishAsync(this, command);
-        await SetPropertyAsync("HeaterActive", true);
-    }
-    
-    // Additional implementation omitted for brevity
-    
-    public ValueTask DisposeAsync()
-    {
-        return ValueTask.CompletedTask;
+        await base.DisposeAsync(disposing);
     }
 }
 ```
 
-## Testing Best Practices
+## Event System Usage
 
-### Unit Testing the Event Processing Pipeline
+### Publishing Events
 
-```csharp
-[Fact]
-public async Task RetryMiddleware_WhenEventFails_ShouldRetrySpecifiedTimes()
-{
-    // Arrange
-    var logger = new TestLogger();
-    var middleware = new RetryMiddleware(logger, maxRetries: 3);
-    
-    var event = new TestEvent { EventId = Guid.NewGuid() };
-    var failCount = 0;
-    
-    Func<object, IEvent, CancellationToken, Task<IEventProcessingResult>> next = 
-        (sender, evt, ct) =>
-        {
-            failCount++;
-            if (failCount <= 2) // Fail twice
-            {
-                return Task.FromResult<IEventProcessingResult>(
-                    EventProcessingResult.Failure(evt, new Exception("Test failure"), shouldRetry: true));
-            }
-            else // Succeed on third attempt
-            {
-                return Task.FromResult<IEventProcessingResult>(
-                    EventProcessingResult.Success(evt));
-            }
-        };
-    
-    // Act
-    var result = await middleware.ProcessAsync(this, event, next, CancellationToken.None);
-    
-    // Assert
-    Assert.True(result.IsSuccess);
-    Assert.Equal(3, failCount); // Should have attempted 3 times
-}
-```
+- Use the EventBus for all event publication
+- Select the appropriate event type for each scenario
+- Include necessary metadata and context
+- Consider routing requirements for the event
+- Add error handling for publication failures
 
-### Unit Testing Error-Event Transformation
+### Subscribing to Events
 
-```csharp
-[Fact]
-public void TransformErrorToEvent_ShouldCreateValidErrorEvent()
-{
-    // Arrange
-    var mockEventBus = new Mock<IEventBus>();
-    var mockLogger = new Mock<ILogger>();
-    var service = new ErrorEventTransformationService(mockEventBus.Object, mockLogger.Object);
-    
-    var error = new TestError
-    {
-        DeviceId = Guid.NewGuid(),
-        ErrorCode = "TEST_ERROR",
-        Message = "Test error message",
-        Severity = ErrorSeverity.Error,
-        CorrelationId = Guid.NewGuid()
-    };
-    
-    // Act
-    var errorEvent = service.TransformErrorToEvent(error);
-    
-    // Assert
-    Assert.Equal(error.DeviceId, errorEvent.DeviceId);
-    Assert.Equal(error.ErrorCode, errorEvent.ErrorCode);
-    Assert.Equal(error.Message, errorEvent.Message);
-    Assert.Equal(error.Severity, errorEvent.Severity);
-    Assert.Equal(error.CorrelationId, errorEvent.CorrelationId);
-}
-```
+- Use typed handlers for specific event types
+- Implement proper error handling in handlers
+- Keep handlers focused and lightweight
+- Unsubscribe when no longer needed
+- Consider subscription options for filtering
+
+### Creating New Event Types
+
+1. Define an interface extending IEvent
+2. Add specific properties for the event type
+3. Create a concrete implementation
+4. Add event-specific handler interface if needed
+5. Implement serialization support if the event needs persistence
+
+## Error Handling Best Practices
+
+### Error Creation
+
+- Always include a descriptive message
+- Use proper severity level based on impact
+- Set appropriate error source and category
+- Include relevant context information
+- Generate consistent error codes
+
+### Error Reporting
+
+- Report all errors through the ErrorMonitor
+- Use ReportErrorAsync for known errors
+- Use ReportExceptionAsync for exceptions
+- Include the component source when reporting
+- Consider whether recovery should be attempted
+
+### Error Recovery
+
+- Implement TryRecoverAsync for recoverable components
+- Design recovery strategies for common errors
+- Use progressive backoff for retry attempts
+- Include recovery attempt tracking
+- Log recovery success or failure
+
+## Testing
+
+### Unit Testing
+
+- Test each component in isolation
+- Mock dependencies using interfaces
+- Verify property changes and events
+- Test error handling and recovery
+- Cover both success and failure paths
 
 ### Integration Testing
 
-```csharp
-[Fact]
-public async Task EventBus_WithPipeline_ShouldRouteCommands()
-{
-    // Arrange
-    using var eventBus = CreateTestEventBus();
-    var logger = new TestLogger();
-    
-    // Configure pipeline
-    var pipeline = new EventPipelineBuilder(logger)
-        .AddLogging()
-        .AddRetry(maxRetries: 1)
-        .Build();
-    
-    eventBus.SetEventProcessingPipeline(pipeline);
-    
-    var deviceId = Guid.NewGuid();
-    var controllerId = Guid.NewGuid();
-    
-    // Set up mock handlers
-    var deviceHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
-    var controllerHandler = new Mock<IHydroGardenPropertyChangedEventHandler>();
-    
-    // Subscribe handlers
-    var deviceOptions = new EventSubscriptionOptions
-    {
-        EventTypes = new[] { EventType.Command },
-        SourceIds = new[] { deviceId }
-    };
-    
-    var controllerOptions = new EventSubscriptionOptions
-    {
-        EventTypes = new[] { EventType.PropertyChanged },
-        SourceIds = new[] { deviceId }
-    };
-    
-    eventBus.Subscribe(deviceHandler.Object, deviceOptions);
-    eventBus.Subscribe(controllerHandler.Object, controllerOptions);
-    
-    // Act - Send command to device
-    var command = new CommandEvent(
-        deviceId,
-        "ChangeMode",
-        new Dictionary<string, object> { { "Mode", "Eco" } }
-    );
-    
-    await eventBus.PublishAsync(this, command);
-    
-    // Assert - Command was received by device
-    deviceHandler.Verify(h => h.HandleEventAsync(
-        It.IsAny<object>(),
-        It.IsAny<IHydroGardenPropertyChangedEvent>(),
-        It.IsAny<CancellationToken>()),
-        Times.Once);
-}
-```
+- Test component interactions
+- Verify event flow between components
+- Test topology-based routing
+- Verify persistence and recovery
+- Test complete scenarios end-to-end
+
+### Test Coverage
+
+- Aim for at least 80% code coverage
+- Focus on business logic and error handling
+- Include edge cases and error conditions
+- Test asynchronous behavior properly
+- Verify component lifecycle transitions
 
 ## Debugging Tips
 
-1. **Enable Diagnostic Logging**
-   - Set log level to Debug or Trace during development
-   - Use the `_logger.Log()` method liberally for visibility
-   - Use the LoggingMiddleware with Diagnostic level for detailed event processing logs
+### Common Issues
 
-2. **Monitor Event Flow**
-   - Use the EventBus diagnostic features to see event routing
-   - Add event subscription to monitor all events during debugging
-   - Check the Dead Letter Queue for failed events
+- **Event not received**: Check subscription options and routing
+- **Property not updated**: Verify property name and validate method
+- **Component not initializing**: Check for errors during initialization
+- **Persistence failing**: Verify storage configuration and permissions
+- **Topology not working**: Check connection conditions and enabled state
 
-3. **Circuit Breaker Monitoring**
-   - Examine circuit breaker states for different event types
-   - Check for open circuits when events aren't being delivered
-   - Manually reset circuits for testing
+### Diagnostic Techniques
 
-4. **Use TestConsole**
-   - The TestConsole project is helpful for isolated testing
-   - Manually trigger events and observe system behavior
-
-5. **Common Issues**
-   - Event subscriptions not matching expected events
-   - Incorrect event routing due to topology setup
-   - Transaction failures in persistence layer
-   - Asynchronous timing issues in event handling
-   - Middleware ordering problems
+- Enable detailed logging during development
+- Use a memory profiler for resource usage issues
+- Monitor event flow with subscription debugging
+- Trace property changes with property changed events
+- Check error repository for reported errors
 
 ## Performance Considerations
 
-1. **Event Batching**
-   - Use batch operations for multiple property changes
-   - PersistenceService supports batched persistence
+### Memory Management
 
-2. **Subscription Filtering**
-   - Be specific in subscription filters to reduce processing
-   - Use source IDs and event types to limit event delivery
+- Dispose components properly when no longer needed
+- Avoid capturing large objects in event handlers
+- Use weak references for non-essential caching
+- Monitor memory usage during long-running operations
+- Implement IAsyncDisposable for async cleanup
 
-3. **Middleware Efficiency**
-   - Only add necessary middleware to the pipeline
-   - Use ShouldApply method to skip middleware for certain events
-   - Consider middleware order for optimal performance
+### Event Handling
 
-4. **Circuit Breaking**
-   - Use circuit breakers to prevent overwhelming failing components
-   - Configure appropriate thresholds based on component importance
+- Keep event handlers lightweight
+- Process events asynchronously when possible
+- Use event filtering to reduce unnecessary processing
+- Consider batching for high-frequency events
+- Implement throttling for rate-limited operations
 
-5. **Memory Management**
-   - Configure appropriate Dead Letter Queue capacity
-   - Enable cleanup for old entries
-   - Be mindful of event size when publishing
+### Persistence Optimization
 
-## Contributing Guidelines
+- Use transactions for related changes
+- Batch persistence operations when possible
+- Implement caching for frequently accessed data
+- Use appropriate storage backend for the scenario
+- Optimize query patterns for the storage technology
 
-1. **Code Style**
-   - Follow C# coding conventions
-   - Use async/await consistently
-   - Document public APIs with XML comments
+## Deployment
 
-2. **Pull Request Process**
-   - Create feature branches from `develop`
-   - Include unit tests for new functionality
-   - Update documentation as needed
-   - Request code review from team members
+### Configuration
 
-3. **Testing Requirements**
-   - All code should have unit test coverage
-   - Integration tests for new features
-   - Manual verification with TestConsole
+- Externalize configuration in appsettings.json
+- Use environment-specific settings
+- Implement configuration validation
+- Support runtime configuration changes
+- Document configuration options
 
-4. **Documentation**
-   - Update relevant documentation files
-   - Include code comments for complex logic
-   - Provide examples for new features
-   - Create handoff documents when transitioning work to another developer
+### Monitoring
+
+- Implement health checks
+- Configure appropriate logging levels
+- Monitor error rates and trends
+- Track component state transitions
+- Implement performance metrics
+
+### Troubleshooting
+
+- Enable diagnostic logging in production
+- Capture and store error context
+- Implement traceable correlation IDs
+- Create detailed error reports
+- Design for supportability
+
+## Contributing
+
+### Pull Request Process
+
+1. Create a feature branch from develop
+2. Implement changes with appropriate tests
+3. Ensure all tests pass
+4. Update documentation
+5. Submit a pull request for review
+
+### Code Review Guidelines
+
+- Verify design aligns with architecture
+- Check for proper error handling
+- Ensure tests cover functionality
+- Verify documentation is updated
+- Review performance implications
+
+## Version Control
+
+### Branching Strategy
+
+- **main**: Production-ready code
+- **develop**: Integration branch for development
+- **feature/\***: Feature development
+- **bugfix/\***: Bug fixes
+- **release/\***: Release preparation
+
+### Commit Guidelines
+
+- Use descriptive commit messages
+- Reference issue numbers when applicable
+- Keep commits focused on single changes
+- Ensure the code builds after each commit
+- Follow conventional commit format
+
+## Release Process
+
+### Versioning
+
+- Follow semantic versioning (MAJOR.MINOR.PATCH)
+- Update version in all relevant places
+- Maintain a changelog
+- Tag releases in the repository
+
+### Distribution
+
+- Create release packages
+- Include release notes
+- Provide upgrade instructions
+- Test installation process
+- Validate in staging environment first

@@ -1,6 +1,6 @@
 # HydroGarden System Components
 
-This document provides detailed information about the key components in the HydroGarden system and how they interact.
+This document provides detailed information about the key components in the HydroGarden system and how they interact. For practical examples of how to use these components, please refer to the [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) file.
 
 ## Core Components
 

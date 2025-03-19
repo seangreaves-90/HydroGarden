@@ -14,6 +14,8 @@ To implement a unified event flow architecture for the HydroGarden system where 
   - Commands
   - Telemetry
   - Alerts
+  - State changes
+  - Error events
 
 - **Component Decoupling**
   - No direct event handler references in components
@@ -23,7 +25,7 @@ To implement a unified event flow architecture for the HydroGarden system where 
 - **Consistent Event Processing**
   - Standardized event handling across the system
   - Common patterns for event creation and consumption
-  - Centralized error handling and retry mechanisms
+  - Centralized error handling and recovery mechanisms
 
 ### 2. Persistence Integration
 
@@ -59,7 +61,21 @@ To implement a unified event flow architecture for the HydroGarden system where 
   - Filtering by source, event type, and custom criteria
   - Priority-based event processing
 
-### 4. UI Integration
+### 4. Error Handling Infrastructure
+
+- **Comprehensive Error Management**
+  - Standardized error representation
+  - Error categorization and classification
+  - Error-to-event transformation
+  - Recovery orchestration
+
+- **Error Reporting Pipeline**
+  - Error aggregation and correlation
+  - Error rate monitoring
+  - Automatic recovery attempts
+  - Error persistence for analysis
+
+### 5. UI Integration (Planned)
 
 - **Real-Time Updates**
   - SignalR bridge for pushing updates to UI clients
@@ -99,17 +115,20 @@ The central messaging system that routes all communication between components.
 - `Command`: Requests for components to perform actions
 - `Telemetry`: Sensor readings and measurements
 - `Alert`: System warnings and notifications
+- `StateChange`: Component state transitions
+- `System`: General system events
+- `Error`: Error-related events
 
 ### Event Processing Pipeline
 
-New in Phase 2, the Event Processing Pipeline enhances the EventBus with middleware capabilities.
+The Event Processing Pipeline enhances the EventBus with middleware capabilities.
 
 **Responsibilities:**
 - Applying middleware to event processing
-- Managing retry policies
-- Implementing circuit breaker patterns
-- Logging and monitoring
-- Managing failed events through dead letter queue
+- Event transformation
+- Event validation
+- State change management
+- Error handling
 
 **Interfaces:**
 - `IEventProcessingPipeline`: Core pipeline interface
@@ -117,33 +136,31 @@ New in Phase 2, the Event Processing Pipeline enhances the EventBus with middlew
 - `IEventProcessingResult`: Result of processing an event
 
 **Middleware Components:**
-- `LoggingMiddleware`: Logs event processing
-- `RetryMiddleware`: Implements retry policies with exponential backoff
-- `CircuitBreakerMiddleware`: Prevents cascading failures
-- `DeadLetterQueueMiddleware`: Manages failed events
+- `EventValidationMiddleware`: Validates events before processing
+- `DefaultTransformerMiddleware`: Transforms events during processing
+- `StateChangeMiddleware`: Manages state change events
 
 ### Error-Event Transformation
 
-New in Phase 1, provides bidirectional conversion between errors and events.
+Provides bidirectional conversion between errors and events.
 
 **Responsibilities:**
 - Converting application errors to events
 - Converting events back to error objects
 - Maintaining correlation context
 - Publishing errors as events
-- Tracking error recovery attempts
+- Tracking error occurrences
 
 **Interfaces:**
 - `IErrorEventTransformationService`: Core transformation interface
 - `IApplicationError`: Interface for error representation
 - `IErrorMonitor`: Interface for error reporting and monitoring
-- `ErrorOccurredEvent`: Event representing an error
-- `RecoveryAttemptedEvent`: Event representing a recovery attempt
+- `IErrorEvent`: Interface for error events
 
 **Key Components:**
-- `ComponentError`: Concrete implementation of IApplicationError with enhanced recovery features
+- `ComponentError`: Concrete implementation of IApplicationError
 - `ErrorContextBuilder`: Utility for building rich error context information
-- `ErrorMonitorBase`: Base implementation for error monitoring services
+- `ErrorEventTransformationService`: Default implementation for error transformation
 
 ### PersistenceService
 
@@ -154,15 +171,17 @@ Manages the storage and retrieval of component state and configuration.
 - Batch processing for performance
 - Entity-specific handling for different data types
 - In-memory caching for frequent access
+- Transaction support for data consistency
 
 **Storage Implementations:**
 - `JsonStore`: File-based JSON storage for development and simple deployments
-- (Future) Database implementations for production deployments
+- `JsonStoreTransaction`: Transaction support for JSON store
 
 **Key Features:**
 - Transactional operations for data consistency
 - Event-based persistence triggered by the EventBus
 - Component property management
+- Component connection storage
 
 ### TopologyService
 
@@ -184,54 +203,100 @@ Manages the connections and relationships between system components.
 - Querying connections for routing decisions
 - Evaluating conditions for dynamic routing
 
-### ModuleControllers
+### ErrorMonitor
 
-Domain-specific controllers that manage particular aspects of the hydroponic system.
+Central service for error tracking and management.
 
-**Types:**
-- pH Controller: Manages pH sensing and adjustment
-- Dosing Controller: Controls nutrient delivery
-- Temperature Controller: Monitors and adjusts temperature
-- Pump Controller: Manages water circulation
+**Responsibilities:**
+- Error reporting and collection
+- Error categorization
+- Error persistence
+- Recovery attempt tracking
+- Error rate monitoring
 
-**Common Features:**
-- Event subscription for relevant data
-- Business logic implementation
-- Command handling for control actions
-- Telemetry generation for monitoring
-
-### UI Bridge
-
-Connects the core system to the user interface layer.
-
-**Components:**
-- SignalR Hub: Real-time communication with web clients
-- REST API: Configuration and control endpoints
-- Authentication/Authorization: Security controls
+**Implementations:**
+- Base error monitor with extensible design
+- In-memory error repository for development
+- (Future) Database-backed repositories for production
 
 **Features:**
-- Event subscription for UI updates
-- Command generation from user actions
-- Data formatting for presentation
-- Session management and user context
+- Error correlation tracking
+- Error categorization by source and severity
+- Active/resolved error states
+- Error rate monitoring
+
+### IoT Device Base
+
+Foundation for all IoT devices in the system.
+
+**Responsibilities:**
+- Lifecycle management (initialization, start, stop)
+- Property management
+- State tracking
+- Error reporting and recovery
+- Event publishing
+
+**Key Components:**
+- `IotDeviceBase`: Base class for all IoT devices
+- `ComponentBase`: Foundation for all components
+- `PumpDevice`: Specialized device for pump control
 
 ## Event Flow Sequence
 
 1. Device reads sensor and updates property value
-2. Property change is published to EventBus
+2. Property change is published to EventBus as PropertyChangedEvent
 3. EventBus processes the event through the Event Processing Pipeline
-4. Pipeline applies middleware (logging, retries, circuit breaking)
+4. Pipeline applies middleware (validation, transformation, etc.)
 5. PersistenceService receives event and persists to storage
-6. Other components (like ModuleControllers) receive event based on subscriptions
-7. SignalR bridge forwards updates to connected UI clients
-8. ModuleController executes business logic based on event
-9. Any resulting actions generate new events, continuing the cycle
+6. Other components receive event based on subscriptions and topology
+7. Components execute business logic based on received events
+8. Any resulting actions generate new events, continuing the cycle
 
-## Implementation Strategy
+## Event Routing Architecture
+
+The event routing system uses a sophisticated approach to deliver events to the right components:
+
+### Direct Routing
+
+Events with explicit target IDs are routed directly to those targets:
+
+1. Event contains target IDs in routing data
+2. DirectEventRouter identifies matching subscriptions
+3. EventBus delivers events to matched handlers
+
+### Topology-Based Routing
+
+Events without explicit targets use the component topology:
+
+1. Event contains source ID but no targets
+2. TopologyEventRouter queries topology connections
+3. Connections define paths from source to targets
+4. EventBus delivers events to connected components
+
+### Composite Routing
+
+Combined approach that uses both strategies:
+
+1. CompositeEventRouter processes event
+2. Event first passes through DirectEventRouter
+3. Then passes through TopologyEventRouter
+4. Results are combined and duplicates removed
+5. EventBus delivers to final subscription list
+
+### Conditional Routing
+
+Topology connections can include conditions:
+
+1. Connection defines condition expression
+2. ConditionEvaluator processes condition at routing time
+3. Event only flows if condition evaluates to true
+4. Enables dynamic, context-sensitive routing
+
+## Implementation Status
 
 ### Phase 1: Core Event System and Error Integration (Completed)
 
-- ✅ Update HydroGardenComponentBase to use EventBus
+- ✅ Update ComponentBase to use EventBus
 - ✅ Modify PersistenceService to subscribe to events
 - ✅ Enhance EventBus for proper routing and subscription management
 - ✅ Implement basic event types and handling
@@ -243,38 +308,75 @@ Connects the core system to the user interface layer.
 
 - ✅ Design and implement the Event Processing Pipeline
 - ✅ Create middleware interfaces and core pipeline classes
-- ✅ Implement logging middleware
-- ✅ Implement retry middleware with exponential backoff
-- ✅ Implement circuit breaker middleware
-- ✅ Implement dead letter queue for failed events
+- ✅ Implement validation middleware
+- ✅ Implement transformer middleware
+- ✅ Implement state change middleware
 - ✅ Integrate pipeline with EventBus
-- ✅ Add dependency injection support
 
-### Phase 3: Recovery Orchestration (Implemented)
+### Phase 3: Advanced Routing and Topology (Completed)
 
-- ✅ Design Recovery Orchestration Service
-- ✅ Implement recovery planning and execution
-- ✅ Add recovery state management
-- ✅ Integrate with error monitoring system
-- ✅ Add retry and circuit breaking support
-- ✅ Create recovery analytics and reporting
-- ✅ Implement sophisticated error categorization taxonomy
-- ✅ Create core recovery strategies
-- ✅ Enhanced disposal pattern with both synchronous and asynchronous options
+- ✅ Implement topology-aware routing
+- ✅ Create condition evaluation system
+- ✅ Develop composite router
+- ✅ Implement connection management
+- ✅ Add condition-based routing
 
-### Phase 4: UI Integration (Planned)
+### Phase 4: IoT Device Framework (Completed)
+
+- ✅ Create IotDeviceBase foundation
+- ✅ Implement lifecycle management
+- ✅ Add specialized device types (Pump)
+- ✅ Integrate error handling
+- ✅ Add recovery mechanisms
+
+### Phase 5: UI Integration (Planned)
 
 - ❌ Create SignalR bridge for real-time updates
 - ❌ Implement REST API for configuration management
 - ❌ Enable service control through API endpoints
 - ❌ Develop web-based management interface
 
-### Phase 5: Testing and Optimization (Planned)
+### Phase 6: Testing and Optimization (In Progress)
 
 - ⚠️ Update unit tests to cover new functionality
-- ❌ Create comprehensive integration tests
+- ⚠️ Create comprehensive integration tests
 - ❌ Perform performance optimization
 - ✅ Document system architecture and APIs
+
+## Key Abstractions
+
+### Event Interfaces
+
+- `IEvent`: Base interface for all events
+- `IPropertyChangedEvent`: Events for property changes
+- `IStateChangeEvent`: Events for state transitions
+- `ICommandEvent`: Events for component commands
+- `ITelemetryEvent`: Events for sensor readings
+- `IAlertEvent`: Events for alerts and notifications
+- `ISystemEvent`: Events for system operations
+- `ILifecycleEvent`: Events for component lifecycle changes
+- `IErrorEvent`: Events for error reporting
+
+### Error Interfaces
+
+- `IApplicationError`: Base interface for errors
+- `IErrorMonitor`: Interface for error reporting
+- `IErrorEventTransformationService`: Interface for error-event conversion
+- `IErrorRepository`: Interface for error storage
+
+### Component Interfaces
+
+- `IComponent`: Base interface for all components
+- `IIoTDevice`: Interface for IoT devices
+- `IComponentConnection`: Interface for topology connections
+
+### Service Interfaces
+
+- `IEventBus`: Interface for event publication and subscription
+- `IEventProcessingPipeline`: Interface for event processing
+- `ITopologyService`: Interface for topology management
+- `IPersistenceService`: Interface for persistence operations
+- `IPropertyAccessService`: Interface for property access
 
 ## Testing Strategy
 
@@ -315,13 +417,12 @@ Connects the core system to the user interface layer.
 - Authentication and authorization
 - Backup and disaster recovery
 
-## Benefits of the New Architecture
+## Benefits of the Architecture
 
 - **Improved Decoupling**: Components interact solely through events
 - **Enhanced Extensibility**: New components can be added by subscribing to events
 - **Consistent Architecture**: All system communication follows the same pattern
-- **Real-time Updates**: UI receives immediate notification of system changes
 - **Centralized Control**: EventBus provides a single point for event monitoring and management
 - **Flexible Topology**: Component connections can be modified dynamically
 - **Improved Maintainability**: Clearer separation of concerns throughout the system
-- **Enhanced Resilience**: Retry policies, circuit breaking, and dead letter queue for robustness
+- **Enhanced Resilience**: Comprehensive error handling and recovery mechanisms
